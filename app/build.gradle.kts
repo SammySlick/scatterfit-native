@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.scatterbrain.scatterfit"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.scatterbrain.scatterfit"
