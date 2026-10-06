@@ -73,7 +73,8 @@ class DayKeysTest {
     @Test fun `addDaysKey crosses month boundaries both directions`() {
         assertEquals("2026-10-01", addDaysKey("2026-09-30", 1))
         assertEquals("2026-09-30", addDaysKey("2026-10-01", -1))
-        assertEquals("2028-03-01", addDaysKey("2028-02-28", 1)) // leap year
+        assertEquals("2028-02-29", addDaysKey("2028-02-28", 1)) // leap year
+        assertEquals("2027-03-01", addDaysKey("2027-02-28", 1)) // non-leap year
     }
 
     @Test fun `lastNDayKeys is ordered oldest-first and honours endKey`() {
