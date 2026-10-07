@@ -206,10 +206,10 @@ class ScoringTest {
     // ---- colour spectrum ----
 
     @Test fun `scoreToColor endpoints and midpoint`() {
-        assertEquals(0xFFF14D4C, scoreToColorArgb(0.0))
-        assertEquals(0xFFF0BB3B, scoreToColorArgb(50.0))
-        assertEquals(0xFF4FD57F, scoreToColorArgb(100.0))
-        assertEquals(0xFF8A8A8A, scoreToColorArgb(null)) // muted, never a judgement colour
+        assertEquals(0xFFF14D4CL, scoreToColorArgb(0.0))
+        assertEquals(0xFFF0BB3BL, scoreToColorArgb(50.0))
+        assertEquals(0xFF4FD57FL, scoreToColorArgb(100.0))
+        assertEquals(0xFF8A8A8AL, scoreToColorArgb(null)) // muted, never a judgement colour
     }
 
     @Test fun `scoreToColor monotonic between stops`() {

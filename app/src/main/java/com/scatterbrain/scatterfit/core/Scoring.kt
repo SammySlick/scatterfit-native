@@ -54,7 +54,7 @@ data class ScoringSettings(
     val unitsPerWeek: Int = 14,
     val z4Target: Int = 30,
     val z5Target: Int = 15,
-    val weekMode: WeekMode = WeekMode.MON,
+    val weekMode: WeekMode = "monday",
     val activeGoal: GoalPreset = GoalPreset.FAT_LOSS,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
     val weightPhases: List<WeightPhase> = emptyList(),
