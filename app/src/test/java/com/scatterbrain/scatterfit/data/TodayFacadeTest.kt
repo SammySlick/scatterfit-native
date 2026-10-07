@@ -61,7 +61,7 @@ class TodayFacadeTest {
         assertEquals(87.8, steps.days.first { it.day == "2026-10-06" }.score!!, 0.0001)
         assertEquals(74.08, steps.days.first { it.day == "2026-10-07" }.score!!, 0.0001)
         val calories = byId["calories"]!!
-        assertNull(calories.latest) // calories target reached = null latest? web: latest 0
+        assertEquals(0.0, calories.latest!!, 0.0001) // web latest = last NON-NULL score; today's 0 counts
         assertEquals(0.0, calories.days.first { it.day == "2026-10-07" }.score!!, 0.0001)
         assertNull(calories.days.first { it.day == "2026-10-06" }.score)
         val sleep = byId["sleep"]!!

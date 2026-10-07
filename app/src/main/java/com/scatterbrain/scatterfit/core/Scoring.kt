@@ -85,6 +85,16 @@ fun formatWeight(kg: Double, system: UnitSystem, sep: String = " "): String =
 
 enum class GoalId { STEPS, CALORIES, PROTEIN, SLEEP, EXERCISE, WEIGHT, BODY_FAT, ALCOHOL, UNITS, RHR_TREND, Z4PLUS }
 
+/** Web-canonical id string: the JS side uses camelCase ids (bodyFat, rhrTrend),
+ *  Kotlin's enum names are snake_case. Every string that crosses the UI/JSON
+ *  boundary uses this, never name.lowercase(). */
+val GoalId.webId: String
+    get() = when (this) {
+        BODY_FAT -> "bodyFat"
+        RHR_TREND -> "rhrTrend"
+        else -> name.lowercase()
+    }
+
 enum class GoalPreset { FAT_LOSS, MAINTENANCE, BUILD_MUSCLE, FITNESS, CUSTOM }
 
 val goalLabel: Map<GoalPreset, String> = mapOf(

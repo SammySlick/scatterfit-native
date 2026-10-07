@@ -43,7 +43,7 @@ class LocalRecordConvertTest {
         // records fixture. Same pipeline, same numbers, via the converter.
         assertEquals(7408.0, d.steps["2026-10-07"]!!, 0.01)
         assertEquals(79.67, d.weight["2026-10-07"]!!, 0.01)
-        assertEquals(61.0, d.restingHr["2026-10-04"]!!, 0.01) // post-binge RHR spike
+        assertEquals(53.0, d.restingHr["2026-10-04"]!!, 0.01) // post-binge RHR spike (web fixture: 53 — the old 61 was from the pre-fix demo notes)
         assertEquals(361.0, d.trainingMinutes["2026-10-04"]!!, 0.01)
         assertEquals(5, month.drinks.size) // pour list survived the trip
     }

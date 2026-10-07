@@ -47,13 +47,13 @@ class GoalInsightsTest {
     @Test
     fun `weekContributions - current week matches web exactly`() {
         val goals = com.scatterbrain.scatterfit.core.computeGoalSeries(
-            TodayFacade.toCoreDaily(d), ScoringSettings(), 30, today)
+            TodayFacade.toCoreDaily(d), ScoringSettings(kcalTarget = 2270), 30, today)
         val weights = com.scatterbrain.scatterfit.core.effectiveWeights(GoalPreset.FAT_LOSS)
         val (items, total) = GoalInsights.weekContributions(goals, weights, "monday", GoalInsights.WeekRef.CURRENT, today)
 
         val expectedIds = listOf("bodyFat", "calories", "units", "protein", "exercise", "weight")
-        assertEquals(expectedIds, items.map { it.id.name.lowercase() })
-        val byId = items.associate { it.id.name.lowercase() to it }
+        assertEquals(expectedIds, items.map { it.id.webId })
+        val byId = items.associate { it.id.webId to it }
         assertEquals(85.0, byId["bodyfat"]!!.score!!, 0.0001)
         assertEquals(29.310344827586206, byId["bodyfat"]!!.points!!, 0.0001)
         assertEquals(GoalInsights.ContributionStatus.POSITIVE, byId["bodyfat"]!!.status)
@@ -72,10 +72,10 @@ class GoalInsightsTest {
     @Test
     fun `weekContributions - previous week matches web`() {
         val goals = com.scatterbrain.scatterfit.core.computeGoalSeries(
-            TodayFacade.toCoreDaily(d), ScoringSettings(), 30, today)
+            TodayFacade.toCoreDaily(d), ScoringSettings(kcalTarget = 2270), 30, today)
         val weights = com.scatterbrain.scatterfit.core.effectiveWeights(GoalPreset.FAT_LOSS)
         val (items, total) = GoalInsights.weekContributions(goals, weights, "monday", GoalInsights.WeekRef.PREVIOUS, today)
-        val byId = items.associate { it.id.name.lowercase() to it }
+        val byId = items.associate { it.id.webId to it }
         assertEquals(62.26190476190479, byId["bodyfat"]!!.score!!, 0.0001)
         assertEquals(48.49339207048458, byId["calories"]!!.score!!, 0.0001)
         assertNull(byId["units"]!!.score)
@@ -87,7 +87,7 @@ class GoalInsightsTest {
     @Test
     fun `goalSentence matches web`() {
         val goals = com.scatterbrain.scatterfit.core.computeGoalSeries(
-            TodayFacade.toCoreDaily(d), ScoringSettings(), 30, today)
+            TodayFacade.toCoreDaily(d), ScoringSettings(kcalTarget = 2270), 30, today)
         val weights = com.scatterbrain.scatterfit.core.effectiveWeights(GoalPreset.FAT_LOSS)
         val sentence = GoalInsights.goalSentence(goals, weights, GoalPreset.FAT_LOSS, 71.26250429282047, today)
         assertEquals("Fat loss · on track — calories is the one to watch today", sentence)

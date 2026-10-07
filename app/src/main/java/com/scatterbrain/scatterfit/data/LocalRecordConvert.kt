@@ -1,7 +1,10 @@
 package com.scatterbrain.scatterfit.data
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -14,20 +17,20 @@ import kotlinx.serialization.json.put
  *  scalars become primitives. Method is implied by the caller's bucket. */
 object LocalRecordConvert {
 
-    /** Any Map with scalar values -> JsonObject; nested maps recurse. Numbers
-     *  keep double precision (web JSON has no int/float distinction). */
+    /** Any Map with scalar values -> JsonObject; nested maps AND lists recurse
+     *  (sleep records carry a `stages` array of objects, HR carries `samples` —
+     *  flattening those to strings broke every downstream parse). */
     fun toJsonObject(map: Map<*, *>): JsonObject = buildJsonObject {
-        for ((k, v) in map) {
-            val key = k.toString()
-            when (v) {
-                null -> {}
-                is Map<*, *> -> put(key, toJsonObject(v))
-                is List<*> -> put(key, JsonPrimitive(v.joinToString(",", "[", "]") { item -> item?.toString() ?: "" }))
-                is Number -> put(key, JsonPrimitive(v.toDouble()))
-                is Boolean -> put(key, v)
-                else -> put(key, v.toString())
-            }
-        }
+        for ((k, v) in map) put(k.toString(), toJsonValue(v))
+    }
+
+    private fun toJsonValue(v: Any?): JsonElement = when (v) {
+        null -> JsonNull
+        is Map<*, *> -> toJsonObject(v)
+        is List<*> -> buildJsonArray { v.forEach { add(toJsonValue(it)) } }
+        is Number -> JsonPrimitive(v.toDouble())
+        is Boolean -> JsonPrimitive(v)
+        else -> JsonPrimitive(v.toString())
     }
 
     /** One record. Note: the SOURCE keeps its app string in [LocalRecord.app];
