@@ -27,9 +27,17 @@ data class CardInputs(
     /** Plain average across this week's logged days (weekly framing). */
     val weekCurrent: Double?,
     val streak: GoalInsights.StreakResult,
-    val readiness: ReadinessResult?,
+    val readiness: ReadinessCard?,
     val sentence: String,
 )
+
+/** The web card's readiness block — state is the web's lowercase string
+ *  ("prime"/"normal"/"compromised"), not the engine enum name. */
+data class ReadinessCard(val score: Int, val state: String, val recommendation: String) {
+    companion object {
+        fun of(r: ReadinessResult) = ReadinessCard(r.score, r.state.name.lowercase(), r.recommendation)
+    }
+}
 
 object TodayFacade {
 
@@ -77,6 +85,6 @@ object TodayFacade {
         val rhrSeries = goals.find { it.id == GoalId.RHR_TREND }
         val readiness = readinessForData(data, rhrSeries?.days ?: emptyList(), settings.sleepTargetHours, today)
         val sentence = GoalInsights.goalSentence(goals, weights, settings.activeGoal, current, today)
-        return CardInputs(goals, momentum, current, weekAgo, delta, weekCurrent, streak, readiness, sentence)
+        return CardInputs(goals, momentum, current, weekAgo, delta, weekCurrent, streak, readiness?.let(ReadinessCard::of), sentence)
     }
 }

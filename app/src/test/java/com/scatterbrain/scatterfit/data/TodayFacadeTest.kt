@@ -88,7 +88,7 @@ class TodayFacadeTest {
         val core = TodayFacade.toCoreDaily(built())
         val n = core.sleep["2026-10-07"]!!
         assertEquals(465.02751666666666, n.totalMin, 0.0001)
-        val z = core.hrZones["2026-10-04"]!!
-        assertTrue(z.z3 > 0)
+        val z = core.hrZones["2026-10-05"]!! // 10-04 is a rest day — no zone entry (fixture: no key)
+        assertEquals(28.0, z.z3, 0.01)
     }
 }

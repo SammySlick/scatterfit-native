@@ -21,13 +21,15 @@ object LocalRecordConvert {
      *  (sleep records carry a `stages` array of objects, HR carries `samples` —
      *  flattening those to strings broke every downstream parse). */
     fun toJsonObject(map: Map<*, *>): JsonObject = buildJsonObject {
-        for ((k, v) in map) put(k.toString(), toJsonValue(v))
+        for ((k, v) in map) if (v != null) put(k.toString(), toJsonValue(v)) // nulls omitted, like the web's record serialisation
     }
 
     private fun toJsonValue(v: Any?): JsonElement = when (v) {
         null -> JsonNull
         is Map<*, *> -> toJsonObject(v)
         is List<*> -> buildJsonArray { v.forEach { add(toJsonValue(it)) } }
+        is Int -> JsonPrimitive(v) // web records keep ints as ints (beatsPerMinute: 137) — don't widen to doubles
+        is Long -> JsonPrimitive(v)
         is Number -> JsonPrimitive(v.toDouble())
         is Boolean -> JsonPrimitive(v)
         else -> JsonPrimitive(v.toString())
