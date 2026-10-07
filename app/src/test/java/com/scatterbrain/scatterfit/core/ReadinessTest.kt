@@ -73,8 +73,8 @@ class ReadinessTest {
     @Test fun `sleep deficit scales against quarter-of-target`() {
         // 150min deficit = 100 - 150/15x10 = 0 (from readinessForData test fixture)
         assertEquals(0.0, sleepDeviationScore(300.0, 450.0), 1e-9)
-        // half the quarter-budget gone -> 50
-        assertEquals(50.0, sleepDeviationScore(375.0, 450.0), 1e-9)
+        // half of the quarter-budget gone: deficit 75 of 112.5 -> 100-66.67
+        assertEquals(33.33, sleepDeviationScore(375.0, 450.0), 0.01)
     }
 
     @Test fun `sleep never below zero`() {
@@ -142,8 +142,9 @@ class ReadinessTest {
     }
 
     @Test fun `percentile interpolates`() {
-        assertEquals(54.95, percentile((50..99 step 1).map { it.toDouble() }, 0.05)!!, 1e-9)
-        assertEquals(1.0, percentile(listOf(1.0, 2.0), 0.5)!!, 1e-9)
+        // sorted 50..99 (n=50): i = 49*0.05 = 2.45 -> 52 + 0.45*(53-52)
+        assertEquals(52.45, percentile((50..99 step 1).map { it.toDouble() }, 0.05)!!, 1e-9)
+        assertEquals(1.5, percentile(listOf(1.0, 2.0), 0.5)!!, 1e-9)
     }
 
     @Test fun `spearman detects perfect positive and null on constant`() {
