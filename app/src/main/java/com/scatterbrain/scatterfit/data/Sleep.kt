@@ -157,7 +157,7 @@ object Sleep {
             val sessions = g.values.sortedBy { it.start }
             val merged = sliceOf(sessions)
             val split = merged.totalMin > MAX_NIGHT_MIN
-            out.add(MergedNight(merged.start, merged.end, merged.totalMin, merged.deepMin, merged.remMin, merged.lightMin, merged.awakeMin, merged.hasStages, merged.stages, night, split, sessions.map { sliceOf(listOf(it)) }))
+            out.add(MergedNight(merged.start, merged.end, merged.totalMin, merged.deepMin, merged.remMin, merged.lightMin, merged.awakeMin, merged.hasStages, merged.stages, night, sessions.map { sliceOf(listOf(it)) }, split))
         }
         return out.sortedBy { it.night }
     }

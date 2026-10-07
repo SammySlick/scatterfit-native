@@ -25,8 +25,8 @@ class DemoTest {
         val b = makeDemoRecords(now, zone)
         assertEquals(a.drinks, b.drinks)
         assertEquals(a.keys, b.keys)
-        assertEquals(a.records[RecordMethod.WEIGHT]!!.map { it.data["weight"] }, b.records[RecordMethod.WEIGHT]!!.map { it.data["weight"] })
-        assertEquals(a.records[RecordMethod.RHR]!!.map { it.data["beatsPerMinute"] }, b.records[RecordMethod.RHR]!!.map { it.data["beatsPerMinute"] })
+        assertEquals(a.records[RecordMethod.WEIGHT.name]!!.map { it.data["weight"] }, b.records[RecordMethod.WEIGHT.name]!!.map { it.data["weight"] })
+        assertEquals(a.records[RecordMethod.RESTING_HEART_RATE.name]!!.map { it.data["beatsPerMinute"] }, b.records[RecordMethod.RESTING_HEART_RATE.name]!!.map { it.data["beatsPerMinute"] })
     }
 
     @Test fun `30 day window with the expected pour list`() {
@@ -48,7 +48,7 @@ class DemoTest {
     @Test fun `steps per day match the web generator`() {
         val m = month()
         val byDay = mutableMapOf<String, Int>()
-        for (r in m.records[RecordMethod.STEPS]!!) {
+        for (r in m.records[RecordMethod.STEPS.name]!!) {
             val day = dayKeyFromIso(r.start, zone)
             byDay[day] = (byDay[day] ?: 0) + (r.data["count"] as Int)
         }
@@ -93,7 +93,7 @@ class DemoTest {
     @Test fun `weight per day matches - including the missed weigh-in`() {
         val m = month()
         val byDay = mutableMapOf<String, Double>()
-        for (r in m.records[RecordMethod.WEIGHT]!!) {
+        for (r in m.records[RecordMethod.WEIGHT.name]!!) {
             byDay[dayKeyFromIso(r.start, zone)] = r.data["weight"].let { (it as Map<*, *>)["inKilograms"] as Double }
         }
         assertEquals(29, byDay.size) // Sep 28 is the fixture's missed weigh-in
@@ -136,7 +136,7 @@ class DemoTest {
     @Test fun `resting heart rate matches - with the post-binge spike`() {
         val m = month()
         val byDay = mutableMapOf<String, Int>()
-        for (r in m.records[RecordMethod.RHR]!!) {
+        for (r in m.records[RecordMethod.RESTING_HEART_RATE.name]!!) {
             byDay[dayKeyFromIso(r.start, zone)] = r.data["beatsPerMinute"] as Int
         }
         assertEquals(
@@ -179,7 +179,7 @@ class DemoTest {
     @Test fun `sleep minutes per wake day match the web generator`() {
         val m = month()
         val byDay = mutableMapOf<String, Int>()
-        for (r in m.records[RecordMethod.SLEEP]!!) {
+        for (r in m.records[RecordMethod.SLEEP_SESSION.name]!!) {
             val stages = r.data["stages"] as List<Map<String, Any?>>
             val first = Instant.parse(stages.first()["startTime"] as String)
             val lastT = Instant.parse(stages.last()["endTime"] as String)

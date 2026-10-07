@@ -37,20 +37,6 @@ data class DrinkInfo(val id: String, val name: String, val serving: String, val 
 
 data class DemoDrink(val day: String, val id: String, val name: String, val serving: String, val units: Double, val kcal: Int, val price: Double, val time: String)
 
-/** Record methods (Health Connect record types), matching web RecordMethod. */
-object RecordMethod {
-    const val STEPS = "steps"
-    const val DISTANCE = "distance"
-    const val NUTRITION = "nutrition"
-    const val BURNED = "totalCaloriesBurned"
-    const val WEIGHT = "weight"
-    const val RHR = "restingHeartRate"
-    const val SLEEP = "sleepSession"
-    const val EXERCISE = "exerciseSession"
-    const val BODY_FAT = "bodyFat"
-    const val HEART_RATE = "heartRate"
-}
-
 data class DemoMonth(
     val records: Map<String, List<LocalRecord>>,
     val drinks: List<DemoDrink>,
@@ -96,11 +82,11 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
     val dow = keys.map { s.dow(it) }
 
     val rec = mutableMapOf<String, MutableList<LocalRecord>>(
-        RecordMethod.STEPS to mutableListOf(), RecordMethod.DISTANCE to mutableListOf(),
-        RecordMethod.NUTRITION to mutableListOf(), RecordMethod.BURNED to mutableListOf(),
-        RecordMethod.WEIGHT to mutableListOf(), RecordMethod.RHR to mutableListOf(),
-        RecordMethod.SLEEP to mutableListOf(), RecordMethod.EXERCISE to mutableListOf(),
-        RecordMethod.BODY_FAT to mutableListOf(), RecordMethod.HEART_RATE to mutableListOf(),
+        RecordMethod.STEPS.name to mutableListOf(), RecordMethod.DISTANCE.name to mutableListOf(),
+        RecordMethod.NUTRITION.name to mutableListOf(), RecordMethod.TOTAL_CALORIES_BURNED.name to mutableListOf(),
+        RecordMethod.WEIGHT.name to mutableListOf(), RecordMethod.RESTING_HEART_RATE.name to mutableListOf(),
+        RecordMethod.SLEEP_SESSION.name to mutableListOf(), RecordMethod.EXERCISE_SESSION.name to mutableListOf(),
+        RecordMethod.BODY_FAT.name to mutableListOf(), RecordMethod.HEART_RATE.name to mutableListOf(),
     )
 
     // ---- calendar of events (index-based, deterministic) ----
@@ -199,7 +185,7 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
                 val remaining = (endD.epochSecond - t.epochSecond) / 60.0
                 push("LIGHT", maxOf(1.0, remaining - awakeTot * 0.2))
                 push("AWAKE", maxOf(1.0, (endD.epochSecond - t.epochSecond) / 60.0))
-                rec[RecordMethod.SLEEP]!!.add(
+                rec[RecordMethod.SLEEP_SESSION.name]!!.add(
                     LocalRecord(s.iso(startD), s.iso(t), WEAR, mapOf(
                         "title" to "Sleep",
                         "stages" to stages.map { (stage, st, en) -> mapOf("startTime" to s.iso(st), "endTime" to s.iso(en), "stage" to stage) },
@@ -214,7 +200,7 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
         val poorSleep = sleptMin == null || sleptMin < 360
         val rhr = (s.between(52.0, 58.0) + (if (drankLastNight) s.between(3.0, 5.0) else 0.0) + (if (poorSleep && !drankLastNight) s.between(2.0, 4.0) else 0.0)).roundToInt()
         val rhrAt = s.at(key, 7, 5)
-        if (s.past(rhrAt)) rec[RecordMethod.RHR]!!.add(LocalRecord(s.iso(rhrAt), s.iso(rhrAt), WEAR, mapOf("beatsPerMinute" to rhr)))
+        if (s.past(rhrAt)) rec[RecordMethod.RESTING_HEART_RATE.name]!!.add(LocalRecord(s.iso(rhrAt), s.iso(rhrAt), WEAR, mapOf("beatsPerMinute" to rhr)))
 
         // ---------- weight + body fat ----------
         val trend = 80.4 - (0.8 * i) / (DEMO_DAYS - 1)
@@ -227,9 +213,9 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
         prevWeight = wv
         val wAt = s.at(key, 7, 10 + floor(r.next() * 25).toInt())
         if (s.past(wAt) && !(i == missingSleep && r.next() < 0.5)) {
-            rec[RecordMethod.WEIGHT]!!.add(LocalRecord(s.iso(wAt), s.iso(wAt), SCALE, mapOf("weight" to mapOf("inKilograms" to (wv * 100).roundToInt() / 100.0))))
+            rec[RecordMethod.WEIGHT.name]!!.add(LocalRecord(s.iso(wAt), s.iso(wAt), SCALE, mapOf("weight" to mapOf("inKilograms" to (wv * 100).roundToInt() / 100.0))))
             val bf = 20.4 + (wv - 80) * 0.45 - i * 0.012 + s.between(-0.45, 0.45)
-            rec[RecordMethod.BODY_FAT]!!.add(LocalRecord(s.iso(wAt), s.iso(wAt), SCALE, mapOf("percentage" to (bf * 10).roundToInt() / 10.0)))
+            rec[RecordMethod.BODY_FAT.name]!!.add(LocalRecord(s.iso(wAt), s.iso(wAt), SCALE, mapOf("percentage" to (bf * 10).roundToInt() / 10.0)))
         }
 
         // ---------- steps ----------
@@ -245,9 +231,9 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
             val portion = if (s.past(end)) 1.0 else (nowMs - start.toEpochMilli()) / (end.toEpochMilli() - start.toEpochMilli()).toDouble()
             val count = (steps * frac * portion).roundToInt()
             val endT = if (s.past(end)) end else now
-            rec[RecordMethod.STEPS]!!.add(LocalRecord(s.iso(start), s.iso(endT), WEAR, mapOf("count" to count)))
-            rec[RecordMethod.DISTANCE]!!.add(LocalRecord(s.iso(start), s.iso(endT), WEAR, mapOf("distance" to mapOf("inMeters" to (count * 0.76).roundToInt()))))
-            rec[RecordMethod.BURNED]!!.add(LocalRecord(s.iso(start), s.iso(endT), WEAR, mapOf("energy" to mapOf("inKilocalories" to ((count * 0.04 + 40) * portion).roundToInt()))))
+            rec[RecordMethod.STEPS.name]!!.add(LocalRecord(s.iso(start), s.iso(endT), WEAR, mapOf("count" to count)))
+            rec[RecordMethod.DISTANCE.name]!!.add(LocalRecord(s.iso(start), s.iso(endT), WEAR, mapOf("distance" to mapOf("inMeters" to (count * 0.76).roundToInt()))))
+            rec[RecordMethod.TOTAL_CALORIES_BURNED.name]!!.add(LocalRecord(s.iso(start), s.iso(endT), WEAR, mapOf("energy" to mapOf("inKilocalories" to ((count * 0.04 + 40) * portion).roundToInt()))))
         }
 
         // ---------- exercise ----------
@@ -259,7 +245,7 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
                 val wave = (sin(m / 3.0) + 1) / 2
                 samples.add(mapOf("time" to s.iso(t), "beatsPerMinute" to (lo + (hi - lo) * wave + s.between(-4.0, 4.0)).roundToInt()))
             }
-            if (samples.isNotEmpty()) rec[RecordMethod.HEART_RATE]!!.add(
+            if (samples.isNotEmpty()) rec[RecordMethod.HEART_RATE.name]!!.add(
                 LocalRecord(samples.first()["time"] as String, samples.last()["time"] as String, WEAR, mapOf("samples" to samples))
             )
         }
@@ -269,8 +255,8 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
             val end = start.plusSeconds(mins * 60L)
             if (s.past(end)) {
                 val title = listOf("Push day", "Pull day", "Legs", "Upper body")[floor(r.next() * 4).toInt()]
-                rec[RecordMethod.EXERCISE]!!.add(LocalRecord(s.iso(start), s.iso(end), HEVY, mapOf("title" to title, "exerciseType" to 70)))
-                rec[RecordMethod.BURNED]!!.add(LocalRecord(s.iso(start), s.iso(end), HEVY, mapOf("energy" to mapOf("inKilocalories" to (mins * 6.5).roundToInt()))))
+                rec[RecordMethod.EXERCISE_SESSION.name]!!.add(LocalRecord(s.iso(start), s.iso(end), HEVY, mapOf("title" to title, "exerciseType" to 70)))
+                rec[RecordMethod.TOTAL_CALORIES_BURNED.name]!!.add(LocalRecord(s.iso(start), s.iso(end), HEVY, mapOf("energy" to mapOf("inKilocalories" to (mins * 6.5).roundToInt()))))
                 hr(start, mins, 118, 162)
             }
         }
@@ -279,7 +265,7 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
             val mins = if (i == sunday15k) 150 else s.between(35.0, 55.0).roundToInt()
             val end = start.plusSeconds(mins * 60L)
             if (s.past(end)) {
-                rec[RecordMethod.EXERCISE]!!.add(LocalRecord(s.iso(start), s.iso(end), WEAR, mapOf("title" to "Walk", "exerciseType" to 79)))
+                rec[RecordMethod.EXERCISE_SESSION.name]!!.add(LocalRecord(s.iso(start), s.iso(end), WEAR, mapOf("title" to "Walk", "exerciseType" to 79)))
                 hr(start, mins, 126, 140)
             }
         }
@@ -292,7 +278,7 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
                 samples.add(mapOf("time" to s.iso(t), "beatsPerMinute" to s.between(64.0, 82.0).roundToInt()))
                 m += 20
             }
-            if (samples.isNotEmpty()) rec[RecordMethod.HEART_RATE]!!.add(
+            if (samples.isNotEmpty()) rec[RecordMethod.HEART_RATE.name]!!.add(
                 LocalRecord(samples.first()["time"] as String, samples.last()["time"] as String, WEAR, mapOf("samples" to samples))
             )
         }
@@ -331,7 +317,7 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
                 val start = s.at(key, h as Int, (mi as Int) + floor(r.next() * 20).toInt())
                 if (!s.past(start)) continue
                 val end = start.plusSeconds(15 * 60)
-                rec[RecordMethod.NUTRITION]!!.add(
+                rec[RecordMethod.NUTRITION.name]!!.add(
                     LocalRecord(s.iso(start), s.iso(end), FOOD, mapOf(
                         "name" to name, "mealType" to mealType,
                         "energy" to mapOf("inKilocalories" to (kcal * (frac as Double)).roundToInt()),

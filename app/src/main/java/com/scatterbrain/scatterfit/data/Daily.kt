@@ -2,6 +2,7 @@ package com.scatterbrain.scatterfit.data
 
 import com.scatterbrain.scatterfit.core.dayKeyFromIso
 import kotlinx.serialization.json.*
+import java.time.Instant
 import java.time.ZoneId
 
 /** Full assembled DailyData (web types.ts DailyData). The scoring engine's
