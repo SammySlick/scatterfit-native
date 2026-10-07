@@ -168,7 +168,7 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
             var durMin = if (short) s.between(300.0, 330.0) else s.between(400.0, 490.0)
             val wakeMin = bedMin + durMin
             val minWake = 24 * 60 + 6.5 * 60
-            val maxWake = 24 * 60 + 9 * 60
+            val maxWake = (24 * 60 + 9 * 60).toDouble()
             val wake = minOf(maxWake, maxOf(if (short) 0.0 else minWake, wakeMin))
             durMin = wake - bedMin
             val startD = s.at(key, 0, 0).plusSeconds(((bedMin - 24 * 60) * 60).toLong())
