@@ -147,7 +147,7 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
         val weekend = dow[i] == 0 || dow[i] == 6
 
         // ---------- sleep (night ending this morning) ----------
-        var sleptMin: Int? = null
+        var sleptMin: Double? = null // web keeps the float; truncation flips poorSleep boundaries
         if (i != missingSleep) {
             val short = i in shortNightAfter
             val bedMin = ((if (short) s.between(60.0, 90.0) else s.between(-60.0, 75.0)) + 24 * 60)
@@ -157,16 +157,18 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
             val maxWake = (24 * 60 + 9 * 60).toDouble()
             val wake = minOf(maxWake, maxOf(if (short) 0.0 else minWake, wakeMin))
             durMin = wake - bedMin
-            val startD = s.at(key, 0, 0).plusSeconds(((bedMin - 24 * 60) * 60).toLong())
-            val endD = startD.plusSeconds((durMin * 60).toLong())
+            val startD = s.at(key, 0, 0).plusMillis(((bedMin - 24 * 60) * 60_000).toLong())
+            val endD = startD.plusMillis((durMin * 60_000).toLong())
             if (s.past(endD)) {
                 val stages = mutableListOf<Triple<String, Instant, Instant>>()
                 var t = startD
                 fun push(stage: String, min: Double) {
                     if (min < 1) return
-                    val mins = (min * 60).toLong()
-                    stages.add(Triple(stage, t, t.plusSeconds(mins)))
-                    t = t.plusSeconds(mins)
+                    // web advances in MILLISECONDS (t + min*60_000); second-level
+                    // truncation desynced every stage boundary
+                    val ms = (min * 60_000).toLong()
+                    stages.add(Triple(stage, t, t.plusMillis(ms)))
+                    t = t.plusMillis(ms)
                 }
                 val deepTot = durMin * s.between(0.15, 0.2)
                 val remTot = durMin * s.between(0.2, 0.25)
@@ -182,16 +184,16 @@ fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDe
                     push("REM", remTot * rw[c])
                     if (c < 4) push("AWAKE", awakeTot * (if (c == 2) 0.35 else 0.15))
                 }
-                val remaining = (endD.epochSecond - t.epochSecond) / 60.0
+                val remaining = (endD.toEpochMilli() - t.toEpochMilli()) / 60_000.0
                 push("LIGHT", maxOf(1.0, remaining - awakeTot * 0.2))
-                push("AWAKE", maxOf(1.0, (endD.epochSecond - t.epochSecond) / 60.0))
+                push("AWAKE", maxOf(1.0, (endD.toEpochMilli() - t.toEpochMilli()) / 60_000.0))
                 rec[RecordMethod.SLEEP_SESSION.name]!!.add(
                     LocalRecord(s.iso(startD), s.iso(t), WEAR, mapOf(
                         "title" to "Sleep",
                         "stages" to stages.map { (stage, st, en) -> mapOf("startTime" to s.iso(st), "endTime" to s.iso(en), "stage" to stage) },
                     ))
                 )
-                sleptMin = durMin.toInt()
+                sleptMin = durMin // keep the float — web never rounds it
             }
         }
 

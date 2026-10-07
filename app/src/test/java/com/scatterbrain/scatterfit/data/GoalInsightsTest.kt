@@ -55,9 +55,9 @@ class GoalInsightsTest {
         val expectedIds = listOf("bodyFat", "calories", "units", "protein", "exercise", "weight")
         assertEquals(expectedIds, items.map { it.id.webId })
         val byId = items.associate { it.id.webId to it }
-        assertEquals(85.0, byId["bodyfat"]!!.score!!, 0.0001)
-        assertEquals(29.310344827586206, byId["bodyfat"]!!.points!!, 0.0001)
-        assertEquals(GoalInsights.ContributionStatus.POSITIVE, byId["bodyfat"]!!.status)
+        assertEquals(85.0, byId["bodyFat"]!!.score!!, 0.0001)
+        assertEquals(29.310344827586206, byId["bodyFat"]!!.points!!, 0.0001)
+        assertEquals(GoalInsights.ContributionStatus.POSITIVE, byId["bodyFat"]!!.status)
         assertEquals(34.40528634361233, byId["calories"]!!.score!!, 0.0001)
         assertEquals(9.491113474099954, byId["calories"]!!.points!!, 0.0001)
         assertEquals(GoalInsights.ContributionStatus.NEGATIVE, byId["calories"]!!.status)
@@ -77,7 +77,7 @@ class GoalInsightsTest {
         val weights = com.scatterbrain.scatterfit.core.effectiveWeights(GoalPreset.FAT_LOSS)
         val (items, total) = GoalInsights.weekContributions(goals, weights, "monday", GoalInsights.WeekRef.PREVIOUS, today)
         val byId = items.associate { it.id.webId to it }
-        assertEquals(62.26190476190479, byId["bodyfat"]!!.score!!, 0.0001)
+        assertEquals(62.26190476190479, byId["bodyFat"]!!.score!!, 0.0001)
         assertEquals(48.49339207048458, byId["calories"]!!.score!!, 0.0001)
         assertNull(byId["units"]!!.score)
         assertEquals(82.5, byId["protein"]!!.score!!, 0.0001)

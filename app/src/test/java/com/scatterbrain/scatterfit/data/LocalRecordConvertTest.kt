@@ -44,7 +44,9 @@ class LocalRecordConvertTest {
         assertEquals(7408.0, d.steps["2026-10-07"]!!, 0.01)
         assertEquals(79.67, d.weight["2026-10-07"]!!, 0.01)
         assertEquals(53.0, d.restingHr["2026-10-04"]!!, 0.01) // post-binge RHR spike (web fixture: 53 — the old 61 was from the pre-fix demo notes)
-        assertEquals(361.0, d.trainingMinutes["2026-10-04"]!!, 0.01)
+        assertNull(d.trainingMinutes["2026-10-04"]) // rest day — no zone data (web fixture: trainingMinutes empty, no 10-04 hrZones)
+        assertEquals(28.0, d.hrZones["2026-10-05"]!!.z3, 0.01) // Tuesday run's z3 minutes survive the trip
+        assertEquals(51.0, d.hrZones["2026-10-05"]!!.exerciseMinutes, 0.01)
         assertEquals(5, month.drinks.size) // pour list survived the trip
     }
 }
