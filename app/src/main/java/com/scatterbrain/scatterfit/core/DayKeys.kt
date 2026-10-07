@@ -4,6 +4,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.Instant
+import java.time.format.DateTimeParseException
 
 /**
  * DAY & WEEK KEYS — Kotlin port of web `src/lib/daykeys.ts` (consolidation
@@ -23,9 +24,15 @@ typealias WeekMode = String // "monday" | "rolling"
 fun dayKey(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
     LocalDate.ofInstant(Instant.ofEpochMilli(epochMillis), zone).toString()
 
-/** Local-date key for a date string parsed at a zone — mirrors web dayKey(String). */
+/** Local-date key for an ISO instant ("2026-10-01T08:00:00Z") or a bare date
+ *  string ("2026-10-01"). Instant goes through the zone (web: dayKey(date) via
+ *  en-CA formatting); bare dates parse directly. */
 fun dayKeyFromIso(iso: String, zone: ZoneId = ZoneId.systemDefault()): String =
-    LocalDate.parse(iso).toString()
+    try {
+        LocalDate.ofInstant(Instant.parse(iso), zone).toString()
+    } catch (e: DateTimeParseException) {
+        LocalDate.parse(iso).toString()
+    }
 
 /** Today, per the device clock in the device zone. The ONLY wall-clock read in
  *  the codebase — everything else derives windows from a passed anchor. */
