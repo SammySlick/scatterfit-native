@@ -58,6 +58,12 @@ data class ScoringSettings(
     val activeGoal: GoalPreset = GoalPreset.FAT_LOSS,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
     val weightPhases: List<WeightPhase> = emptyList(),
+    // personal stats (Mifflin-St Jeor inputs; web DEFAULT_SETTINGS values)
+    val heightCm: Int = 178,
+    val ageYears: Int = 35,
+    val sex: com.scatterbrain.scatterfit.core.MifflinStJeor.Sex = com.scatterbrain.scatterfit.core.MifflinStJeor.Sex.MALE,
+    val sexCustom: String = "",
+    val bmrFormula: BmrFormula = BmrFormula.MALE,
 )
 
 enum class UnitSystem { METRIC, IMPERIAL }

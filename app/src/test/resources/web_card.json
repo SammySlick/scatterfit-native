@@ -1,0 +1,336 @@
+{
+ "current": 71.26250429282047,
+ "weekAgo": 62.82312777339732,
+ "delta": 8.43937651942315,
+ "sentence": "Fat loss · on track — calories is the one to watch today",
+ "streak": {
+  "days": 1,
+  "brokenAt": null
+ },
+ "readiness": {
+  "score": 67,
+  "state": "normal",
+  "recommendation": "Baseline recovery. Stick to the scheduled plan."
+ },
+ "goals": [
+  {
+   "id": "steps",
+   "latest": 74.08,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": 58.599999999999994
+    },
+    {
+     "day": "2026-10-05",
+     "score": 45.57
+    },
+    {
+     "day": "2026-10-06",
+     "score": 87.8
+    },
+    {
+     "day": "2026-10-07",
+     "score": 74.08
+    }
+   ]
+  },
+  {
+   "id": "calories",
+   "latest": 0,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": 89.77973568281938
+    },
+    {
+     "day": "2026-10-05",
+     "score": 68.81057268722466
+    },
+    {
+     "day": "2026-10-06",
+     "score": null
+    },
+    {
+     "day": "2026-10-07",
+     "score": 0
+    }
+   ]
+  },
+  {
+   "id": "sleep",
+   "latest": null,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": null
+    },
+    {
+     "day": "2026-10-05",
+     "score": null
+    },
+    {
+     "day": "2026-10-06",
+     "score": null
+    },
+    {
+     "day": "2026-10-07",
+     "score": null
+    }
+   ]
+  },
+  {
+   "id": "exercise",
+   "latest": null,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": null
+    },
+    {
+     "day": "2026-10-05",
+     "score": null
+    },
+    {
+     "day": "2026-10-06",
+     "score": null
+    },
+    {
+     "day": "2026-10-07",
+     "score": null
+    }
+   ]
+  },
+  {
+   "id": "weight",
+   "latest": 100,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": 100
+    },
+    {
+     "day": "2026-10-05",
+     "score": 100
+    },
+    {
+     "day": "2026-10-06",
+     "score": 100
+    },
+    {
+     "day": "2026-10-07",
+     "score": 100
+    }
+   ]
+  },
+  {
+   "id": "bodyFat",
+   "latest": 85,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": 85
+    },
+    {
+     "day": "2026-10-05",
+     "score": 85
+    },
+    {
+     "day": "2026-10-06",
+     "score": 85
+    },
+    {
+     "day": "2026-10-07",
+     "score": 85
+    }
+   ]
+  },
+  {
+   "id": "protein",
+   "latest": 53.125,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": 74.375
+    },
+    {
+     "day": "2026-10-05",
+     "score": 63.74999999999999
+    },
+    {
+     "day": "2026-10-06",
+     "score": null
+    },
+    {
+     "day": "2026-10-07",
+     "score": 53.125
+    }
+   ]
+  },
+  {
+   "id": "alcohol",
+   "latest": null,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": null
+    },
+    {
+     "day": "2026-10-05",
+     "score": null
+    },
+    {
+     "day": "2026-10-06",
+     "score": null
+    },
+    {
+     "day": "2026-10-07",
+     "score": null
+    }
+   ]
+  },
+  {
+   "id": "units",
+   "latest": null,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": null
+    },
+    {
+     "day": "2026-10-05",
+     "score": null
+    },
+    {
+     "day": "2026-10-06",
+     "score": null
+    },
+    {
+     "day": "2026-10-07",
+     "score": null
+    }
+   ]
+  },
+  {
+   "id": "rhrTrend",
+   "latest": 45.71428571428573,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": 38.57142857142858
+    },
+    {
+     "day": "2026-10-05",
+     "score": 45.71428571428573
+    },
+    {
+     "day": "2026-10-06",
+     "score": 47.14285714285712
+    },
+    {
+     "day": "2026-10-07",
+     "score": 45.71428571428573
+    }
+   ]
+  },
+  {
+   "id": "z4plus",
+   "latest": 0,
+   "days": [
+    {
+     "day": "2026-10-04",
+     "score": null
+    },
+    {
+     "day": "2026-10-05",
+     "score": 0
+    },
+    {
+     "day": "2026-10-06",
+     "score": null
+    },
+    {
+     "day": "2026-10-07",
+     "score": 0
+    }
+   ]
+  }
+ ],
+ "wc": [
+  {
+   "id": "bodyFat",
+   "score": 85,
+   "points": 29.310344827586206,
+   "status": "positive"
+  },
+  {
+   "id": "calories",
+   "score": 34.40528634361233,
+   "points": 9.491113474099954,
+   "status": "negative"
+  },
+  {
+   "id": "units",
+   "score": null,
+   "points": null,
+   "status": "watch"
+  },
+  {
+   "id": "protein",
+   "score": 58.4375,
+   "points": 12.09051724137931,
+   "status": "watch"
+  },
+  {
+   "id": "exercise",
+   "score": null,
+   "points": null,
+   "status": "watch"
+  },
+  {
+   "id": "weight",
+   "score": 100,
+   "points": 17.24137931034483,
+   "status": "positive"
+  }
+ ],
+ "wcTotal": 68.1333548534103,
+ "wcp": [
+  {
+   "id": "bodyFat",
+   "score": 62.26190476190479
+  },
+  {
+   "id": "calories",
+   "score": 48.49339207048458
+  },
+  {
+   "id": "units",
+   "score": null
+  },
+  {
+   "id": "protein",
+   "score": 82.5
+  },
+  {
+   "id": "exercise",
+   "score": null
+  },
+  {
+   "id": "weight",
+   "score": 55.7202380952378
+  }
+ ],
+ "wcpTotal": 61.52301291927978,
+ "dayLoggedToday": true,
+ "dayLoggedYest": false,
+ "sleep": {
+  "day": "2026-10-07",
+  "totalMin": 465.02751666666666,
+  "deepMin": 85.77823333333333,
+  "remMin": 111.01408333333333,
+  "lightMin": 268.23519999999996,
+  "awakeMin": 20.122033333333334,
+  "end": "2026-10-07T08:54:05.023Z"
+ }
+}
