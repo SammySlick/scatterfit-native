@@ -35,7 +35,7 @@ object Records {
         if (isBlockedApp(r)) return@filter false
         val start = parseMillis(r.start)
         when (method) {
-            RecordMethod.HEART_RATE -> start >= HR_LEGACY_CUTOFF_MS
+            RecordMethod.HEART_RATE -> start != null && start >= HR_LEGACY_CUTOFF_MS
             RecordMethod.BODY_FAT -> {
                 val v = Normalise.num(r.data?.get("percentage"))
                 v != null && v > 0 && v <= 60
