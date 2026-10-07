@@ -18,7 +18,8 @@ import androidx.health.connect.client.records.WeightRecord
  *  request set. READ_HEALTH_DATA_HISTORY is required for anything older than
  *  30 days (first sync reaches back the full retention window). */
 object HcPermissions {
-    val read: Set<androidx.health.connect.client.permission.HealthPermission> = buildSet {
+    /** Plain permission strings — 1.1.0's getReadPermission returns String. */
+    val read: Set<String> = buildSet {
         for (t in listOf(
             StepsRecord::class, DistanceRecord::class, NutritionRecord::class,
             TotalCaloriesBurnedRecord::class, WeightRecord::class,
