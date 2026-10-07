@@ -21,7 +21,7 @@ class DailyTest {
     private val webRecords = jf("web_records.json").jsonObject
 
     private fun JsonObject.mapOfD(key: String): Map<String, Double> =
-        (this[key] as? JsonObject)?.mapValues { it.value.jsonPrimitive.double }
+        (this[key] as? JsonObject)?.mapValues { it.value.jsonPrimitive.double } ?: emptyMap()
 
     private fun built(): AssembledDaily {
         val records = HashMap<RecordMethod, List<HealthRecord>>()
