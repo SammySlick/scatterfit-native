@@ -168,7 +168,7 @@ class HcTranslateTest {
      *  contract test against the shape we define: Power in watts. */
     @Test
     fun basalMetabolicRate() {
-        val got = HcTranslate.basalMetabolicRate("com.wear", 1788500000000L, 1.66)
+        val got = HcTranslate.basalMetabolicRate("com.wear", 1788657600000L, 1.66)
         assertEquals(
             buildJsonObject {
                 put("app", "com.wear")
