@@ -90,8 +90,8 @@ enum class GoalId { STEPS, CALORIES, PROTEIN, SLEEP, EXERCISE, WEIGHT, BODY_FAT,
  *  boundary uses this, never name.lowercase(). */
 val GoalId.webId: String
     get() = when (this) {
-        BODY_FAT -> "bodyFat"
-        RHR_TREND -> "rhrTrend"
+        GoalId.BODY_FAT -> "bodyFat"
+        GoalId.RHR_TREND -> "rhrTrend"
         else -> name.lowercase()
     }
 
