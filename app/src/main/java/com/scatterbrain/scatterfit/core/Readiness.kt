@@ -93,7 +93,7 @@ const val MIN_HR_SAMPLES = 500
 
 fun derivedRestingHr(samples: List<Pair<Long, Double>>, zone: ZoneId = ZoneId.systemDefault()): Map<String, Double> {
     val byDay = LinkedHashMap<String, MutableList<Double>>()
-    for ((t, v) in samples) byDay.getOrPut(DayKeys.dayKey(t, zone)) { ArrayList() }.add(v)
+    for ((t, v) in samples) byDay.getOrPut(dayKey(t, zone)) { ArrayList() }.add(v)
     val out = LinkedHashMap<String, Double>()
     for ((d, list) in byDay) {
         if (list.size < MIN_HR_SAMPLES) continue
@@ -110,7 +110,7 @@ fun morningReadings(readings: List<Pair<Long, Double>>, zone: ZoneId = ZoneId.sy
     for ((t, v) in readings) {
         val zdt = Instant.ofEpochMilli(t).atZone(zone)
         if (zdt.hour >= 11) continue
-        val k = DayKeys.dayKey(t, zone)
+        val k = dayKey(t, zone)
         val cur = out[k]
         if (cur == null || t < cur.first) out[k] = t to v
     }

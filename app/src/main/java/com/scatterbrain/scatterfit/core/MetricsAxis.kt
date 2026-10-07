@@ -1,9 +1,11 @@
 package com.scatterbrain.scatterfit.core
 
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.log10
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
 
 /**
@@ -43,26 +45,26 @@ fun metricAxisDomain(
 ): Pair<Double, Double> {
     val present = (values + target).filterNotNull().filter { it.isFinite() }
     if (present.isEmpty()) return if (policy == AxisPolicy.ZERO) 0.0 to 1.0 else 0.0 to 100.0
-    val min = present.min()
-    val max = present.max()
-    val span = max(max - min, max(kotlin.math.abs(max) * 0.02, 1.0))
+    val lo = present.min()
+    val hi = present.max()
+    val span = max(hi - lo, max(abs(hi) * 0.02, 1.0))
     return when (policy) {
-        AxisPolicy.ZERO -> 0.0 to max(1.0, ceil(max * 1.1))
+        AxisPolicy.ZERO -> 0.0 to max(1.0, ceil(hi * 1.1))
         AxisPolicy.RESTING_HR -> {
-            val floorV = min(50.0, floor(min - 5))
-            floorV to ceil(max + max(5.0, (max - floorV) * 0.25))
+            val axisFloor = min(50.0, floor(lo - 5))
+            axisFloor to ceil(hi + max(5.0, (hi - axisFloor) * 0.25))
         }
         AxisPolicy.SYMMETRIC -> {
             val padding = max(span * 0.12, 0.5)
-            floor((min - padding) * 10) / 10.0 to ceil((max + padding) * 10) / 10.0
+            floor((lo - padding) * 10) / 10.0 to ceil((hi + padding) * 10) / 10.0
         }
         AxisPolicy.TIGHT -> {
             val padding = max(span * 0.08, 0.2)
-            floor((min - padding) * 10) / 10.0 to ceil((max + padding) * 10) / 10.0
+            floor((lo - padding) * 10) / 10.0 to ceil((hi + padding) * 10) / 10.0
         }
         AxisPolicy.AUTO -> {
             val padding = max(span * 0.1, 1.0)
-            floor(min - padding) to ceil(max + padding)
+            floor(lo - padding) to ceil(hi + padding)
         }
     }
 }
