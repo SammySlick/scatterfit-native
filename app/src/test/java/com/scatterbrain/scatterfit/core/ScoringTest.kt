@@ -43,7 +43,7 @@ class ScoringTest {
     }
 
     @Test fun `at or above 500 kcal scores normally against the kcal target`() {
-        val target = 2270.0 // activeMacroTargets(DEFAULT) — kcal target on grams mode
+        val target = ScoringSettings().kcalTarget // 2500 — macro-mode resolution is a data-layer job
         val s = calSeries(DailyData().withCal(TODAY to target)).days.last { it.day == TODAY }.score
         assertEquals(100.0, s!!, 1e-9)
     }
@@ -56,7 +56,7 @@ class ScoringTest {
         val at = calSeries(DailyData().withCal(TODAY to 500.0)).days.last { it.day == TODAY }.score
         assertTrue(at != null && at <= 100.0)
         assertEquals(0.0, at!!, 1e-9)
-        assertTrue(2270 > 500)
+        assertTrue(2500 > 500)
     }
 
     // ---- RHR swing: 10 bpm clamp window ----
