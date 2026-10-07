@@ -43,6 +43,8 @@ class DailyTest {
     @Test fun `maps - numeric day maps match web exactly`() {
         val d = built()
         for (key in listOf("steps", "caloriesEaten", "protein", "carbs", "fat", "caloriesBurned", "weight", "restingHr", "bodyFat", "stepsSource", "distance", "distanceSource", "burnedSource", "trainingMinutes", "foodKcal", "alcoholKcal", "alcoholUnits")) {
+            // sources are string maps — skip before parsing as numbers
+            if (key.endsWith("Source")) continue
             val expected = web.mapOfD(key) ?: emptyMap()
             val actual = when (key) {
                 "steps" -> d.steps; "caloriesEaten" -> d.caloriesEaten; "protein" -> d.protein
