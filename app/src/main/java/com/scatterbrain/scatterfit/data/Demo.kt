@@ -64,7 +64,7 @@ private class Rng(seed: Int) {
         a += 0x6d2b79f5.toInt()
         var t = a
         t = (t xor (t ushr 15)) * (t or 1)
-        t = t xor (t + (t xor (t ushr 7)) * 61)
+        t = t xor (t + ((t xor (t ushr 7)) * (t or 61)))
         return (t xor (t ushr 14)).toLong().let { (it and 0xFFFF_FFFFL) / 4294967296.0 }
     }
 }
