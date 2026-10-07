@@ -26,7 +26,7 @@ class DailyTest {
     private fun built(): AssembledDaily {
         val records = HashMap<RecordMethod, List<HealthRecord>>()
         for ((k, v) in webRecords["records"]!!.jsonObject) {
-            val m = RecordMethod.valueOf(k.uppercase())
+            val m = RecordMethod.entries.first { it.name.replace("_", "") == k.uppercase().replace("_", "") }
             records[m] = v.jsonArray.map { r ->
                 val o = r.jsonObject
                 HealthRecord(
