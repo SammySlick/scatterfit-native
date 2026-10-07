@@ -24,7 +24,8 @@ class TodayFacadeTest {
         return Daily.buildDailyDataFromMaps(records, Zones.DEFAULT_ZONES, java.time.ZoneId.of("UTC"), nowMs = nowMs)
     }
 
-    private val card = TodayFacade.todayCard(built(), ScoringSettings(), today)
+    // Web DEFAULT_SETTINGS: macroMode grams -> calories = kcalFromMacros(160, 70, 250) = 2270.
+    private val card = TodayFacade.todayCard(built(), ScoringSettings(kcalTarget = 2270), today)
 
     @Test
     fun `momentum headline matches web`() {
