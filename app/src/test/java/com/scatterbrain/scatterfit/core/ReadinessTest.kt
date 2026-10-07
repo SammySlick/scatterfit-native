@@ -135,7 +135,7 @@ class ReadinessTest {
 
     @Test fun `morning readings exclude 11-00 and later`() {
         val zone = ZoneId.of("UTC") // web test uses ISO strings in UTC
-        val t = (h: Int, d: Int, m: Int = 0) ->
+        fun t(h: Int, d: Int, m: Int = 0) =
             LocalDateTime.of(2026, 9, d, h, m).atZone(zone).toInstant().toEpochMilli()
         val out = morningReadings(listOf(t(7, 10) to 80.0, t(12, 10) to 82.0, t(11, 11) to 81.0), zone)
         assertEquals(mapOf("2026-09-10" to 80.0), out)
