@@ -12,6 +12,7 @@ import com.scatterbrain.scatterfit.core.computeGoalSeries
 import com.scatterbrain.scatterfit.core.computeMomentum
 import com.scatterbrain.scatterfit.core.effectiveWeights
 import com.scatterbrain.scatterfit.core.readinessForData
+import com.scatterbrain.scatterfit.core.weekKeysEndingAt
 
 /** Everything the Today card needs, computed once from the assembled data.
  *  Mirrors the web's TodayPage `scored` useMemo + streak + readiness + sentence. */
