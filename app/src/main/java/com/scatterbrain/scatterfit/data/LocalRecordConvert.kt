@@ -35,16 +35,11 @@ object LocalRecordConvert {
         else -> JsonPrimitive(v.toString())
     }
 
-    /** One record. Note: the SOURCE keeps its app string in [LocalRecord.app];
-     *  readers that own a dataOrigin map put it in the data themselves (the web's
-     *  hcgateway records carry it inside `data`), which is why the converted
-     *  record only fills HealthRecord.app and the pipeline's clean() sees the
-     *  right thing either way. */
+    /** One record. `app` is a record-level field in the gateway shape (the web
+     *  interface puts it beside start/end, never inside data); `data` passes
+     *  through verbatim. */
     fun convert(method: RecordMethod, r: LocalRecord): HealthRecord {
-        val data = r.data?.let { toJsonObject(it) }
-        val enriched = if (r.app != null && data != null && data["app"] == null)
-            JsonObject(data + mapOf("app" to JsonPrimitive(r.app))) else data
-        return HealthRecord(app = r.app, start = r.start, end = r.end, data = enriched)
+        return HealthRecord(app = r.app, start = r.start, end = r.end, data = r.data?.let { toJsonObject(it) })
     }
 
     fun convertAll(method: RecordMethod, list: List<LocalRecord>): List<HealthRecord> =
