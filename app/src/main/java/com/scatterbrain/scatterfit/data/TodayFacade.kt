@@ -66,7 +66,7 @@ object TodayFacade {
         // WEEKLY FRAMING: the unit is the week — Monday is a clean slate.
         // Anchored to [today] (no wall-clock read): the same window the web's
         // currentWeekKeys yields when today is the anchor.
-        val thisWeek = com.scatterbrain.scatterfit.core.DayKeys.weekKeysEndingAt(today, settings.weekMode)
+        val thisWeek = weekKeysEndingAt(today, settings.weekMode)
         val weekVals = thisWeek.map { k ->
             val dayScores = goals.mapNotNull { g -> g.days.find { it.day == k }?.score }
             if (dayScores.isEmpty()) null else dayScores.sum() / dayScores.size

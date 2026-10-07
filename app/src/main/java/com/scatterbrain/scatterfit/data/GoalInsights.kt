@@ -1,9 +1,10 @@
 package com.scatterbrain.scatterfit.data
 
 import com.scatterbrain.scatterfit.core.DailyData
-import com.scatterbrain.scatterfit.core.DayKeys.dayBefore
-import com.scatterbrain.scatterfit.core.DayKeys.previousWeekKeys
-import com.scatterbrain.scatterfit.core.DayKeys.weekKeysEndingAt
+import com.scatterbrain.scatterfit.core.WeekMode
+import com.scatterbrain.scatterfit.core.dayBefore
+import com.scatterbrain.scatterfit.core.previousWeekKeys
+import com.scatterbrain.scatterfit.core.weekKeysEndingAt
 import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.GoalPreset
 import com.scatterbrain.scatterfit.core.GoalSeries
