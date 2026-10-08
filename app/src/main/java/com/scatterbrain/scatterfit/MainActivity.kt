@@ -31,11 +31,15 @@ class MainActivity : ComponentActivity() {
     private fun ensureHcPermissions() {
         lifecycleScope.launch {
             try {
-                SyncHub.setStatus("Health Connect: connecting…")
+                if (SyncHub.records.value == null) {
+                    SyncHub.setStatus("Health Connect: connecting…")
+                }
                 val client = HealthConnectClient.getOrCreate(this@MainActivity)
                 val granted = client.permissionController.getGrantedPermissions()
                 if (granted.containsAll(HcPermissions.read)) {
-                    SyncHub.setStatus("")
+                    if (SyncHub.records.value == null) {
+                        SyncHub.setStatus("Health Connect: syncing…")
+                    }
                     SyncService.start(this@MainActivity)
                 } else if (!requestedPermissions) {
                     requestedPermissions = true

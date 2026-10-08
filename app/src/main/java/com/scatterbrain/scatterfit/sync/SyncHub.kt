@@ -67,7 +67,11 @@ object SyncHub {
             val result = e.sync(reader = { ms, fromMs, toMs -> HcReaders.readAll(c, fromMs, toMs, ms) })
             _records.value = result.merged
             _lastError.value = null
-            _status.value = ""
+            _status.value = if (result.merged.isEmpty()) {
+                // Sync ran, read everything it was allowed to — and got nothing.
+                // Almost always: no source app is writing to Health Connect.
+                "Sync ran: 0 records from Health Connect. Open Health Connect > Data and access and check your fitness app is sharing data."
+            } else ""
             result
         } catch (t: Throwable) {
             _lastError.value = t.message ?: t.javaClass.simpleName
