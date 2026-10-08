@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
@@ -52,11 +54,25 @@ fun MainAppScreen(
             )
         }
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            val hcStatus by SyncHub.status.collectAsState()
+            if (hcStatus.isNotBlank()) {
+                Text(
+                    text = hcStatus,
+                    color = TealHighlight,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DarkCardSurface)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
             when (selectedTab) {
                 AppTab.MY_DAY -> MyDayScreen(
                     onSettingsClick = onSettingsClick
@@ -65,6 +81,7 @@ fun MainAppScreen(
                     onSettingsClick = onSettingsClick
                 )
                 AppTab.ASK -> AskScreen()
+            }
             }
         }
     }

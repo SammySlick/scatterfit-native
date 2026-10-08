@@ -29,6 +29,13 @@ object SyncHub {
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
+    /** Why sync isn't running (HC missing/outdated/stale) — surfaced on Today.
+     *  Cleared on any successful sync. */
+    private val _status = MutableStateFlow("")
+    val status: StateFlow<String> = _status.asStateFlow()
+
+    fun setStatus(msg: String) { _status.value = msg }
+
     fun init(context: Context) {
         if (store != null) return
         val appContext = context.applicationContext
@@ -60,6 +67,7 @@ object SyncHub {
             val result = e.sync(reader = { ms, fromMs, toMs -> HcReaders.readAll(c, fromMs, toMs, ms) })
             _records.value = result.merged
             _lastError.value = null
+            _status.value = ""
             result
         } catch (t: Throwable) {
             _lastError.value = t.message ?: t.javaClass.simpleName

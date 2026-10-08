@@ -31,20 +31,25 @@ class MainActivity : ComponentActivity() {
         when (HealthConnectClient.getSdkStatus(this)) {
             HealthConnectClient.SDK_AVAILABLE -> {
                 lifecycleScope.launch {
-                    val client = HealthConnectClient.getOrCreate(this@MainActivity)
-                    val granted = client.permissionController.getGrantedPermissions()
-                    if (granted.containsAll(HcPermissions.read)) {
-                        SyncService.start(this@MainActivity)
-                    } else {
-                        permissionLauncher.launch(HcPermissions.read)
+                    try {
+                        val client = HealthConnectClient.getOrCreate(this@MainActivity)
+                        val granted = client.permissionController.getGrantedPermissions()
+                        if (granted.containsAll(HcPermissions.read)) {
+                            SyncService.start(this@MainActivity)
+                        } else {
+                            permissionLauncher.launch(HcPermissions.read)
+                        }
+                    } catch (e: Exception) {
+                        SyncHub.setStatus("Health Connect error: ${e.message ?: e.javaClass.simpleName}")
                     }
                 }
             }
             HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
-                // TODO (Sam's screen): provider-update prompt. For now nothing.
-                {}
-            HealthConnectClient.SDK_UNAVAILABLE -> {} // no HC provider: demo mode
-            else -> {}
+                SyncHub.setStatus("Health Connect is out of date. Update it (Settings > search 'Health Connect', or the Play Store), then reopen ScatterFit.")
+            HealthConnectClient.SDK_UNAVAILABLE ->
+                SyncHub.setStatus("Health Connect isn't installed on this phone. Install it from the Play Store, then reopen ScatterFit.")
+            else ->
+                SyncHub.setStatus("Health Connect unavailable (unknown status ${HealthConnectClient.getSdkStatus(this)}).")
         }
 
         setContent {
