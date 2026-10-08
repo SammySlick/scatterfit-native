@@ -69,6 +69,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.core.dayBefore
+import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BorderInput
@@ -199,7 +200,9 @@ fun MyDayScreen(
             .verticalScroll(scrollState)
     ) {
         val isFutureDay = currentDayKey > today
-        val momentumSource: MomentumSource = remember { TodayFacadeMomentumSource() }
+        // Real synced HC records when present; demo month otherwise.
+        val hubRecords by SyncHub.records.collectAsState()
+        val momentumSource: MomentumSource = remember(hubRecords) { TodayFacadeMomentumSource(hcRecords = hubRecords) }
 
         val isTodayLogged = foodLogCompleted || weighInCompleted || trainCompleted || weeklyCheckInCompleted || drinkState.loggedDrinks.isNotEmpty()
         val streakInfo = remember(momentumSource, today, isTodayLogged) {
@@ -567,7 +570,7 @@ fun TodayPulseCard(
     goalName: String = "FAT LOSS",
     projectedTargetText: String = "TARGET • 10.08.26",
     activeDayKey: String = remember { todayKey() },
-    momentumSource: MomentumSource = remember { TodayFacadeMomentumSource() },
+    momentumSource: MomentumSource = remember(SyncHub.records.value) { TodayFacadeMomentumSource(hcRecords = SyncHub.records.value) },
     sleepHours: Int = 8,
     sleepMinutes: Int = 13,
     rhrText: String = "RHR warming up",

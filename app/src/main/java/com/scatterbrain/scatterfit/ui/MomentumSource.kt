@@ -51,16 +51,22 @@ interface MomentumSource {
 
 class TodayFacadeMomentumSource(
     private val zone: ZoneId = ZoneId.systemDefault(),
-    private val settings: ScoringSettings = ScoringSettings(activeGoal = GoalPreset.FAT_LOSS, kcalTarget = 2270)
+    private val settings: ScoringSettings = ScoringSettings(activeGoal = GoalPreset.FAT_LOSS, kcalTarget = 2270),
+    /** Real synced records (SyncHub). Null or empty per method -> demo month. */
+    private val hcRecords: Map<RecordMethod, List<HealthRecord>>? = null,
 ) : MomentumSource {
 
     private val now = Instant.now()
     private val demoMonth = makeDemoRecords(now, zone)
     private val daily: AssembledDaily = run {
         val records = HashMap<RecordMethod, List<HealthRecord>>()
-        for ((key, list) in demoMonth.records) {
-            val m = RecordMethod.entries.firstOrNull { it.name == key } ?: continue
-            records[m] = LocalRecordConvert.convertAll(m, list)
+        if (hcRecords != null && hcRecords.isNotEmpty()) {
+            for ((m, list) in hcRecords) if (list.isNotEmpty()) records[m] = list
+        } else {
+            for ((key, list) in demoMonth.records) {
+                val m = RecordMethod.entries.firstOrNull { it.name == key } ?: continue
+                records[m] = LocalRecordConvert.convertAll(m, list)
+            }
         }
         Daily.buildDailyDataFromMaps(records, Zones.DEFAULT_ZONES, zone, nowMs = now.toEpochMilli())
     }
