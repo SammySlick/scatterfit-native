@@ -13,8 +13,11 @@ android {
         applicationId = "com.scatterbrain.scatterfit"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI stamps the run number into the version so every sideload is
+        // self-identifying (Settings > Apps > ScatterFit shows it). Locally
+        // built (no CI env) it falls back to a static version.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionName = "0.1." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
     buildTypes {
