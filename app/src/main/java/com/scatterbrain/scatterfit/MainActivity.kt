@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
                     SyncService.start(this@MainActivity)
                 } else if (!requestedPermissions) {
                     requestedPermissions = true
+                    Log.d(logTag, "onResume: LAUNCHING permission request (${HcPermissions.read.size} permissions)")
                     SyncHub.setStatus("")
                     permissionLauncher.launch(HcPermissions.read)
                 } else {
