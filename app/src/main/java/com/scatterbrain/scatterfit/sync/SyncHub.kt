@@ -1,6 +1,7 @@
 package com.scatterbrain.scatterfit.sync
 
 import android.content.Context
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import com.scatterbrain.scatterfit.data.HealthRecord
 import com.scatterbrain.scatterfit.data.HcReaders
@@ -15,6 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
  *  and owns the one real engine instance. UI reads [records]; MainActivity
  *  triggers [syncNow] after permissions land. */
 object SyncHub {
+
+    private const val TAG = "ScatterFitSync"
 
     private var store: SyncStore? = null
     private var engine: SyncEngine? = null
@@ -64,7 +67,15 @@ object SyncHub {
         val c = client ?: return null
         if (!_syncing.compareAndSet(false, true)) return null
         return try {
-            val result = e.sync(reader = { ms, fromMs, toMs -> HcReaders.readAll(c, fromMs, toMs, ms) })
+            val result = e.sync(reader = { ms, fromMs, toMs ->
+                val read = HcReaders.readAll(c, fromMs, toMs, ms)
+                read.forEach { (method, rows) ->
+                    Log.d(TAG, "sync read: ${method.name} rows=${rows.size} window=${fromMs}..${toMs}")
+                }
+                Log.d(TAG, "sync read: methods=${ms.size} totalRows=${read.values.sumOf { it.size }}")
+                read
+            })
+            Log.d(TAG, "sync done: mergedMethods=${result.merged.size} mergedRows=${result.merged.values.sumOf { it.size }}")
             _records.value = result.merged
             _lastError.value = null
             _status.value = if (result.merged.isEmpty()) {

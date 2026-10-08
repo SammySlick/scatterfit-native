@@ -1,6 +1,7 @@
 package com.scatterbrain.scatterfit
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -17,8 +18,11 @@ import kotlin.coroutines.cancellation.CancellationException
 
 class MainActivity : ComponentActivity() {
 
+    private val logTag = "ScatterFitSync"
+
     private val permissionLauncher =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+            Log.d(logTag, "permission result: ${granted.size} granted=$granted")
             if (granted.containsAll(HcPermissions.read)) {
                 SyncService.start(this)
             }
@@ -31,11 +35,14 @@ class MainActivity : ComponentActivity() {
     private fun ensureHcPermissions() {
         lifecycleScope.launch {
             try {
+                val sdkStatus = HealthConnectClient.getSdkStatus(this@MainActivity)
+                Log.d(logTag, "onResume: sdkStatus=$sdkStatus records=${SyncHub.records.value != null}")
                 if (SyncHub.records.value == null) {
                     SyncHub.setStatus("Health Connect: connecting…")
                 }
                 val client = HealthConnectClient.getOrCreate(this@MainActivity)
                 val granted = client.permissionController.getGrantedPermissions()
+                Log.d(logTag, "onResume: alreadyGranted=${granted.size} missing=${HcPermissions.read - granted}")
                 if (granted.containsAll(HcPermissions.read)) {
                     if (SyncHub.records.value == null) {
                         SyncHub.setStatus("Health Connect: syncing…")
@@ -63,6 +70,7 @@ class MainActivity : ComponentActivity() {
 
         when (HealthConnectClient.getSdkStatus(this)) {
             HealthConnectClient.SDK_AVAILABLE -> {
+                Log.d("ScatterFitSync", "sdkStatus: AVAILABLE")
                 // onResume also runs right after onCreate, so the check starts there;
                 // it re-runs every time the app comes back (incl. after the dialog closes)
             }
