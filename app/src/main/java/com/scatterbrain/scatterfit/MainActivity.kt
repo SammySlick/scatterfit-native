@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.health.connect.client.HealthConnectClient
-import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.scatterbrain.scatterfit.data.HcPermissions
 import com.scatterbrain.scatterfit.sync.SyncHub
@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private val permissionLauncher =
-        registerForActivityResult(HealthPermission.PermissionController.createRequestPermissionResultContract()) { granted ->
+        registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
             if (granted.containsAll(HcPermissions.read)) {
                 SyncService.start(this)
             }

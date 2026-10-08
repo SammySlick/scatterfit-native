@@ -57,7 +57,7 @@ object SyncHub {
         val c = client ?: return null
         if (!_syncing.compareAndSet(false, true)) return null
         return try {
-            val result = e.sync { ms, fromMs, toMs -> HcReaders.readAll(c, fromMs, toMs, ms) }
+            val result = e.sync(reader = { ms, fromMs, toMs -> HcReaders.readAll(c, fromMs, toMs, ms) })
             _records.value = result.merged
             _lastError.value = null
             result
