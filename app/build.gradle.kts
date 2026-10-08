@@ -20,7 +20,24 @@ android {
         versionName = "0.1." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
+    signingConfigs {
+        // Pinned debug keystore: every CI build signs with the SAME key so
+        // sideloaded updates install over each other and KEEP their Health
+        // Connect permissions (ephemeral CI keystores meant every build was a
+        // different "publisher" — uninstall/reinstall wiped the grants).
+        create("stableDebug") {
+            storeFile = file("../signing/debug.keystore")
+            storePassword = "scatterfit"
+            storeType = "PKCS12"
+            keyAlias = "scatterfit-debug"
+            keyPassword = "scatterfit"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("stableDebug")
+        }
         release {
             isMinifyEnabled = false
         }
