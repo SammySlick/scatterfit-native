@@ -33,7 +33,7 @@ object SyncHub {
         if (store != null) return
         val appContext = context.applicationContext
         store = SyncStore(File(appContext.filesDir, "hc-sync"))
-        engine = SyncEngine(store!!)
+        engine = SyncEngine(store!!, nowMs = { System.currentTimeMillis() })
         try {
             client = HealthConnectClient.getOrCreate(appContext)
         } catch (_: Exception) {
