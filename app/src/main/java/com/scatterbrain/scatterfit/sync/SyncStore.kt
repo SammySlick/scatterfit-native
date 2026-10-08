@@ -82,6 +82,6 @@ class SyncStore(private val dir: File) {
          *  physical record share it; an edit (new content, extended end) also
          *  shares it, so the fresh read must win over the stale cached row —
          *  the engine inserts new records last so they overwrite on collision. */
-        fun key(method: RecordMethod, r: HealthRecord): String = "$method|${r.start}|${r.end ?: ""}"
+        fun key(method: RecordMethod, r: HealthRecord): String = "$method|${r.start}"
     }
 }

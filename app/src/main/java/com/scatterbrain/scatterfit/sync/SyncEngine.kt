@@ -52,9 +52,10 @@ class SyncEngine(
             val existing = store.load(m).records
             val newRecords = fresh[m] ?: emptyList()
             // LinkedHashMap: cached rows first, fresh rows second — identical
-            // keys (same start+end) overwrite so the fresh read wins, which is
+            // keys (method+start) overwrite so the fresh read wins, which is
             // what makes an HC edit (content change, extended sleep end) replace
-            // rather than duplicate its stale cached self.
+            // rather than duplicate its stale cached self. Two same-start rows
+            // are the same logical record edited; fresh data is authoritative.
             val byKey = LinkedHashMap<String, HealthRecord>(existing.size + newRecords.size)
             for (r in existing) byKey[SyncStore.key(m, r)] = r
             for (r in newRecords) byKey[SyncStore.key(m, r)] = r
@@ -70,14 +71,16 @@ class SyncEngine(
         return SyncResult(merged, fetchedBy, from, now)
     }
 
-    /** Oldest cursor among the requested methods, else full lookback. */
+    /** Oldest cursor among the requested methods, else full lookback.
+     *  A newer cursor MUST win over the lookback — that's what makes the
+     *  second pass incremental instead of another full-history read. */
     private fun windowStart(methods: Set<RecordMethod>, now: Long): Long {
-        var oldest = now - lookbackMs
+        var oldest: Long? = null
         for (m in methods) {
             val c = store.load(m).cursorMs ?: continue
-            if (c < oldest) oldest = c
+            if (oldest == null || c < oldest) oldest = c
         }
-        return oldest - overlapMs
+        return (oldest ?: (now - lookbackMs)) - overlapMs
     }
 
     companion object {
