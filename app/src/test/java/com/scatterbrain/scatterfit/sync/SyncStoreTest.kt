@@ -20,7 +20,7 @@ class SyncStoreTest {
     @get:Rule
     val tmp = TemporaryFolder()
 
-    private fun store() = SyncStore(tmp.newFolder())
+    private fun store() = SyncStore(tmp.root)
 
     private fun rec(start: String = "2026-10-05T10:00:00Z", steps: Long = 1234) = HealthRecord(
         app = "com.elink.fittrackhealth.pro",
