@@ -74,7 +74,7 @@ private class DemoState(val zone: ZoneId, val r: Rng, val nowMs: Long) {
 }
 
 fun makeDemoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): DemoMonth {
-    val keys = lastNDayKeys(DEMO_DAYS, zone = zone)
+    val keys = lastNDayKeys(DEMO_DAYS, endKey = com.scatterbrain.scatterfit.core.dayKey(now.toEpochMilli(), zone), zone = zone)
     val last = keys.size - 1
     val r = Rng(SEED)
     val nowMs = now.toEpochMilli()
