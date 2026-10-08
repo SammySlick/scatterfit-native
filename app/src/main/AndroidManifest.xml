@@ -44,6 +44,30 @@
             android:exported="false"
             android:foregroundServiceType="health"
             tools:targetApi="upsideDownCake" />
+
+        <!-- HC-mandatory rationale entry (Android 13-): without this the
+             permission dialog never shows and HC won't list the app. -->
+        <activity
+            android:name=".PermissionsRationaleActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
+        <!-- HC-mandatory rationale entry (Android 14+): VIEW_PERMISSION_USAGE +
+             HEALTH_PERMISSIONS category. This is what registers ScatterFit in
+             Health Connect's App permissions list. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:targetActivity=".PermissionsRationaleActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
     </application>
 
 </manifest>
