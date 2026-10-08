@@ -37,8 +37,8 @@ class SyncEngine(
      *  Reader errors propagate: the caller (service/activity) decides
      *  whether that's fatal — the cache always holds the last good state. */
     suspend fun sync(
-        reader: suspend (Set<RecordMethod>, Long, Long) -> Map<RecordMethod, List<HealthRecord>>,
         methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
+        reader: suspend (Set<RecordMethod>, Long, Long) -> Map<RecordMethod, List<HealthRecord>>,
     ): SyncResult {
         val now = nowMs()
         val from = windowStart(methods, now)
