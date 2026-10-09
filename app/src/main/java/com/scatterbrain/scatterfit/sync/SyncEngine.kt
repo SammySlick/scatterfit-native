@@ -81,7 +81,7 @@ class SyncEngine(
             val out = ArrayList(map.values)
             merged[m] = out
             sliceCount[m] = (sliceCount[m] ?: 0) + sliceRecords.size
-            fetchedBy[m] = sliceCount[m]
+            fetchedBy[m] = sliceCount[m] ?: 0
             store.save(m, sliceCursor, out) // cursor advances per slice: killed sync resumes
         }
 
