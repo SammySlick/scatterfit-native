@@ -16,6 +16,7 @@ import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import kotlinx.coroutines.withTimeout
 import java.time.Instant
 
 /** The ONLY file allowed to know Health Connect types exist (Foundations:
@@ -27,6 +28,9 @@ import java.time.Instant
  *  This file is deliberately dumb: no decisions, no maths, no filtering —
  *  just extraction. */
 object HcReaders {
+
+    /** Max wall-time for ONE readRecords page call. */
+    const val PAGE_TIMEOUT_MS: Long = 30_000
 
     /** Window is [fromMs, toMs). Note: sleep sessions may START before fromMs —
      *  a session crossing the cursor boundary is read on its start timestamp,
@@ -67,14 +71,23 @@ object HcReaders {
         client: HealthConnectClient,
         fromMs: Long,
         toMs: Long,
+        label: String,
         block: (T) -> HealthRecord,
     ): List<HealthRecord> {
         val out = ArrayList<HealthRecord>()
         var token: String? = null
+        var page = 0
         do {
-            val response = client.readRecords(
-                ReadRecordsRequest<T>(window(fromMs, toMs), pageToken = token),
-            )
+            // Timeout per PAGE, not per method: a slow-but-progressing read
+            // keeps getting fresh tokens; only a single wedged IPC call dies.
+            // (Samsung provider sometimes never returns one page — seen live
+            // 2026-10-09: STEPS page hung 7+ min.)
+            val response = withTimeout(PAGE_TIMEOUT_MS) {
+                client.readRecords(ReadRecordsRequest<T>(window(fromMs, toMs), pageToken = token))
+            }
+            page++
+            val n = response.records.size
+            Log.d("ScatterFitSync", "readAll: $label page=$page rows=$n more=${token != null}")
             out.addAll(response.records.map(block))
             token = response.pageToken
         } while (token != null)
@@ -82,19 +95,19 @@ object HcReaders {
     }
 
     private suspend fun readSteps(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: StepsRecord ->
+        read(client, fromMs, toMs, "Steps") { r: StepsRecord ->
             HcTranslate.steps(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                 r.endTime.toEpochMilli(), r.count)
         }
 
     private suspend fun readDistance(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: DistanceRecord ->
+        read(client, fromMs, toMs, "Distance") { r: DistanceRecord ->
             HcTranslate.distance(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                 r.endTime.toEpochMilli(), r.distance.inMeters)
         }
 
     private suspend fun readNutrition(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: NutritionRecord ->
+        read(client, fromMs, toMs, "Nutrition") { r: NutritionRecord ->
             HcTranslate.nutrition(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                 r.endTime.toEpochMilli(), r.name, r.mealType,
                 r.energy?.inKilocalories, r.protein?.inGrams,
@@ -102,47 +115,47 @@ object HcReaders {
         }
 
     private suspend fun readTotalCaloriesBurned(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: TotalCaloriesBurnedRecord ->
+        read(client, fromMs, toMs, "TotalCaloriesBurned") { r: TotalCaloriesBurnedRecord ->
             HcTranslate.totalCaloriesBurned(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                 r.endTime.toEpochMilli(), r.energy.inKilocalories)
         }
 
     private suspend fun readWeight(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: WeightRecord ->
+        read(client, fromMs, toMs, "Weight") { r: WeightRecord ->
             HcTranslate.weight(r.metadata.dataOrigin.packageName, r.time.toEpochMilli(), r.weight.inKilograms)
         }
 
     private suspend fun readRestingHeartRate(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: RestingHeartRateRecord ->
+        read(client, fromMs, toMs, "RestingHeartRate") { r: RestingHeartRateRecord ->
             HcTranslate.restingHeartRate(r.metadata.dataOrigin.packageName, r.time.toEpochMilli(), r.beatsPerMinute)
         }
 
     private suspend fun readSleepSession(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: SleepSessionRecord ->
+        read(client, fromMs, toMs, "SleepSession") { r: SleepSessionRecord ->
             HcTranslate.sleepSession(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                 r.endTime.toEpochMilli(), r.title,
                 r.stages.map { HcTranslate.StageInput(it.startTime.toEpochMilli(), it.endTime.toEpochMilli(), it.stage) })
         }
 
     private suspend fun readExerciseSession(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: ExerciseSessionRecord ->
+        read(client, fromMs, toMs, "ExerciseSession") { r: ExerciseSessionRecord ->
             HcTranslate.exerciseSession(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                 r.endTime.toEpochMilli(), r.title, r.exerciseType)
         }
 
     private suspend fun readBodyFat(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: BodyFatRecord ->
+        read(client, fromMs, toMs, "BodyFat") { r: BodyFatRecord ->
             HcTranslate.bodyFat(r.metadata.dataOrigin.packageName, r.time.toEpochMilli(), r.percentage.value)
         }
 
     private suspend fun readHeartRate(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: HeartRateRecord ->
+        read(client, fromMs, toMs, "HeartRate") { r: HeartRateRecord ->
             HcTranslate.heartRate(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                 r.endTime.toEpochMilli(), r.samples.map { HcTranslate.SampleInput(it.time.toEpochMilli(), it.beatsPerMinute) })
         }
 
     private suspend fun readBasalMetabolicRate(client: HealthConnectClient, fromMs: Long, toMs: Long) =
-        read(client, fromMs, toMs) { r: BasalMetabolicRateRecord ->
+        read(client, fromMs, toMs, "BasalMetabolicRate") { r: BasalMetabolicRateRecord ->
             HcTranslate.basalMetabolicRate(r.metadata.dataOrigin.packageName, r.time.toEpochMilli(),
                 r.basalMetabolicRate.inWatts)
         }
