@@ -179,12 +179,12 @@ object HcAggregators {
             // (origin, day, metric). The LAST bucket may end at tomorrow's
             // midnight even though the day is still in progress — its total
             // covers what exists; the next sync replaces it (same key).
-            val sorted = buckets.sortedBy { it.startTime.toInstant(zone).toEpochMilli() }
-            val lastEndMs = sorted.last().endTime.toInstant(zone).toEpochMilli()
+            val sorted = buckets.sortedBy { it.startTime.atZone(zone).toInstant().toEpochMilli() }
+            val lastEndMs = sorted.last().endTime.atZone(zone).toInstant().toEpochMilli()
             val perMethod = HashMap<RecordMethod, MutableList<HealthRecord>>()
             for (b in sorted) {
-                val sMs = b.startTime.toInstant(zone).toEpochMilli()
-                val eMs = b.endTime.toInstant(zone).toEpochMilli()
+                val sMs = b.startTime.atZone(zone).toInstant().toEpochMilli()
+                val eMs = b.endTime.atZone(zone).toInstant().toEpochMilli()
                 for ((m, rec) in dailyRecords(
                     origin, sMs, eMs, mMethods,
                     b.result[StepsRecord.COUNT_TOTAL],

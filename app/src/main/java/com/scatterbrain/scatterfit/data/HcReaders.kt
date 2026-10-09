@@ -118,18 +118,18 @@ object HcReaders {
     ): List<HealthRecord> {
         if (fromMs >= toMs) return emptyList()
         return when (method) {
-            RecordMethod.STEPS -> read(client, fromMs, toMs, "Probe.Steps", { r: StepsRecord ->
+            RecordMethod.STEPS -> read(client, fromMs, toMs, "Probe.Steps", ascendingOrder = false, maxPages = maxPages) { r: StepsRecord ->
                 HcTranslate.steps(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                     r.endTime.toEpochMilli(), r.count)
-            }, ascendingOrder = false, maxPages = maxPages)
-            RecordMethod.DISTANCE -> read(client, fromMs, toMs, "Probe.Distance", { r: DistanceRecord ->
+            }
+            RecordMethod.DISTANCE -> read(client, fromMs, toMs, "Probe.Distance", ascendingOrder = false, maxPages = maxPages) { r: DistanceRecord ->
                 HcTranslate.distance(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                     r.endTime.toEpochMilli(), r.distance.inMeters)
-            }, ascendingOrder = false, maxPages = maxPages)
-            RecordMethod.TOTAL_CALORIES_BURNED -> read(client, fromMs, toMs, "Probe.Calories", { r: TotalCaloriesBurnedRecord ->
+            }
+            RecordMethod.TOTAL_CALORIES_BURNED -> read(client, fromMs, toMs, "Probe.Calories", ascendingOrder = false, maxPages = maxPages) { r: TotalCaloriesBurnedRecord ->
                 HcTranslate.totalCaloriesBurned(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
                     r.endTime.toEpochMilli(), r.energy.inKilocalories)
-            }, ascendingOrder = false, maxPages = maxPages)
+            }
             else -> emptyList()
         }
     }
@@ -160,9 +160,9 @@ object HcReaders {
         fromMs: Long,
         toMs: Long,
         label: String,
-        block: (T) -> HealthRecord,
         ascendingOrder: Boolean = true,
         maxPages: Int = Int.MAX_VALUE,
+        block: (T) -> HealthRecord,
     ): List<HealthRecord> {
         val out = ArrayList<HealthRecord>()
         var token: String? = null
