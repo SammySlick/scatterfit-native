@@ -23,22 +23,35 @@ class SyncService : Service() {
     private val TAG = "ScatterFitSync"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var syncJob: kotlinx.coroutines.Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "service onStartCommand — starting foreground + sync")
         startForeground(NOTIF_ID, buildNotification())
-        scope.launch {
+        if (syncJob?.isActive == true) {
+            // A sync is already in flight. Do NOT stopSelf here: stopping the
+            // service destroys it, onDestroy cancels the scope, and the RUNNING
+            // sync dies mid-read (seen live 2026-10-09 ~03:11: every activity
+            // re-resume murdered the in-flight sync ~3s in). The running job
+            // owns the shutdown; this start just re-asserts foreground.
+            Log.d(TAG, "service onStartCommand — sync already in flight, leaving it alone")
+            return START_NOT_STICKY
+        }
+        syncJob = scope.launch {
             SyncHub.syncNow()
             Log.d(TAG, "service sync returned — stopping")
-            stopSelf(startId)
+            stopSelf()
         }
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        scope.cancel()
+        // Cancel only if no sync is in flight — an in-flight sync keeps this
+        // service alive by contract, so reaching onDestroy here means system
+        // teardown; cancel to avoid leaking the scope.
+        if (syncJob?.isActive != true) scope.cancel()
         super.onDestroy()
     }
 
