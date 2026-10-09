@@ -69,19 +69,24 @@ object SyncHub {
         if (!_syncing.compareAndSet(false, true)) { Log.d(TAG, "syncNow: already running, skip"); return null }
         Log.d(TAG, "syncNow: STARTING engine sync")
         return try {
-            val result = e.sync(reader = { ms, fromMs, toMs, onSlice ->
-                var sliceN = 0
-                val read = HcReaders.readAll(c, fromMs, toMs, ms) { m, sliceEnd, sliceRecords ->
-                    onSlice(m, sliceEnd, sliceRecords)
-                    sliceN++
-                    Log.d(TAG, "slice ${sliceN} committed: ${m.name} rows=${sliceRecords.size} cursor=${sliceEnd}")
-                }
-                read.forEach { (method, rows) ->
-                    Log.d(TAG, "sync read: ${method.name} rows=${rows.size} window=${fromMs}..${toMs}")
-                }
-                Log.d(TAG, "sync read: methods=${ms.size} totalRows=${read.values.sumOf { it.size }}")
-                read
-            })
+            val result = e.sync(
+                reader = { ms, fromMs, toMs, onSlice ->
+                    var sliceN = 0
+                    val read = HcReaders.readAll(c, fromMs, toMs, ms) { m, sliceEnd, sliceRecords ->
+                        onSlice(m, sliceEnd, sliceRecords)
+                        sliceN++
+                        Log.d(TAG, "slice ${sliceN} committed: ${m.name} rows=${sliceRecords.size} cursor=${sliceEnd}")
+                    }
+                    read.forEach { (method, rows) ->
+                        Log.d(TAG, "sync read: ${method.name} rows=${rows.size} window=${fromMs}..${toMs}")
+                    }
+                    Log.d(TAG, "sync read: methods=${ms.size} totalRows=${read.values.sumOf { it.size }}")
+                    read
+                },
+                // Stream each slice into the UI the moment it commits — the
+                // Today screen updates WHILE the sync runs, not after.
+                onProgress = { snapshot -> _records.value = snapshot },
+            )
             Log.d(TAG, "sync done: mergedMethods=${result.merged.size} mergedRows=${result.merged.values.sumOf { it.size }}")
             _records.value = result.merged
             _lastError.value = null

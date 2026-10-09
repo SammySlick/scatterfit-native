@@ -228,15 +228,14 @@ fun MyDayScreen(
         Spacer(modifier = Modifier.height(14.dp))
 
         // 2. Today Pulse Card (Consolidates Momentum + Readiness with integrated Goal Header strip)
-        TodayPulseCard(
-            goalName = goalProjection.goalName,
+        TodayPulseCard(            goalName = goalProjection.goalName,
             targetValueText = goalProjection.targetText,
             currentValueText = goalProjection.currentText,
             activeDayKey = currentDayKey,
             momentumSource = momentumSource,
-            sleepHours = 8,
-            sleepMinutes = 13,
-            rhrText = "RHR warming up",
+            sleepHours = momentumSource.sleepMinutesForDay(currentDayKey)?.let { m -> (m / 60).toInt() },
+            sleepMinutes = momentumSource.sleepMinutesForDay(currentDayKey)?.let { m -> (m % 60).toInt() },
+            rhrText = momentumSource.restingHrForDay(currentDayKey)?.let { "RHR ${it.toInt()}" },
             onMomentumClick = { /* Navigate to Momentum */ },
             onTrendsClick = { activeMetricScreen = "weight" },
             onSleepClick = { activeMetricScreen = "sleep" },
@@ -574,9 +573,9 @@ fun TodayPulseCard(
     currentValueText: String? = null,
     activeDayKey: String = remember { todayKey() },
     momentumSource: MomentumSource = remember(SyncHub.records.value) { TodayFacadeMomentumSource(hcRecords = SyncHub.records.value) },
-    sleepHours: Int = 8,
-    sleepMinutes: Int = 13,
-    rhrText: String = "RHR warming up",
+    sleepHours: Int? = null,
+    sleepMinutes: Int? = null,
+    rhrText: String? = null,
     onMomentumClick: () -> Unit = {},
     onTrendsClick: () -> Unit = {},
     onSleepClick: () -> Unit = {},
@@ -634,7 +633,8 @@ fun TodayPulseCard(
     val readinessBadge = readinessStateWord.lowercase().replaceFirstChar { it.uppercase() }
 
     // Whole numbers rounded for sleep
-    val formattedSleep = "${sleepHours}h ${sleepMinutes}m"
+    // Honest sleep line: real minutes when synced, "—" when not. No fake numbers.
+    val formattedSleep = if (sleepHours != null && sleepMinutes != null) "${sleepHours}h ${sleepMinutes}m" else null
 
     val momentumSentence = remember(calVsAvg) { buildMomentumWatchSentence(calVsAvg) }
     val readinessSentence = remember(readinessStateWord, readinessTarget) {
@@ -743,6 +743,19 @@ fun TodayPulseCard(
                         )
                     }
                 }
+            }
+
+            // Honest demo state: if the hero is running on demo data (no sync yet), SAY SO —
+            // silent fake numbers are the lie. Muted text, not a highlight (gold rule).
+            if (momentumSource.isUsingDemoData) {
+                Text(
+                    text = "demo data — first sync pending",
+                    fontSize = 9.sp,
+                    color = TextMuted,
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             }
 
             // Hairline divider
@@ -945,8 +958,12 @@ fun TodayPulseCard(
                     strokeWidthDp = 1.5.dp
                 )
                 Spacer(modifier = Modifier.width(6.dp))
+                val footerParts = listOfNotNull(
+                    formattedSleep?.let { "$it sleep last night" },
+                    rhrText
+                )
                 Text(
-                    text = "$formattedSleep sleep last night · $rhrText",
+                    text = footerParts.joinToString(" · ").ifEmpty { "Syncing health data…" },
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted,
                     fontSize = 10.sp

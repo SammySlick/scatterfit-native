@@ -55,6 +55,11 @@ interface MomentumSource {
     fun readinessStateForDay(dayKey: String): String
     fun readinessTargetForDay(dayKey: String): String
     fun readinessDeltaForDay(dayKey: String): Int?
+
+    /** Actual sleep minutes for the night ending on/near [dayKey]; null = no data yet. */
+    fun sleepMinutesForDay(dayKey: String): Double?
+    /** Resting HR for [dayKey]; null = no data yet (NOT "warming up" — say nothing). */
+    fun restingHrForDay(dayKey: String): Double?
 }
 
 class TodayFacadeMomentumSource(
@@ -66,6 +71,9 @@ class TodayFacadeMomentumSource(
 
     private val now = Instant.now()
     private val demoMonth = makeDemoRecords(now, zone)
+    /** True when there was no synced cache and we fell back to the demo month.
+     *  The UI must SHOW this — silent demo data is the lie we're killing. */
+    val isUsingDemoData: Boolean = hcRecords == null || hcRecords.isEmpty()
     private val recordsList: List<HealthRecord> = run {
         val records = HashMap<RecordMethod, List<HealthRecord>>()
         if (hcRecords != null && hcRecords.isNotEmpty()) {
@@ -196,6 +204,13 @@ class TodayFacadeMomentumSource(
         val scoreYesterday = cardYesterday.readiness?.score ?: return null
         return scoreToday - scoreYesterday
     }
+
+    override fun sleepMinutesForDay(dayKey: String): Double? {
+        val night = daily.sleep[dayKey] ?: daily.sleepNights.lastOrNull { it.day <= dayKey } ?: return null
+        return night.totalMin
+    }
+
+    override fun restingHrForDay(dayKey: String): Double? = daily.restingHr[dayKey]
 }
 
 typealias MomentumSourceStub = TodayFacadeMomentumSource

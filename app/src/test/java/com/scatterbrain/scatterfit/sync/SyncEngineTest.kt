@@ -209,4 +209,25 @@ class SyncEngineTest {
         assertEquals(listOf(ancient), e.store.load(RecordMethod.WEIGHT).records.map { it.start })
     }
 
+    @Test
+    fun `onProgress streams after each slice and at sync end`() = runTest {
+        val e = engine()
+        val snapshots = mutableListOf<Map<RecordMethod, List<HealthRecord>>>()
+        val r1 = steps("2026-10-04T10:00:00Z")
+        val r2 = steps("2026-10-05T10:00:00Z")
+        e.sync(onProgress = { snapshots.add(it) }) { _, _, _, onSlice ->
+            onSlice(RecordMethod.STEPS, NOW - 86_400_000, listOf(r1))
+            onSlice(RecordMethod.STEPS, NOW, listOf(r2))
+            emptyMap()
+        }
+        // One snapshot per slice + one at sync end = 3
+        assertEquals(3, snapshots.size)
+        // First snapshot: 1 record, second: 2, final: 2 (streaming grows live)
+        assertEquals(1, snapshots[0][RecordMethod.STEPS]?.size)
+        assertEquals(2, snapshots[1][RecordMethod.STEPS]?.size)
+        assertEquals(2, snapshots[2][RecordMethod.STEPS]?.size)
+        // Untouched methods appear in every snapshot (cached/empty), never dropped
+        assertTrue(snapshots.all { it.containsKey(RecordMethod.WEIGHT) })
+    }
+
 }

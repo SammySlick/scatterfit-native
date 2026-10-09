@@ -52,6 +52,10 @@ class SyncEngine(
             Long,
             suspend (RecordMethod, Long, List<HealthRecord>) -> Unit,
         ) -> Map<RecordMethod, List<HealthRecord>>,
+        /** Fired after each slice commit (and once at sync end) with the
+         *  live whole-cache snapshot — cache + everything committed so far —
+         *  so the UI can stream while the sync is still running. */
+        onProgress: suspend (Map<RecordMethod, List<HealthRecord>>) -> Unit = {},
     ): SyncResult {
         val now = nowMs()
         val from = windowStart(methods, now)
@@ -85,6 +89,9 @@ class SyncEngine(
             sliceCount[m] = (sliceCount[m] ?: 0) + sliceRecords.size
             fetchedBy[m] = sliceCount[m] ?: 0
             store.save(m, sliceCursor, out) // cursor advances per slice: killed sync resumes
+            // Progress snapshot = every method (cache + committed slices), so
+            // untouched methods keep showing their cached data while we work.
+            onProgress(methods.associateWith { m2 -> pruneFor(m2, ArrayList(byKey.getValue(m2).values), now) })
         }
 
         val fresh = reader(methods, from, now, onSlice)
@@ -114,7 +121,9 @@ class SyncEngine(
                 if (s < earliest) earliest = s
             }
         }
-        return SyncResult(merged, fetchedBy, from, now)
+        return SyncResult(merged, fetchedBy, from, now).also {
+            onProgress(merged)
+        }
     }
 
     /** Oldest cursor among the requested methods, else full lookback.
