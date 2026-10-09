@@ -1,6 +1,6 @@
 package com.scatterbrain.scatterfit.data
 
-import com.scatterbrain.scatterfit.core.Daily
+import com.scatterbrain.scatterfit.data.Daily
 import com.scatterbrain.scatterfit.data.RecordMethod
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.sync.SyncStore
