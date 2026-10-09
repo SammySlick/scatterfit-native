@@ -206,7 +206,7 @@ class TodayFacadeMomentumSource(
     }
 
     override fun sleepMinutesForDay(dayKey: String): Double? {
-        val night = daily.sleep[dayKey] ?: daily.sleepNights.lastOrNull { it.day <= dayKey } ?: return null
+        val night = daily.sleep[dayKey] ?: daily.sleepNights.lastOrNull { it.night <= dayKey } ?: return null
         return night.totalMin
     }
 
