@@ -145,8 +145,6 @@ class SyncEngineTest {
         assertEquals(1, r.merged[RecordMethod.STEPS]!!.size)
         assertEquals(1, r.merged[RecordMethod.WEIGHT]!!.size)
     }
-}
-
     // --- 2026-10-09 aggregation pivot additions ---
 
     private fun heartRate(start: String, bpm: Double = 60.0) = HealthRecord(
@@ -210,3 +208,5 @@ class SyncEngineTest {
         }
         assertEquals(listOf(ancient), e.store.load(RecordMethod.WEIGHT).records.map { it.start })
     }
+
+}
