@@ -83,14 +83,24 @@ object HcReaders {
             }
         }
         // Low-volume types (sleep, weight, RHR, exercise, body fat, nutrition,
-        // BMR): read fine over the WHOLE window in a handful of pages —
-        // day-slicing would multiply calls by 120 for nothing. A wedge on one
-        // method costs that method's pass, not the sync.
+        // BMR): ALSO day-sliced. Rationale (live 2026-10-09): NUTRITION's
+        // provider token chain looped, serving the same 2-row pages forever —
+        // a whole-window read turned that into 400 wasted calls per sync with
+        // the cursor never advancing. Day slices bound the damage to one day
+        // and commit progress that survives restarts. Cost: +1 call per empty
+        // day per method — trivial next to what throttled pages were costing.
+        // Dedupe makes boundary-crossing records (sleep over midnight) safe:
+        // both windows yield the same start-keyed record, second copy collapses.
         for (m in methods) {
             if (m in HcAggregators.AGGREGATED || m == RecordMethod.FOOD_LOG || m == RecordMethod.HEART_RATE) continue
-            val list = readMethod(client, m, fromMs, toMs)
-            if (list.isNotEmpty()) out.getOrPut(m) { ArrayList() }.addAll(list)
-            onSlice(m, toMs, list)
+            var dayStart = fromMs
+            while (dayStart < toMs) {
+                val dayEnd = minOf(dayStart + SLICE_MS, toMs)
+                val list = readMethod(client, m, dayStart, dayEnd)
+                if (list.isNotEmpty()) out.getOrPut(m) { ArrayList() }.addAll(list)
+                onSlice(m, dayEnd, list)
+                dayStart = dayEnd
+            }
         }
         // HEART_RATE: sample-level, but the web only ever needs ~2 days of it
         // (records.ts DEFAULT_HR_DAYS = 2) — zones, maxHr and the live graph
@@ -165,6 +175,7 @@ object HcReaders {
         block: (T) -> HealthRecord,
     ): List<HealthRecord> {
         val out = ArrayList<HealthRecord>()
+        val seen = HashSet<String>() // start|end keys, for token-loop detection
         var token: String? = null
         var page = 0
         do {
@@ -202,12 +213,18 @@ object HcReaders {
             if (response == null) break
             page++
             val n = response.records.size
-            Log.d("ScatterFitSync", "readAll: $label page=$page rows=$n more=${token != null}")
-            if (page >= minOf(maxPages, MAX_PAGES_PER_CALL)) {
-                Log.w("ScatterFitSync", "readAll: $label hit MAX_PAGES_PER_CALL=$MAX_PAGES_PER_CALL — token chain may be looping, breaking")
+            Log.d("ScatterFitSync", "readAll: $label page=$page rows=$n more=${response.pageToken != null}")
+            val translated = response.records.map(block)
+            // Loop detection: a page that adds ZERO new records is either empty
+            // or re-serving rows we already have — the provider's token chain
+            // is looping (live 2026-10-09: NUTRITION pages of the same 2 rows,
+            // forever). Break instead of crawling to the page breaker.
+            val freshCount = translated.count { seen.add("${it.start}|${it.end}") }
+            if (freshCount == 0) {
+                Log.w("ScatterFitSync", "readAll: $label page=$page added 0 new rows — token chain looping/empty, stopping read")
                 break
             }
-            out.addAll(response.records.map(block))
+            out.addAll(translated)
             token = response.pageToken
             // Pacing: the provider throttles under request pressure (pages
             // shrank 1000 -> 36 rows as quota drained, live 2026-10-09). A
