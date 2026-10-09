@@ -112,7 +112,7 @@ object HcReaders {
             // Rate-limit aware: the provider serves throttled (tiny) pages as
             // quota runs low, then rejects outright with RemoteException. Back
             // off and retry the SAME token instead of burning the slice.
-            var response: ReadResponse<T>? = null
+            var response: ReadRecordsResponse<T>? = null
             for (attempt in 0..RATE_RETRY_MAX) {
                 try {
                     response = withTimeoutOrNull(PAGE_TIMEOUT_MS) {
