@@ -16,7 +16,9 @@ import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
 
 /** The ONLY file allowed to know Health Connect types exist (Foundations:
@@ -32,6 +34,13 @@ object HcReaders {
     /** Max wall-time for ONE readRecords page call. */
     const val PAGE_TIMEOUT_MS: Long = 30_000
 
+    /** Read the window in slices of this size. A wedged provider call
+     *  costs one slice, not the whole history. */
+    const val SLICE_MS: Long = 24L * 60 * 60 * 1000
+
+    /** Circuit breaker: never trust a page token chain to terminate. */
+    const val MAX_PAGES_PER_CALL: Int = 400
+
     /** Window is [fromMs, toMs). Note: sleep sessions may START before fromMs —
      *  a session crossing the cursor boundary is read on its start timestamp,
      *  same convention the web's fetch uses (start-gte/lt). Sync cursors are
@@ -42,24 +51,33 @@ object HcReaders {
         toMs: Long,
         methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
     ): Map<RecordMethod, List<HealthRecord>> {
-        val out = HashMap<RecordMethod, List<HealthRecord>>()
-        for (m in methods) {
-            Log.d("ScatterFitSync", "readAll: READING ${m.name} ${fromMs}..${toMs}")
-            val list = when (m) {
-                RecordMethod.STEPS -> readSteps(client, fromMs, toMs)
-                RecordMethod.DISTANCE -> readDistance(client, fromMs, toMs)
-                RecordMethod.NUTRITION -> readNutrition(client, fromMs, toMs)
-                RecordMethod.FOOD_LOG -> emptyList() // in-app logger, not HC — write path, separate store
-                RecordMethod.TOTAL_CALORIES_BURNED -> readTotalCaloriesBurned(client, fromMs, toMs)
-                RecordMethod.WEIGHT -> readWeight(client, fromMs, toMs)
-                RecordMethod.RESTING_HEART_RATE -> readRestingHeartRate(client, fromMs, toMs)
-                RecordMethod.SLEEP_SESSION -> readSleepSession(client, fromMs, toMs)
-                RecordMethod.EXERCISE_SESSION -> readExerciseSession(client, fromMs, toMs)
-                RecordMethod.BODY_FAT -> readBodyFat(client, fromMs, toMs)
-                RecordMethod.HEART_RATE -> readHeartRate(client, fromMs, toMs)
-                RecordMethod.BASAL_METABOLIC_RATE -> readBasalMetabolicRate(client, fromMs, toMs)
+        val out = HashMap<RecordMethod, MutableList<HealthRecord>>()
+        val totalSlices = ((toMs - fromMs) + SLICE_MS - 1) / SLICE_MS
+        var sliceStart = fromMs
+        var slice = 0
+        while (sliceStart < toMs) {
+            val sliceEnd = minOf(sliceStart + SLICE_MS, toMs)
+            slice++
+            for (m in methods) {
+                if (m == RecordMethod.FOOD_LOG) continue // in-app logger, not HC — write path, separate store
+                val list = when (m) {
+                    RecordMethod.STEPS -> readSteps(client, sliceStart, sliceEnd)
+                    RecordMethod.DISTANCE -> readDistance(client, sliceStart, sliceEnd)
+                    RecordMethod.NUTRITION -> readNutrition(client, sliceStart, sliceEnd)
+                    RecordMethod.FOOD_LOG -> emptyList()
+                    RecordMethod.TOTAL_CALORIES_BURNED -> readTotalCaloriesBurned(client, sliceStart, sliceEnd)
+                    RecordMethod.WEIGHT -> readWeight(client, sliceStart, sliceEnd)
+                    RecordMethod.RESTING_HEART_RATE -> readRestingHeartRate(client, sliceStart, sliceEnd)
+                    RecordMethod.SLEEP_SESSION -> readSleepSession(client, sliceStart, sliceEnd)
+                    RecordMethod.EXERCISE_SESSION -> readExerciseSession(client, sliceStart, sliceEnd)
+                    RecordMethod.BODY_FAT -> readBodyFat(client, sliceStart, sliceEnd)
+                    RecordMethod.HEART_RATE -> readHeartRate(client, sliceStart, sliceEnd)
+                    RecordMethod.BASAL_METABOLIC_RATE -> readBasalMetabolicRate(client, sliceStart, sliceEnd)
+                }
+                if (list.isNotEmpty()) out.getOrPut(m) { ArrayList() }.addAll(list)
             }
-            if (list.isNotEmpty()) out[m] = list
+            Log.d("ScatterFitSync", "readAll: slice $slice/$totalSlices done (${sliceStart}..${sliceEnd})")
+            sliceStart = sliceEnd
         }
         return out
     }
@@ -78,16 +96,25 @@ object HcReaders {
         var token: String? = null
         var page = 0
         do {
-            // Timeout per PAGE, not per method: a slow-but-progressing read
-            // keeps getting fresh tokens; only a single wedged IPC call dies.
-            // (Samsung provider sometimes never returns one page — seen live
-            // 2026-10-09: STEPS page hung 7+ min.)
-            val response = withTimeout(PAGE_TIMEOUT_MS) {
-                client.readRecords(ReadRecordsRequest<T>(window(fromMs, toMs), pageToken = token))
+            // withTimeoutOrNull + abandoned child: if the provider wedges mid-IPC
+            // and the call never reaches a suspension point, plain withTimeout
+            // CANNOT interrupt it (seen live 2026-10-09: STEPS page hung 20+ min,
+            // timeout never fired). The orphaned child stays blocked on IO but
+            // the reader MOVES ON — one wedge costs one page, not the sync.
+            val response = withTimeoutOrNull(PAGE_TIMEOUT_MS) {
+                coroutineScope { async { client.readRecords(ReadRecordsRequest<T>(window(fromMs, toMs), pageToken = token)) }.await() }
+            }
+            if (response == null) {
+                Log.w("ScatterFitSync", "readAll: $label page=${page + 1} TIMED OUT (${PAGE_TIMEOUT_MS / 1000}s) — skipping rest of slice")
+                break
             }
             page++
             val n = response.records.size
             Log.d("ScatterFitSync", "readAll: $label page=$page rows=$n more=${token != null}")
+            if (page >= MAX_PAGES_PER_CALL) {
+                Log.w("ScatterFitSync", "readAll: $label hit MAX_PAGES_PER_CALL=$MAX_PAGES_PER_CALL — token chain may be looping, breaking")
+                break
+            }
             out.addAll(response.records.map(block))
             token = response.pageToken
         } while (token != null)
