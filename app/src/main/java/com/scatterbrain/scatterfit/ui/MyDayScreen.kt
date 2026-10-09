@@ -67,9 +67,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.core.dayBefore
+import com.scatterbrain.scatterfit.data.Daily
+import com.scatterbrain.scatterfit.data.TaskChecklist
+import com.scatterbrain.scatterfit.data.Zones
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
@@ -97,18 +101,32 @@ fun MyDayScreen(
     var dailyCalorieTarget by remember { mutableIntStateOf(1800) }
     var checkInCompletedValue by remember { mutableStateOf("Target updated (1,800 kcal)") }
 
-    var weighInCompleted by remember { mutableStateOf(false) }
-    var weighInData by remember { mutableStateOf("") }
-
-    var foodLogCompleted by remember { mutableStateOf(false) }
-    var foodLogData by remember { mutableStateOf("345 / 1800 kcal") }
-
+    // Manual tick state (session-only stopgap until weigh-in dialog writes HC records)
+    var manualWeighIn by remember { mutableStateOf(false) }
+    var manualFood by remember { mutableStateOf(false) }
     var trainCompleted by remember { mutableStateOf(false) }
     var trainData by remember { mutableStateOf("HIIT 20 minutes") }
 
-    // Steps pedometer state (reading emulated steps source)
-    var stepsToday by remember { mutableIntStateOf(8420) }
-    val dailyStepTarget = 10_000
+    // DERIVED checklist: completed-ness comes from the day's data (sync OR
+    // manual write), never from flipping booleans. Streams live with sync.
+    val hubRecords = SyncHub.records.collectAsState().value
+    val checklistDaily = remember(hubRecords) {
+        hubRecords?.let {
+            Daily.buildDailyDataFromMaps(
+                it, Zones.DEFAULT_ZONES, ZoneId.systemDefault(),
+                nowMs = System.currentTimeMillis(),
+            )
+        }
+    }
+    val checklist = remember(checklistDaily, currentDayKey, dailyCalorieTarget, manualWeighIn, manualFood) {
+        TaskChecklist.derive(
+            daily = checklistDaily,
+            dayKey = currentDayKey,
+            calorieTarget = dailyCalorieTarget,
+            manualWeighIn = manualWeighIn,
+            manualFood = manualFood,
+        )
+    }
 
     var showWeighInDialog by remember { mutableStateOf(false) }
     var showWeeklyCheckInDialog by remember { mutableStateOf(false) }
@@ -117,8 +135,9 @@ fun MyDayScreen(
         WeighInDialog(
             onDismiss = { showWeighInDialog = false },
             onSubmitWeight = { weight, bodyFat ->
-                weighInData = "${weight}kg • ${bodyFat}% body fat"
-                weighInCompleted = true
+                // Until the dialog writes an HC WEIGHT record, a manual entry
+                // is a session tick that ORs into the derived state.
+                manualWeighIn = true
             }
         )
     }
@@ -129,7 +148,6 @@ fun MyDayScreen(
             onCompleteCheckIn = { newTarget ->
                 dailyCalorieTarget = newTarget
                 checkInCompletedValue = "Target: %,d kcal".format(newTarget)
-                foodLogData = "345 / %,d kcal".format(newTarget)
                 weeklyCheckInCompleted = true
             },
             currentTargetKcal = dailyCalorieTarget,
@@ -205,7 +223,7 @@ fun MyDayScreen(
         val hubRecords by SyncHub.records.collectAsState()
         val momentumSource: MomentumSource = remember(hubRecords) { TodayFacadeMomentumSource(hcRecords = hubRecords) }
 
-        val isTodayLogged = foodLogCompleted || weighInCompleted || trainCompleted || weeklyCheckInCompleted || drinkState.loggedDrinks.isNotEmpty()
+        val isTodayLogged = checklist.weighInCompleted || checklist.foodLogCompleted || trainCompleted || weeklyCheckInCompleted || drinkState.loggedDrinks.isNotEmpty()
         val streakInfo = remember(momentumSource, today, isTodayLogged) {
             momentumSource.computeStreak(today = today, todayLoggedOverride = isTodayLogged)
         }
@@ -253,20 +271,22 @@ fun MyDayScreen(
                     if (!weeklyCheckInCompleted) showWeeklyCheckInDialog = true else weeklyCheckInCompleted = false
                 }
             },
-            weighInCompleted = weighInCompleted,
-            weighInData = weighInData,
+            weighInCompleted = checklist.weighInCompleted,
+            weighInData = checklist.weighInData ?: "",
             onWeighInClick = {
                 if (!isFutureDay) {
-                    if (!weighInCompleted) showWeighInDialog = true else weighInCompleted = false
+                    // Until manual writes create records: tick a session-only manual
+                    // override. Once the dialog writes HC records, untick = delete.
+                    if (!checklist.weighInCompleted) showWeighInDialog = true else manualWeighIn = false
                 }
             },
-            foodLogCompleted = foodLogCompleted,
-            foodLogData = foodLogData,
-            onFoodLogClick = { if (!isFutureDay) foodLogCompleted = !foodLogCompleted },
+            foodLogCompleted = checklist.foodLogCompleted,
+            foodLogData = checklist.foodLogData ?: "",
+            onFoodLogClick = { if (!isFutureDay) manualFood = !manualFood },
             trainCompleted = trainCompleted,
             trainData = trainData,
             onTrainClick = { if (!isFutureDay) trainCompleted = !trainCompleted },
-            stepsToday = if (isFutureDay) 0 else stepsToday,
+            stepsToday = if (isFutureDay) 0 else (checklist.stepsToday ?: 0.0).toInt(),
             dailyStepTarget = dailyStepTarget,
             isFutureDay = isFutureDay,
             subtitleText = "Log anything today to start a streak",
