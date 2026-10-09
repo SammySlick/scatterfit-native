@@ -15,6 +15,9 @@ import java.time.ZoneId
  * and hero numbers can never disagree about what a day was. Picks read the
  * assembled day maps; the source walks back up to HISTORY_DAYS looking for
  * the newest non-null value (missing days are gaps, not zeros).
+ *
+ * The registry drives everything: forMetric(id) reads the def's methods and
+ * value function. There is no per-metric plumbing left to forget.
  */
 class StoreDailySource(
     private val ad: AssembledDaily,
@@ -57,33 +60,19 @@ class StoreDailySource(
 }
 
 /**
- * Production sources — each reads only its own methods from the sync cache.
- * Returns null when the store isn't attached yet (cold start before first
- * sync); the UI layer decides what to show then (demo stubs stay available
- * to it — data never imports ui).
+ * Production sources — the registry is the routing table. Returns null when
+ * the store isn't attached yet (cold start before first sync); the UI layer
+ * decides what to show then (demo stubs stay available to it — data never
+ * imports ui).
  */
 object RealMetricSources {
-    fun steps(
+    fun forMetric(
+        id: com.scatterbrain.scatterfit.core.MetricId,
         store: SyncStore? = SyncHub.store,
         zone: ZoneId = ZoneId.systemDefault(),
         nowMs: Long = System.currentTimeMillis(),
     ): MetricSource? = store?.let { s ->
-        StoreDailySource.fromStore(s, zone, nowMs, listOf(RecordMethod.STEPS)) { ad, k -> ad.steps[k] }
-    }
-
-    fun sleep(
-        store: SyncStore? = SyncHub.store,
-        zone: ZoneId = ZoneId.systemDefault(),
-        nowMs: Long = System.currentTimeMillis(),
-    ): MetricSource? = store?.let { s ->
-        StoreDailySource.fromStore(s, zone, nowMs, listOf(RecordMethod.SLEEP_SESSION)) { ad, k -> ad.sleep[k]?.let { it.totalMin / 60.0 } }
-    }
-
-    fun weight(
-        store: SyncStore? = SyncHub.store,
-        zone: ZoneId = ZoneId.systemDefault(),
-        nowMs: Long = System.currentTimeMillis(),
-    ): MetricSource? = store?.let { s ->
-        StoreDailySource.fromStore(s, zone, nowMs, listOf(RecordMethod.WEIGHT)) { ad, k -> ad.weight[k] }
+        val def = com.scatterbrain.scatterfit.core.MetricRegistry.byId(id)
+        StoreDailySource.fromStore(s, zone, nowMs, def.methods, def.valueFrom)
     }
 }

@@ -82,6 +82,8 @@ fun MetricPageScreen(
     metricSource: MetricSource,
     anchorDayKey: String = remember { todayKey() },
     today: String = remember { todayKey() },
+    /** Optional slot between header and hero — metric-to-metric nav, special sections. */
+    topSlot: (@Composable () -> Unit)? = null,
     onBackClick: () -> Unit,
     formatValue: (Double?) -> String = { it?.toString() ?: "—" },
     showList: Boolean = true,
@@ -150,6 +152,9 @@ fun MetricPageScreen(
                 color = TextForeground
             )
         }
+
+        // 1b. Optional top slot (chip row / special section, Sam 2026-10-10: special sections sit ABOVE the chart)
+        topSlot?.invoke()
 
         // 2. Hero block: value + unit + verdict pill + delta context line
         Card(
