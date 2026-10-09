@@ -67,6 +67,7 @@ class SyncEngine(
         // the same logical record edited; fresh data is authoritative.
         val byKey = HashMap<RecordMethod, LinkedHashMap<String, HealthRecord>>()
         val sliceCount = HashMap<RecordMethod, Int>()
+        val attempted = HashMap<RecordMethod, Boolean>() // reader touched this method at all
         for (m in methods) {
             val existing = store.load(m).records
             val map = LinkedHashMap<String, HealthRecord>(existing.size + 64)
@@ -76,9 +77,10 @@ class SyncEngine(
         }
 
         val onSlice: suspend (RecordMethod, Long, List<HealthRecord>) -> Unit = { m, sliceCursor, sliceRecords ->
+            attempted[m] = true
             val map = byKey.getValue(m)
             for (r in sliceRecords) map[SyncStore.key(m, r)] = r
-            val out = ArrayList(map.values)
+            val out = pruneFor(m, ArrayList(map.values), now)
             merged[m] = out
             sliceCount[m] = (sliceCount[m] ?: 0) + sliceRecords.size
             fetchedBy[m] = sliceCount[m] ?: 0
@@ -89,9 +91,18 @@ class SyncEngine(
 
         for (m in methods) {
             val newRecords = fresh[m] ?: emptyList()
+            // Cursor-freeze protocol: a method the reader never attempted (no
+            // slice callback, not in the return map) was NOT read this pass —
+            // e.g. aggregation found no origins — so freeze its cursor and
+            // surface the cached state; the next sync retries the window.
+            // A method that WAS attempted but found nothing advances normally.
+            if (attempted[m] != true && newRecords.isEmpty()) {
+                merged[m] = ArrayList(byKey.getValue(m).values)
+                continue
+            }
             val map = byKey.getValue(m)
             for (r in newRecords) map[SyncStore.key(m, r)] = r
-            val out = ArrayList(map.values)
+            val out = pruneFor(m, ArrayList(map.values), now)
             // Fake/test readers that ignore the callback report their whole
             // batch in the return map; count that. Slice-reporting readers are
             // already counted (their return map is the same records).
@@ -118,10 +129,22 @@ class SyncEngine(
         return (oldest ?: (now - lookbackMs)) - overlapMs
     }
 
+    /** HEART_RATE raw records: the cache holds recent samples only (web parity
+     *  — the web never persists raw HR, it fetches ~2 days on demand). Pruned
+     *  before every save so the store stays bounded; records with an
+     *  unparseable start are kept (never delete what you can't date). */
+    private fun pruneFor(m: RecordMethod, list: List<HealthRecord>, now: Long): List<HealthRecord> {
+        if (m != RecordMethod.HEART_RATE) return list
+        val cutoff = now - HR_PRUNE_MS
+        return list.filter { (parseMillis(it.start) ?: cutoff) >= cutoff }
+    }
+
     companion object {
         /** Re-read window behind the cursor for late writes/edits. */
         const val OVERLAP_MS: Long = 24L * 60 * 60 * 1000
         /** First sync look-back — the engine's HISTORY_DAYS window. */
         const val LOOKBACK_MS: Long = 120L * 24 * 60 * 60 * 1000
+        /** HR raw records older than this leave the cache on the next save. */
+        const val HR_PRUNE_MS: Long = 7L * 24 * 60 * 60 * 1000
     }
 }

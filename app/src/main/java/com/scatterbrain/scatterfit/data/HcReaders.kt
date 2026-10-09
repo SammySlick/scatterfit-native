@@ -43,6 +43,11 @@ object HcReaders {
     /** Circuit breaker: never trust a page token chain to terminate. */
     const val MAX_PAGES_PER_CALL: Int = 400
 
+    /** HEART_RATE raw read window (today + yesterday). The web reads HR
+     *  on demand for DEFAULT_HR_DAYS = 2 and never persists raw samples;
+     *  the engine prunes the cache to match. */
+    const val HR_RAW_WINDOW_MS: Long = 2 * 24L * 60 * 60 * 1000
+
     /** Pause between pages of the same paginated read. */
     const val PAGE_PAUSE_MS: Long = 250
 
@@ -65,35 +70,86 @@ object HcReaders {
         onSlice: suspend (RecordMethod, Long, List<HealthRecord>) -> Unit = { _, _, _ -> },
     ): Map<RecordMethod, List<HealthRecord>> {
         val out = HashMap<RecordMethod, MutableList<HealthRecord>>()
-        val totalSlices = ((toMs - fromMs) + SLICE_MS - 1) / SLICE_MS
-        var sliceStart = fromMs
-        var slice = 0
-        while (sliceStart < toMs) {
-            val sliceEnd = minOf(sliceStart + SLICE_MS, toMs)
-            slice++
-            for (m in methods) {
-                if (m == RecordMethod.FOOD_LOG) continue // in-app logger, not HC — write path, separate store
-                val list = when (m) {
-                    RecordMethod.STEPS -> readSteps(client, sliceStart, sliceEnd)
-                    RecordMethod.DISTANCE -> readDistance(client, sliceStart, sliceEnd)
-                    RecordMethod.NUTRITION -> readNutrition(client, sliceStart, sliceEnd)
-                    RecordMethod.FOOD_LOG -> emptyList()
-                    RecordMethod.TOTAL_CALORIES_BURNED -> readTotalCaloriesBurned(client, sliceStart, sliceEnd)
-                    RecordMethod.WEIGHT -> readWeight(client, sliceStart, sliceEnd)
-                    RecordMethod.RESTING_HEART_RATE -> readRestingHeartRate(client, sliceStart, sliceEnd)
-                    RecordMethod.SLEEP_SESSION -> readSleepSession(client, sliceStart, sliceEnd)
-                    RecordMethod.EXERCISE_SESSION -> readExerciseSession(client, sliceStart, sliceEnd)
-                    RecordMethod.BODY_FAT -> readBodyFat(client, sliceStart, sliceEnd)
-                    RecordMethod.HEART_RATE -> readHeartRate(client, sliceStart, sliceEnd)
-                    RecordMethod.BASAL_METABOLIC_RATE -> readBasalMetabolicRate(client, sliceStart, sliceEnd)
-                }
-                if (list.isNotEmpty()) out.getOrPut(m) { ArrayList() }.addAll(list)
-                onSlice(m, sliceEnd, list)
+        // High-volume types (steps, distance, calories): daily AGGREGATION per
+        // data origin — one call per origin for the whole window, instead of
+        // ~720k raw records. Live failure 2026-10-09: raw paging of Samsung's
+        // near-continuous step increments burned the request quota (pages
+        // shrank 1000 -> 36 rows, then rejection) and made first sync take
+        // hours. See HcAggregators for the full rationale.
+        val aggregated = methods intersect HcAggregators.AGGREGATED
+        if (aggregated.isNotEmpty()) {
+            for ((m, list) in HcAggregators.readAggregated(client, fromMs, toMs, aggregated, onSlice)) {
+                out.getOrPut(m) { ArrayList() }.addAll(list)
             }
-            Log.d("ScatterFitSync", "readAll: slice $slice/$totalSlices done (${sliceStart}..${sliceEnd})")
-            sliceStart = sliceEnd
+        }
+        // Low-volume types (sleep, weight, RHR, exercise, body fat, nutrition,
+        // BMR): read fine over the WHOLE window in a handful of pages —
+        // day-slicing would multiply calls by 120 for nothing. A wedge on one
+        // method costs that method's pass, not the sync.
+        for (m in methods) {
+            if (m in HcAggregators.AGGREGATED || m == RecordMethod.FOOD_LOG || m == RecordMethod.HEART_RATE) continue
+            val list = readMethod(client, m, fromMs, toMs)
+            if (list.isNotEmpty()) out.getOrPut(m) { ArrayList() }.addAll(list)
+            onSlice(m, toMs, list)
+        }
+        // HEART_RATE: sample-level, but the web only ever needs ~2 days of it
+        // (records.ts DEFAULT_HR_DAYS = 2) — zones, maxHr and the live graph
+        // consume RECENT samples; the engine prunes older HR from the cache.
+        // Clamping the read window keeps the biggest record type small.
+        if (RecordMethod.HEART_RATE in methods) {
+            val start = maxOf(fromMs, toMs - HR_RAW_WINDOW_MS)
+            val list = if (start < toMs) readHeartRate(client, start, toMs) else emptyList()
+            if (list.isNotEmpty()) out.getOrPut(RecordMethod.HEART_RATE) { ArrayList() }.addAll(list)
+            onSlice(RecordMethod.HEART_RATE, toMs, list)
         }
         return out
+    }
+
+    /** Raw records, newest first, capped pages — used to discover which apps
+     *  (data origins) write a type, before per-origin aggregation. The probe
+     *  reuses [read]'s rate-limit machinery; its records are NOT stored
+     *  (only their app fields are inspected). */
+    suspend fun probeRaw(
+        client: HealthConnectClient,
+        method: RecordMethod,
+        fromMs: Long,
+        toMs: Long,
+        maxPages: Int,
+    ): List<HealthRecord> {
+        if (fromMs >= toMs) return emptyList()
+        return when (method) {
+            RecordMethod.STEPS -> read(client, fromMs, toMs, "Probe.Steps", { r: StepsRecord ->
+                HcTranslate.steps(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
+                    r.endTime.toEpochMilli(), r.count)
+            }, ascendingOrder = false, maxPages = maxPages)
+            RecordMethod.DISTANCE -> read(client, fromMs, toMs, "Probe.Distance", { r: DistanceRecord ->
+                HcTranslate.distance(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
+                    r.endTime.toEpochMilli(), r.distance.inMeters)
+            }, ascendingOrder = false, maxPages = maxPages)
+            RecordMethod.TOTAL_CALORIES_BURNED -> read(client, fromMs, toMs, "Probe.Calories", { r: TotalCaloriesBurnedRecord ->
+                HcTranslate.totalCaloriesBurned(r.metadata.dataOrigin.packageName, r.startTime.toEpochMilli(),
+                    r.endTime.toEpochMilli(), r.energy.inKilocalories)
+            }, ascendingOrder = false, maxPages = maxPages)
+            else -> emptyList()
+        }
+    }
+
+    /** Whole-window raw read dispatch for the low-volume types. */
+    private suspend fun readMethod(
+        client: HealthConnectClient,
+        m: RecordMethod,
+        fromMs: Long,
+        toMs: Long,
+    ): List<HealthRecord> = when (m) {
+        RecordMethod.NUTRITION -> readNutrition(client, fromMs, toMs)
+        RecordMethod.TOTAL_CALORIES_BURNED -> readTotalCaloriesBurned(client, fromMs, toMs)
+        RecordMethod.WEIGHT -> readWeight(client, fromMs, toMs)
+        RecordMethod.RESTING_HEART_RATE -> readRestingHeartRate(client, fromMs, toMs)
+        RecordMethod.SLEEP_SESSION -> readSleepSession(client, fromMs, toMs)
+        RecordMethod.EXERCISE_SESSION -> readExerciseSession(client, fromMs, toMs)
+        RecordMethod.BODY_FAT -> readBodyFat(client, fromMs, toMs)
+        RecordMethod.BASAL_METABOLIC_RATE -> readBasalMetabolicRate(client, fromMs, toMs)
+        else -> emptyList() // FOOD_LOG never syncs; STEPS/DISTANCE/HEART_RATE handled above
     }
 
     private fun window(fromMs: Long, toMs: Long) =
@@ -105,6 +161,8 @@ object HcReaders {
         toMs: Long,
         label: String,
         block: (T) -> HealthRecord,
+        ascendingOrder: Boolean = true,
+        maxPages: Int = Int.MAX_VALUE,
     ): List<HealthRecord> {
         val out = ArrayList<HealthRecord>()
         var token: String? = null
@@ -122,7 +180,7 @@ object HcReaders {
             for (attempt in 0..RATE_RETRY_MAX) {
                 try {
                     response = withTimeoutOrNull(PAGE_TIMEOUT_MS) {
-                        coroutineScope { async { client.readRecords(ReadRecordsRequest<T>(window(fromMs, toMs), pageToken = token)) }.await() }
+                        coroutineScope { async { client.readRecords(ReadRecordsRequest<T>(window(fromMs, toMs), ascendingOrder = ascendingOrder, pageToken = token)) }.await() }
                     }
                 } catch (e: Exception) {
                     val msg = e.message ?: ""
@@ -145,7 +203,7 @@ object HcReaders {
             page++
             val n = response.records.size
             Log.d("ScatterFitSync", "readAll: $label page=$page rows=$n more=${token != null}")
-            if (page >= MAX_PAGES_PER_CALL) {
+            if (page >= minOf(maxPages, MAX_PAGES_PER_CALL)) {
                 Log.w("ScatterFitSync", "readAll: $label hit MAX_PAGES_PER_CALL=$MAX_PAGES_PER_CALL — token chain may be looping, breaking")
                 break
             }
