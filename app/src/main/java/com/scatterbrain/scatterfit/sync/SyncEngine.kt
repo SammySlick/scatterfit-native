@@ -46,16 +46,18 @@ class SyncEngine(
      *  throttled 36-row pages and burned the quota again. */
     suspend fun sync(
         methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
+        /** Fired after each slice commit (and once at sync end) with the
+         *  live whole-cache snapshot — cache + everything committed so far —
+         *  so the UI can stream while the sync is still running.
+         *  NB: MUST sit before `reader` so trailing-lambda callers bind to
+         *  reader, not here (r89 lesson). */
+        onProgress: suspend (Map<RecordMethod, List<HealthRecord>>) -> Unit = {},
         reader: suspend (
             Set<RecordMethod>,
             Long,
             Long,
             suspend (RecordMethod, Long, List<HealthRecord>) -> Unit,
         ) -> Map<RecordMethod, List<HealthRecord>>,
-        /** Fired after each slice commit (and once at sync end) with the
-         *  live whole-cache snapshot — cache + everything committed so far —
-         *  so the UI can stream while the sync is still running. */
-        onProgress: suspend (Map<RecordMethod, List<HealthRecord>>) -> Unit = {},
     ): SyncResult {
         val now = nowMs()
         val from = windowStart(methods, now)

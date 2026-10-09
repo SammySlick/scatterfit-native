@@ -1,5 +1,6 @@
 package com.scatterbrain.scatterfit.data
 
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -13,6 +14,8 @@ class TaskChecklistTest {
         caloriesEaten = mapOf("2026-10-09" to 345.0),
         weight = mapOf("2026-10-09" to 84.2),
         bodyFat = mapOf("2026-10-09" to 26.8),
+        zoneBounds = Zones.DEFAULT_ZONES,
+        zone = ZoneId.of("Europe/London"),
     )
 
     @Test
@@ -48,8 +51,11 @@ class TaskChecklistTest {
 
     @Test
     fun `steps are pure data - no data means null not a fake number`() {
-        val empty = TaskChecklist.derive(AssembledDaily(), "2026-10-09", 1800)
+        val empty = TaskChecklist.derive(
+            AssembledDaily(zoneBounds = Zones.DEFAULT_ZONES, zone = ZoneId.of("Europe/London")),
+            "2026-10-09", 1800,
+        )
         assertNull(empty.stepsToday)
-        assertEquals(8420.0, TaskChecklist.derive(daily, "2026-10-09", 1800).stepsToday, 0.0)
+        assertEquals(8420.0, TaskChecklist.derive(daily, "2026-10-09", 1800).stepsToday!!, 0.0)
     }
 }
