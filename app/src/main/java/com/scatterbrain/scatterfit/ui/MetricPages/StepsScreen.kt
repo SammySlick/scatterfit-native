@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.scatterbrain.scatterfit.ui.MetricSource
+import com.scatterbrain.scatterfit.data.RealMetricSources
 import com.scatterbrain.scatterfit.ui.StepsMetricSourceStub
 import com.scatterbrain.scatterfit.core.PaceMode
 import com.scatterbrain.scatterfit.core.dailyPaceScore
@@ -21,7 +22,7 @@ import java.util.Locale
 fun StepsScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
-    metricSource: MetricSource = remember { StepsMetricSourceStub() },
+    metricSource: MetricSource = remember { RealMetricSources.steps() ?: StepsMetricSourceStub() },
     todayKey: String = remember { todayKey() },
     dailyTarget: Int = 10_000
 ) {

@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.scatterbrain.scatterfit.ui.MetricSource
 import com.scatterbrain.scatterfit.ui.WeightMetricSourceStub
+import com.scatterbrain.scatterfit.data.RealMetricSources
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.ui.MetricChartType
 import com.scatterbrain.scatterfit.ui.MetricPageScreen
@@ -15,7 +16,7 @@ import java.util.Locale
 fun WeightScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
-    metricSource: MetricSource = remember { WeightMetricSourceStub() },
+    metricSource: MetricSource = remember { RealMetricSources.weight() ?: WeightMetricSourceStub() },
     todayKey: String = remember { todayKey() }
 ) {
     val latest = remember(metricSource) { metricSource.latest() }

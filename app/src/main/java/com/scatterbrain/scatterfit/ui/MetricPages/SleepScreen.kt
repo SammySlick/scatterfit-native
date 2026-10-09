@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.scatterbrain.scatterfit.ui.MetricSource
+import com.scatterbrain.scatterfit.data.RealMetricSources
 import com.scatterbrain.scatterfit.ui.SleepMetricSourceStub
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.ui.MetricChartType
@@ -15,7 +16,7 @@ import kotlin.math.roundToInt
 fun SleepScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
-    metricSource: MetricSource = remember { SleepMetricSourceStub() },
+    metricSource: MetricSource = remember { RealMetricSources.sleep() ?: SleepMetricSourceStub() },
     todayKey: String = remember { todayKey() }
 ) {
     val latest = remember(metricSource) { metricSource.latest() }
