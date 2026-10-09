@@ -59,6 +59,10 @@ object HcReaders {
         fromMs: Long,
         toMs: Long,
         methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
+        /** Called after each completed slice read, per method: (method,
+         *  sliceEndMs, slice records). The engine commits + advances the
+         *  cursor per slice, so a killed sync resumes instead of restarting. */
+        onSlice: suspend (RecordMethod, Long, List<HealthRecord>) -> Unit = { _, _, _ -> },
     ): Map<RecordMethod, List<HealthRecord>> {
         val out = HashMap<RecordMethod, MutableList<HealthRecord>>()
         val totalSlices = ((toMs - fromMs) + SLICE_MS - 1) / SLICE_MS
@@ -84,6 +88,7 @@ object HcReaders {
                     RecordMethod.BASAL_METABOLIC_RATE -> readBasalMetabolicRate(client, sliceStart, sliceEnd)
                 }
                 if (list.isNotEmpty()) out.getOrPut(m) { ArrayList() }.addAll(list)
+                onSlice(m, sliceEnd, list)
             }
             Log.d("ScatterFitSync", "readAll: slice $slice/$totalSlices done (${sliceStart}..${sliceEnd})")
             sliceStart = sliceEnd
