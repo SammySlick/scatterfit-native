@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,14 +20,18 @@ import kotlinx.coroutines.launch
  *  lives in SyncEngine/SyncHub; this file makes no decisions. */
 class SyncService : Service() {
 
+    private val TAG = "ScatterFitSync"
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "service onStartCommand — starting foreground + sync")
         startForeground(NOTIF_ID, buildNotification())
         scope.launch {
             SyncHub.syncNow()
+            Log.d(TAG, "service sync returned — stopping")
             stopSelf(startId)
         }
         return START_NOT_STICKY
