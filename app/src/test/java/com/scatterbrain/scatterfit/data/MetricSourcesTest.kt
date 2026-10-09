@@ -1,4 +1,6 @@
-@Suppress("unused") // Daily.daysAgoKey used in tests
+package com.scatterbrain.scatterfit.data
+
+import com.scatterbrain.scatterfit.data.Daily
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
