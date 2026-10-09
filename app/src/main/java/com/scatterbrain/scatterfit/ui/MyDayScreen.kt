@@ -100,25 +100,7 @@ fun MyDayScreen(
     var weeklyCheckInCompleted by remember { mutableStateOf(false) }
     var dailyCalorieTarget by remember { mutableIntStateOf(1800) }
     var checkInCompletedValue by remember { mutableStateOf("Target updated (1,800 kcal)") }
-
-    // DERIVED checklist: completed-ness comes from the day's data — sync OR a
-    // manual record write (weigh-in dialog / food logger). No boolean ticks.
-    val hubRecords = SyncHub.records.collectAsState().value
-    val checklistDaily = remember(hubRecords) {
-        hubRecords?.let {
-            Daily.buildDailyDataFromMaps(
-                it, Zones.DEFAULT_ZONES, ZoneId.systemDefault(),
-                nowMs = System.currentTimeMillis(),
-            )
-        }
-    }
-    val checklist = remember(checklistDaily, currentDayKey, dailyCalorieTarget) {
-        TaskChecklist.derive(
-            daily = checklistDaily,
-            dayKey = currentDayKey,
-            calorieTarget = dailyCalorieTarget,
-        )
-    }
+    val dailyStepTarget = 10_000
 
     var showWeighInDialog by remember { mutableStateOf(false) }
     var showWeeklyCheckInDialog by remember { mutableStateOf(false) }
@@ -157,6 +139,25 @@ fun MyDayScreen(
     // Day key calendar navigation (using core/DayKeys contract)
     val today = remember { todayKey() }
     var currentDayKey by remember { mutableStateOf(today) }
+
+    // DERIVED checklist: completed-ness comes from the day's data — sync OR a
+    // manual record write (weigh-in dialog / food logger). No boolean ticks.
+    val checklistRecords = SyncHub.records.collectAsState().value
+    val checklistDaily = remember(checklistRecords) {
+        checklistRecords?.let {
+            Daily.buildDailyDataFromMaps(
+                it, Zones.DEFAULT_ZONES, ZoneId.systemDefault(),
+                nowMs = System.currentTimeMillis(),
+            )
+        }
+    }
+    val checklist = remember(checklistDaily, currentDayKey, dailyCalorieTarget) {
+        TaskChecklist.derive(
+            daily = checklistDaily,
+            dayKey = currentDayKey,
+            calorieTarget = dailyCalorieTarget,
+        )
+    }
 
     // Day-keyed persistent drink tracking ViewModel
     val context = androidx.compose.ui.platform.LocalContext.current

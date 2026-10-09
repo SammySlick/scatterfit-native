@@ -60,6 +60,9 @@ interface MomentumSource {
     fun sleepMinutesForDay(dayKey: String): Double?
     /** Resting HR for [dayKey]; null = no data yet (NOT "warming up" — say nothing). */
     fun restingHrForDay(dayKey: String): Double?
+
+    /** True when the source is running on the demo month (no synced cache). UI must SHOW it. */
+    val isUsingDemoData: Boolean get() = false
 }
 
 class TodayFacadeMomentumSource(
@@ -73,7 +76,7 @@ class TodayFacadeMomentumSource(
     private val demoMonth = makeDemoRecords(now, zone)
     /** True when there was no synced cache and we fell back to the demo month.
      *  The UI must SHOW this — silent demo data is the lie we're killing. */
-    val isUsingDemoData: Boolean = hcRecords == null || hcRecords.isEmpty()
+    override val isUsingDemoData: Boolean = hcRecords == null || hcRecords.isEmpty()
     private val recordsList: List<HealthRecord> = run {
         val records = HashMap<RecordMethod, List<HealthRecord>>()
         if (hcRecords != null && hcRecords.isNotEmpty()) {
@@ -206,8 +209,12 @@ class TodayFacadeMomentumSource(
     }
 
     override fun sleepMinutesForDay(dayKey: String): Double? {
-        val night = daily.sleep[dayKey] ?: daily.sleepNights.lastOrNull { it.night <= dayKey } ?: return null
-        return night.totalMin
+        // NB: sleep[dayKey] is SleepNight, sleepNights is MergedNight — keep the
+        // lookups separate (a joined elvis chain infers a common supertype with
+        // no totalMin; that's the r86/r88 failure).
+        val byMap = daily.sleep[dayKey]
+        if (byMap != null) return byMap.totalMin
+        return daily.sleepNights.lastOrNull { it.night <= dayKey }?.totalMin
     }
 
     override fun restingHrForDay(dayKey: String): Double? = daily.restingHr[dayKey]
