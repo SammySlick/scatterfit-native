@@ -34,15 +34,17 @@ class SyncEngineTest {
         val sliceEnd = NOW - lookback + 3 * dayMs // third daily slice
 
         // Sync 1: reader commits two slices, then dies (provider wedge / rate limit)
-        val e2 = org.junit.Assert.assertFailsWith<Exception> {
-            e.sync { methods, from, to, onSlice ->
+        var threw = false
+        try {
+            e.sync { _, _, _, onSlice ->
                 onSlice(RecordMethod.STEPS, sliceEnd, listOf(steps("2026-05-15T10:00:00Z")))
                 onSlice(RecordMethod.STEPS, sliceEnd + dayMs, listOf(steps("2026-05-16T10:00:00Z")))
                 throw IllegalStateException("provider wedged mid-read")
-                @Suppress("USELESS_ELABORATED_PARAMETER", "UNREACHABLE_CODE")
-                emptyMap<RecordMethod, List<HealthRecord>>()
             }
+        } catch (ex: IllegalStateException) {
+            threw = true
         }
+        assertTrue("sync should propagate the reader error", threw)
         // Cache holds the committed slices; cursor is at the last committed slice end
         val after = e.store.load(RecordMethod.STEPS)
         assertEquals(sliceEnd + dayMs, after.cursorMs)
