@@ -31,9 +31,12 @@ class TaskChecklistTest {
 
     @Test
     fun `manual weigh-in tick completes without data`() {
-        val s = TaskChecklist.derive(null, "2026-10-09", 1800, manualWeighIn = true)
-        assertTrue(s.weighInCompleted)
-        assertNull(s.weighInData) // no fabricated numbers
+        // Manual ticks are GONE by design (2026-10-09): a weigh-in from proper
+        // scales is the truth, and manual entry will be a record write, not a
+        // parallel state. No data + no record = not completed. Period.
+        val s = TaskChecklist.derive(null, "2026-10-09", 1800)
+        assertFalse(s.weighInCompleted)
+        assertNull(s.weighInData)
     }
 
     @Test

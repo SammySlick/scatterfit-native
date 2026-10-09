@@ -10,12 +10,13 @@ package com.scatterbrain.scatterfit.data
  *
  * Tiering:
  *  - steps: pure indicator — never manually tickable
- *  - weigh-in: derived OR manual write-through (dialog writes a WEIGHT record)
- *  - food: derived from FOOD_LOG writes (until the logger exists, manual)
+ *  - weigh-in: derived ONLY. If a weight came from proper scales (Hume etc.),
+ *    there is nothing for a manual override to add. Manual entry (weigh-in
+ *    dialog, once it writes HC records) is just another source of the same
+ *    data — it auto-completes through the same derivation. No parallel state.
+ *  - food: derived from FOOD_LOG writes (until the logger exists, it just
+ *    shows unticked — no fake ticks)
  *  - weekly check-in: reflective, not measurable — stays manually ticked
- *
- * In-memory-only manual ticks (pre-persistence stopgap) ride alongside via
- * [manualTicks] and OR into the derived state; they die with the process.
  */
 data class ChecklistState(
     val stepsToday: Double?,
@@ -31,18 +32,15 @@ object TaskChecklist {
         daily: AssembledDaily?,
         dayKey: String,
         calorieTarget: Int,
-        manualWeighIn: Boolean = false,
-        manualFood: Boolean = false,
     ): ChecklistState {
-        if (daily == null) {
-            return ChecklistState(
-                stepsToday = null,
-                weighInCompleted = manualWeighIn,
-                weighInData = null,
-                foodLogCompleted = manualFood,
-                foodLogData = null,
-            )
-        }
+        val empty = ChecklistState(
+            stepsToday = null,
+            weighInCompleted = false,
+            weighInData = null,
+            foodLogCompleted = false,
+            foodLogData = null,
+        )
+        if (daily == null) return empty
         val weight = daily.weight[dayKey]
         val bf = daily.bodyFat[dayKey]
         val weighInData = weight?.let { w ->
@@ -53,9 +51,9 @@ object TaskChecklist {
         val foodData = kcal?.let { "${fmt(it)} / %,d kcal".format(calorieTarget) }
         return ChecklistState(
             stepsToday = daily.steps[dayKey],
-            weighInCompleted = weight != null || manualWeighIn,
+            weighInCompleted = weight != null,
             weighInData = weighInData,
-            foodLogCompleted = kcal != null || manualFood,
+            foodLogCompleted = kcal != null,
             foodLogData = foodData,
         )
     }

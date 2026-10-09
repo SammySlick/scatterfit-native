@@ -101,14 +101,8 @@ fun MyDayScreen(
     var dailyCalorieTarget by remember { mutableIntStateOf(1800) }
     var checkInCompletedValue by remember { mutableStateOf("Target updated (1,800 kcal)") }
 
-    // Manual tick state (session-only stopgap until weigh-in dialog writes HC records)
-    var manualWeighIn by remember { mutableStateOf(false) }
-    var manualFood by remember { mutableStateOf(false) }
-    var trainCompleted by remember { mutableStateOf(false) }
-    var trainData by remember { mutableStateOf("HIIT 20 minutes") }
-
-    // DERIVED checklist: completed-ness comes from the day's data (sync OR
-    // manual write), never from flipping booleans. Streams live with sync.
+    // DERIVED checklist: completed-ness comes from the day's data — sync OR a
+    // manual record write (weigh-in dialog / food logger). No boolean ticks.
     val hubRecords = SyncHub.records.collectAsState().value
     val checklistDaily = remember(hubRecords) {
         hubRecords?.let {
@@ -118,26 +112,31 @@ fun MyDayScreen(
             )
         }
     }
-    val checklist = remember(checklistDaily, currentDayKey, dailyCalorieTarget, manualWeighIn, manualFood) {
+    val checklist = remember(checklistDaily, currentDayKey, dailyCalorieTarget) {
         TaskChecklist.derive(
             daily = checklistDaily,
             dayKey = currentDayKey,
             calorieTarget = dailyCalorieTarget,
-            manualWeighIn = manualWeighIn,
-            manualFood = manualFood,
         )
     }
 
     var showWeighInDialog by remember { mutableStateOf(false) }
     var showWeeklyCheckInDialog by remember { mutableStateOf(false) }
 
+    // Train stays manual-only for now (needs EXERCISE_SESSION reads or workout logging)
+    var trainCompleted by remember { mutableStateOf(false) }
+    var trainData by remember { mutableStateOf("HIIT 20 minutes") }
+
+    // Weigh-in dialog: once it writes a real HC WEIGHT record, the derivation
+    // auto-completes the tick. Until then it opens but its submission is a no-op
+    // by design — no fake ticks, no parallel state.
     if (showWeighInDialog) {
         WeighInDialog(
             onDismiss = { showWeighInDialog = false },
             onSubmitWeight = { weight, bodyFat ->
-                // Until the dialog writes an HC WEIGHT record, a manual entry
-                // is a session tick that ORs into the derived state.
-                manualWeighIn = true
+                showWeighInDialog = false
+                // TODO(weigh-in dialog): write WEIGHT (and BODY_FAT) record via
+                // HC write + sync store; the checklist then derives itself.
             }
         )
     }
@@ -274,15 +273,13 @@ fun MyDayScreen(
             weighInCompleted = checklist.weighInCompleted,
             weighInData = checklist.weighInData ?: "",
             onWeighInClick = {
-                if (!isFutureDay) {
-                    // Until manual writes create records: tick a session-only manual
-                    // override. Once the dialog writes HC records, untick = delete.
-                    if (!checklist.weighInCompleted) showWeighInDialog = true else manualWeighIn = false
-                }
+                if (!isFutureDay && !checklist.weighInCompleted) showWeighInDialog = true
+                // No untick: data is the truth. Removing a weigh-in = deleting
+                // the record (weigh-in dialog work), never un-ticking a box.
             },
             foodLogCompleted = checklist.foodLogCompleted,
             foodLogData = checklist.foodLogData ?: "",
-            onFoodLogClick = { if (!isFutureDay) manualFood = !manualFood },
+            onFoodLogClick = { /* no-op until the food logger exists: no fake ticks */ },
             trainCompleted = trainCompleted,
             trainData = trainData,
             onTrainClick = { if (!isFutureDay) trainCompleted = !trainCompleted },
