@@ -16,8 +16,14 @@ android {
         // CI stamps the run number into the version so every sideload is
         // self-identifying (Settings > Apps > ScatterFit shows it). Locally
         // built (no CI env) it falls back to a static version.
-        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
-        versionName = "0.1." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        // CI builds: versionCode = run number (69, 70, ...).
+        // Local AS builds (no CI env): 100000 — always higher than any CI run
+        // number for the foreseeable future, so Run > installs over CI builds
+        // instead of failing with "device already has a newer version"
+        // (seen live 2026-10-09 03:47: phone had CI versionCode 62-64, local
+        // build was 1, installer refused as a downgrade).
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 100000
+        versionName = "0.1." + (System.getenv("GITHUB_RUN_NUMBER") ?: "local")
     }
 
     signingConfigs {
