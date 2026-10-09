@@ -17,6 +17,7 @@ import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
@@ -40,6 +41,13 @@ object HcReaders {
 
     /** Circuit breaker: never trust a page token chain to terminate. */
     const val MAX_PAGES_PER_CALL: Int = 400
+
+    /** Pause between pages of the same paginated read. */
+    const val PAGE_PAUSE_MS: Long = 250
+
+    /** Rate-limit retries per page: backoff 30s, 60s, 120s, 240s, 480s. */
+    const val RATE_RETRY_MAX: Int = 4
+    const val RATE_BACKOFF_BASE_MS: Long = 30_000
 
     /** Window is [fromMs, toMs). Note: sleep sessions may START before fromMs —
      *  a session crossing the cursor boundary is read on its start timestamp,
@@ -101,13 +109,33 @@ object HcReaders {
             // CANNOT interrupt it (seen live 2026-10-09: STEPS page hung 20+ min,
             // timeout never fired). The orphaned child stays blocked on IO but
             // the reader MOVES ON — one wedge costs one page, not the sync.
-            val response = withTimeoutOrNull(PAGE_TIMEOUT_MS) {
-                coroutineScope { async { client.readRecords(ReadRecordsRequest<T>(window(fromMs, toMs), pageToken = token)) }.await() }
-            }
-            if (response == null) {
-                Log.w("ScatterFitSync", "readAll: $label page=${page + 1} TIMED OUT (${PAGE_TIMEOUT_MS / 1000}s) — skipping rest of slice")
+            // Rate-limit aware: the provider serves throttled (tiny) pages as
+            // quota runs low, then rejects outright with RemoteException. Back
+            // off and retry the SAME token instead of burning the slice.
+            var response: ReadResponse<T>? = null
+            for (attempt in 0..RATE_RETRY_MAX) {
+                try {
+                    response = withTimeoutOrNull(PAGE_TIMEOUT_MS) {
+                        coroutineScope { async { client.readRecords(ReadRecordsRequest<T>(window(fromMs, toMs), pageToken = token)) }.await() }
+                    }
+                } catch (e: Exception) {
+                    val msg = e.message ?: ""
+                    if (msg.contains("Rate limited", ignoreCase = true) || msg.contains("quota", ignoreCase = true)) {
+                        val wait = RATE_BACKOFF_BASE_MS * (1L shl attempt)
+                        Log.w("ScatterFitSync", "readAll: $label page=${page + 1} RATE LIMITED — backing off ${wait / 1000}s (attempt $attempt/$RATE_RETRY_MAX)")
+                        delay(wait)
+                        continue
+                    }
+                    throw e
+                }
+                if (response == null) {
+                    Log.w("ScatterFitSync", "readAll: $label page=${page + 1} TIMED OUT (${PAGE_TIMEOUT_MS / 1000}s) — skipping rest of slice")
+                    break
+                }
+                if (attempt > 0) Log.d("ScatterFitSync", "readAll: $label page=${page + 1} rate-limit retry #$attempt succeeded")
                 break
             }
+            if (response == null) break
             page++
             val n = response.records.size
             Log.d("ScatterFitSync", "readAll: $label page=$page rows=$n more=${token != null}")
@@ -117,6 +145,10 @@ object HcReaders {
             }
             out.addAll(response.records.map(block))
             token = response.pageToken
+            // Pacing: the provider throttles under request pressure (pages
+            // shrank 1000 -> 36 rows as quota drained, live 2026-10-09). A
+            // small pause between pages is polite and costs little.
+            if (token != null) delay(PAGE_PAUSE_MS)
         } while (token != null)
         return out
     }
