@@ -73,7 +73,8 @@ class DrinkStorage(private val context: Context) {
 
     fun loadAll(): Map<String, List<LoggedDrink>> {
         val result = mutableMapOf<String, List<LoggedDrink>>()
-        val allEntries = prefs.all
+        // In preview/layoutlib environments, prefs.all can be null
+        val allEntries = prefs.all ?: return emptyMap()
         for (key in allEntries.keys) {
             if (key.startsWith("logged_drinks_")) {
                 val dayKey = key.removePrefix("logged_drinks_")

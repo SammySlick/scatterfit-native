@@ -1,5 +1,6 @@
 package com.scatterbrain.scatterfit.ui
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -137,7 +138,7 @@ fun MyDayScreen(
     }
 
     // Day key calendar navigation (using core/DayKeys contract)
-    val today = remember { com.scatterbrain.scatterfit.core.todayKey() }
+    val today = remember { todayKey() }
     var currentDayKey by remember { mutableStateOf(today) }
 
     // Day-keyed persistent drink tracking ViewModel
@@ -229,7 +230,8 @@ fun MyDayScreen(
         // 2. Today Pulse Card (Consolidates Momentum + Readiness with integrated Goal Header strip)
         TodayPulseCard(
             goalName = goalProjection.goalName,
-            projectedTargetText = goalProjection.projectionText,
+            targetValueText = goalProjection.targetText,
+            currentValueText = goalProjection.currentText,
             activeDayKey = currentDayKey,
             momentumSource = momentumSource,
             sleepHours = 8,
@@ -525,7 +527,7 @@ fun buildReadinessRecommendationSentence(stateWord: String, targetZone: String):
 fun DeltaPointsBlock(
     delta: Int,
     comparisonText: String = "from yesterday",
-    modifier: Modifier = Modifier
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
     val sign = if (delta >= 0) "+" else "−"
     val absVal = kotlin.math.abs(delta)
@@ -558,7 +560,7 @@ fun DeltaPointsBlock(
 
 /**
  * Redesigned "Today pulse" card matching the web mockup:
- * - Integrated top header strip: "DAY <N>" | FAT LOSS | "TARGET •" + pill containing "10.08.26"
+ * - Integrated top header strip: "TODAY •" + pill | {GOAL_NAME} | "TARGET •" + pill
  * - Hairline divider
  * - LEFT = MOMENTUM (10sp muted) + High pill, 84 +7 points / dynamic comparison date, watch sentence
  * - RIGHT = READINESS (10sp muted) + Primed pill, 70 +12 points / dynamic comparison date, recommendation
@@ -568,7 +570,8 @@ fun DeltaPointsBlock(
 @Composable
 fun TodayPulseCard(
     goalName: String = "FAT LOSS",
-    projectedTargetText: String = "TARGET • 10.08.26",
+    targetValueText: String? = null,
+    currentValueText: String? = null,
     activeDayKey: String = remember { todayKey() },
     momentumSource: MomentumSource = remember(SyncHub.records.value) { TodayFacadeMomentumSource(hcRecords = SyncHub.records.value) },
     sleepHours: Int = 8,
@@ -577,8 +580,9 @@ fun TodayPulseCard(
     onMomentumClick: () -> Unit = {},
     onTrendsClick: () -> Unit = {},
     onSleepClick: () -> Unit = {},
-    modifier: Modifier = Modifier
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
+
     val yesterdayKey = remember(activeDayKey) { dayBefore(activeDayKey) }
 
     // Dynamic comparison date ("from EEE d MMM", e.g. "from Sun 04 Oct")
@@ -596,17 +600,8 @@ fun TodayPulseCard(
     val goalProjection = remember(activeDayKey, momentumSource) {
         momentumSource.computeGoalProjection(activeDayKey)
     }
-    val dayNText = goalProjection.elapsedText
-
-    // Target date value for the pill (e.g. "10.08.26")
-    val targetDateValue = remember(projectedTargetText) {
-        if (projectedTargetText.contains("•")) {
-            val parts = projectedTargetText.split("•").map { it.trim() }
-            parts.getOrElse(1) { "" }.ifBlank { "" }
-        } else {
-            projectedTargetText
-        }
-    }
+    val effectiveTargetText = targetValueText ?: goalProjection.targetText
+    val effectiveCurrentText = currentValueText ?: goalProjection.currentText
 
     // Momentum data
     val momentumTodayRaw = momentumSource.scoreForDay(activeDayKey)
@@ -653,27 +648,48 @@ fun TodayPulseCard(
         border = BorderStroke(1.dp, BorderDefault)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 1. Top Header Strip: Left = "DAY <N>" plain label | Centre = "FAT LOSS" | Right = "TARGET •" + pill
+            // 1. Top Header Strip: Left = "TODAY •" + pill | Centre = {GOAL_NAME} | Right = "TARGET •" + pill
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                // Left slot: "DAY <N>" single line, plain label, no pill
-                Box(
+                // Left slot: label "TODAY •" above a pill with the CURRENT value
+                Column(
                     modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.TopStart
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Text(
-                        text = dayNText,
+                        text = "TODAY •",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Normal,
                         color = TextMuted,
                         letterSpacing = 0.5.sp,
+                        textAlign = TextAlign.Start,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(BrandPrimaryLime.copy(alpha = 0.16f))
+                            .border(
+                                BorderStroke(1.dp, BrandPrimaryLime.copy(alpha = 0.40f)),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = effectiveCurrentText,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = BrandPrimaryLime,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 // Centre slot: goal title horizontally centred, vertically aligned with first line
@@ -691,7 +707,7 @@ fun TodayPulseCard(
                     )
                 }
 
-                // Right slot: "TARGET •" on line 1, pill containing date on line 2 (both right-aligned)
+                // Right slot: label "TARGET •" above a pill with the TARGET value
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.End,
@@ -718,10 +734,12 @@ fun TodayPulseCard(
                             .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = targetDateValue,
+                            text = effectiveTargetText,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = BrandPrimaryLime
+                            color = BrandPrimaryLime,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -812,7 +830,7 @@ fun TodayPulseCard(
                             text = momentumSentence,
                             fontSize = 10.sp,
                             lineHeight = 13.sp,
-                            maxLines = 2,
+                            maxLines = 4,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
@@ -897,7 +915,7 @@ fun TodayPulseCard(
                             text = readinessSentence,
                             fontSize = 10.sp,
                             lineHeight = 13.sp,
-                            maxLines = 2,
+                            maxLines = 4,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
@@ -992,7 +1010,7 @@ fun TodayTasksCard(
             MicroTaskRow(
                 title = "Weekly check-in",
                 hint = if (isFutureDay) "Upcoming" else "Review last week & adjust targets",
-                isCompleted = if (isFutureDay) false else weeklyCheckInCompleted,
+                isCompleted = !isFutureDay && weeklyCheckInCompleted,
                 completedValue = weeklyCheckInCompletedValue,
                 onClick = onWeeklyCheckInClick
             )
@@ -1001,7 +1019,7 @@ fun TodayTasksCard(
             MicroTaskRow(
                 title = "Weigh in",
                 hint = if (isFutureDay) "Upcoming" else "Jump on the scales",
-                isCompleted = if (isFutureDay) false else weighInCompleted,
+                isCompleted = !isFutureDay && weighInCompleted,
                 completedValue = weighInData,
                 onClick = onWeighInClick
             )
@@ -1010,7 +1028,7 @@ fun TodayTasksCard(
             MicroTaskRow(
                 title = "Log your food",
                 hint = if (isFutureDay) "Upcoming" else "Fastest win of the day",
-                isCompleted = if (isFutureDay) false else foodLogCompleted,
+                isCompleted = !isFutureDay && foodLogCompleted,
                 completedValue = foodLogData,
                 onClick = onFoodLogClick
             )
@@ -1019,7 +1037,7 @@ fun TodayTasksCard(
             MicroTaskRow(
                 title = trainData,
                 hint = if (isFutureDay) "Upcoming" else "Even a walk counts",
-                isCompleted = if (isFutureDay) false else trainCompleted,
+                isCompleted = !isFutureDay && trainCompleted,
                 completedValue = "Workout completed",
                 onClick = onTrainClick
             )
@@ -1049,9 +1067,10 @@ fun TodayTasksCard(
 @Composable
 fun StepsTaskRow(
     steps: Int,
+
     target: Int = 10_000,
     isFutureDay: Boolean = false,
-    modifier: Modifier = Modifier,
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
     val isCompleted = steps >= target && !isFutureDay

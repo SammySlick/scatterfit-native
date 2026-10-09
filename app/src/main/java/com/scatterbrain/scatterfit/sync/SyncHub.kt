@@ -19,7 +19,8 @@ object SyncHub {
 
     private const val TAG = "ScatterFitSync"
 
-    private var store: SyncStore? = null
+    var store: SyncStore? = null
+        private set
     private var engine: SyncEngine? = null
     private var client: HealthConnectClient? = null
 

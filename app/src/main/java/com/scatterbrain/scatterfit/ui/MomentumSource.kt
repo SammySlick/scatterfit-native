@@ -4,18 +4,24 @@ import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.GoalPreset
 import com.scatterbrain.scatterfit.core.ScoringSettings
 import com.scatterbrain.scatterfit.core.dayBefore
+import com.scatterbrain.scatterfit.core.dayKeyFromIso
+import com.scatterbrain.scatterfit.core.goalLabel
 import com.scatterbrain.scatterfit.core.lastNDayKeys
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.AssembledDaily
 import com.scatterbrain.scatterfit.data.CardInputs
 import com.scatterbrain.scatterfit.data.Daily
 import com.scatterbrain.scatterfit.data.GoalInsights
+import com.scatterbrain.scatterfit.data.GoalTargetsStore
 import com.scatterbrain.scatterfit.data.HealthRecord
 import com.scatterbrain.scatterfit.data.LocalRecordConvert
 import com.scatterbrain.scatterfit.data.RecordMethod
 import com.scatterbrain.scatterfit.data.TodayFacade
 import com.scatterbrain.scatterfit.data.Zones
+import com.scatterbrain.scatterfit.data.currentPrimaryMetricValue
+import com.scatterbrain.scatterfit.data.formatGoalValue
 import com.scatterbrain.scatterfit.data.makeDemoRecords
+import com.scatterbrain.scatterfit.data.primaryMetricFor
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -31,8 +37,10 @@ data class StreakInfo(
 data class GoalProjectionInfo(
     val goalName: String,
     val elapsedText: String,
-    val projectionText: String,
-    val isOnTrack: Boolean
+    val targetText: String,
+    val currentText: String,
+    val isOnTrack: Boolean,
+    val projectionText: String = targetText,
 )
 
 interface MomentumSource {
@@ -58,6 +66,18 @@ class TodayFacadeMomentumSource(
 
     private val now = Instant.now()
     private val demoMonth = makeDemoRecords(now, zone)
+    private val recordsList: List<HealthRecord> = run {
+        val records = HashMap<RecordMethod, List<HealthRecord>>()
+        if (hcRecords != null && hcRecords.isNotEmpty()) {
+            for ((m, list) in hcRecords) if (list.isNotEmpty()) records[m] = list
+        } else {
+            for ((key, list) in demoMonth.records) {
+                val m = RecordMethod.entries.firstOrNull { it.name == key } ?: continue
+                records[m] = LocalRecordConvert.convertAll(m, list)
+            }
+        }
+        records.values.flatten()
+    }
     private val daily: AssembledDaily = run {
         val records = HashMap<RecordMethod, List<HealthRecord>>()
         if (hcRecords != null && hcRecords.isNotEmpty()) {
@@ -115,13 +135,22 @@ class TodayFacadeMomentumSource(
         }
         val daysElapsed = ChronoUnit.DAYS.between(startDate, todayDate).coerceAtLeast(0)
         val elapsedText = "DAY ${daysElapsed + 1}"
-        val targetDate = todayDate.plusDays(90)
-        val targetFormatted = targetDate.format(DateTimeFormatter.ofPattern("dd.MM.yy"))
+
+        val primaryMetric = primaryMetricFor(settings.activeGoal)
+        val targetVal = GoalTargetsStore.targetFor(primaryMetric)
+        val targetText = formatGoalValue(targetVal, primaryMetric, settings.unitSystem)
+
+        val dayRecords = recordsList.filter { dayKeyFromIso(it.start, zone) == today }
+        val currentVal = currentPrimaryMetricValue(dayRecords, primaryMetric)
+        val currentText = formatGoalValue(currentVal, primaryMetric, settings.unitSystem)
+
+        val goalName = goalLabel[settings.activeGoal]?.uppercase() ?: "FAT LOSS"
 
         return GoalProjectionInfo(
-            goalName = "FAT LOSS",
+            goalName = goalName,
             elapsedText = elapsedText,
-            projectionText = "TARGET • $targetFormatted",
+            targetText = targetText,
+            currentText = currentText,
             isOnTrack = true
         )
     }
