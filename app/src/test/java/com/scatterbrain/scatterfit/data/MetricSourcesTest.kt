@@ -1,6 +1,9 @@
 package com.scatterbrain.scatterfit.data
 
-import com.scatterbrain.scatterfit.core.Daily
+import com.scatterbrain.scatterfit.data.Daily
+
+@Suppress("unused")
+@Suppress("unused") // Daily.daysAgoKey used in tests
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -14,7 +17,7 @@ class MetricSourcesTest {
     private fun key(daysAgo: Int): String = Daily.daysAgoKey(daysAgo, zone, nowMs)
 
     private fun source(steps: Map<String, Double>): StoreDailySource {
-        val ad = AssembledDaily(steps = steps, zone = zone)
+        val ad = AssembledDaily(zone = zone, zoneBounds = ZoneBounds(0, 0, 0, 0), steps = steps)
         return StoreDailySource(ad, { a, k -> a.steps[k] }, zone, nowMs)
     }
 
