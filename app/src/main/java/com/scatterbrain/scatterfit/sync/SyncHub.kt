@@ -65,7 +65,8 @@ object SyncHub {
     suspend fun syncNow(methods: Set<RecordMethod> = RecordMethod.entries.toSet()): SyncEngine.SyncResult? {
         val e = engine ?: return null
         val c = client ?: return null
-        if (!_syncing.compareAndSet(false, true)) return null
+        if (!_syncing.compareAndSet(false, true)) { Log.d(TAG, "syncNow: already running, skip"); return null }
+        Log.d(TAG, "syncNow: STARTING engine sync")
         return try {
             val result = e.sync(reader = { ms, fromMs, toMs ->
                 val read = HcReaders.readAll(c, fromMs, toMs, ms)
@@ -85,6 +86,7 @@ object SyncHub {
             } else ""
             result
         } catch (t: Throwable) {
+            Log.e(TAG, "syncNow: FAILED", t)
             _lastError.value = t.message ?: t.javaClass.simpleName
             null
         } finally {

@@ -1,5 +1,6 @@
 package com.scatterbrain.scatterfit.data
 
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.BasalMetabolicRateRecord
 import androidx.health.connect.client.records.BodyFatRecord
@@ -39,6 +40,7 @@ object HcReaders {
     ): Map<RecordMethod, List<HealthRecord>> {
         val out = HashMap<RecordMethod, List<HealthRecord>>()
         for (m in methods) {
+            Log.d("ScatterFitSync", "readAll: READING ${m.name} ${fromMs}..${toMs}")
             val list = when (m) {
                 RecordMethod.STEPS -> readSteps(client, fromMs, toMs)
                 RecordMethod.DISTANCE -> readDistance(client, fromMs, toMs)
