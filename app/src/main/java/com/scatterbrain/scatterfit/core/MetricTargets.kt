@@ -52,7 +52,7 @@ fun metricTargetContext(
             val gap = mean - settings.weightTarget
             MetricTargetContext(
                 verdict = when {
-                    Math.abs(gap) <= 0.2 -> "On target"
+                    Math.abs(gap) <= 0.2 + 1e-9 -> "On target" // epsilon: 80.2-80.0 == 0.20000000000000283 in FP
                     gap > 0 -> "Above target"
                     else -> "Below target"
                 },
@@ -81,7 +81,7 @@ fun metricTargetContext(
         }
         MetricId.SLEEP -> {
             val gap = mean - settings.sleepTargetHours
-            val onTarget = Math.abs(gap) <= 0.5
+            val onTarget = Math.abs(gap) <= 0.5 + 1e-9
             MetricTargetContext(
                 verdict = if (onTarget) "On target" else if (gap < 0) "Below target" else "Above target",
                 comparison = "avg ${num(mean, 1)}h vs ${num(settings.sleepTargetHours, 1)}h",
