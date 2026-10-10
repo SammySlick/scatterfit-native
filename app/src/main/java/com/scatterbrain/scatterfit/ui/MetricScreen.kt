@@ -102,10 +102,14 @@ fun MetricScreen(
         today = todayKey,
         onBackClick = onBackClick,
         formatValue = { v ->
-            if (currentId == MetricId.SLEEP) v?.let {
-                val mins = (it * 60.0).roundToInt(); "${mins / 60}h ${mins % 60}m"
-            } else "—"
-            else MetricRegistry.format(def, v)
+            when {
+                v == null -> "—"
+                currentId == MetricId.SLEEP -> {
+                    val mins = (v * 60.0).roundToInt()
+                    "${mins / 60}h ${mins % 60}m"
+                }
+                else -> MetricRegistry.format(def, v)
+            }
         },
         topSlot = { MetricChipRow(currentId, onPick = { currentId = it }) },
         modifier = modifier,
