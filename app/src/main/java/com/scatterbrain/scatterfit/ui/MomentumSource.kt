@@ -43,6 +43,8 @@ data class GoalProjectionInfo(
     val projectionText: String = targetText,
 )
 
+data class DomainScore(val id: String, val score: Double?)
+
 interface MomentumSource {
     fun momentumForDay(dayKey: String): Double?
     fun scoreForDay(dayKey: String): Double? = momentumForDay(dayKey)
@@ -63,6 +65,8 @@ interface MomentumSource {
 
     /** True when the source is running on the demo month (no synced cache). UI must SHOW it. */
     val isUsingDemoData: Boolean get() = false
+
+    fun domainScoresForDay(dayKey: String): List<DomainScore>
 }
 
 class TodayFacadeMomentumSource(
@@ -218,6 +222,51 @@ class TodayFacadeMomentumSource(
     }
 
     override fun restingHrForDay(dayKey: String): Double? = daily.restingHr[dayKey]
+
+    override fun domainScoresForDay(dayKey: String): List<DomainScore> {
+        val card = getCard(dayKey)
+
+        fun recentScore(seriesId: GoalId): Double? {
+            val series = card.goals.find { it.id == seriesId } ?: return null
+            val targetDate = runCatching { LocalDate.parse(dayKey) }.getOrNull()
+            val candidateIndex = series.days.indexOfLast { it.day <= dayKey }
+            if (candidateIndex < 0) return null
+            val startIndex = (candidateIndex - 6).coerceAtLeast(0)
+            for (i in candidateIndex downTo startIndex) {
+                val day = series.days[i]
+                if (targetDate != null) {
+                    val dayDate = runCatching { LocalDate.parse(day.day) }.getOrNull()
+                    if (dayDate != null && ChronoUnit.DAYS.between(dayDate, targetDate) > 7) break
+                }
+                if (day.score != null) return day.score
+            }
+            return null
+        }
+
+        val exerciseScore = recentScore(GoalId.EXERCISE)
+        val stepsScore = recentScore(GoalId.STEPS)
+        val caloriesScore = recentScore(GoalId.CALORIES)
+        val alcoholScore = recentScore(GoalId.ALCOHOL)
+        val unitsScore = recentScore(GoalId.UNITS)
+
+        val combinedAlcoholScore = when {
+            alcoholScore != null && unitsScore != null -> kotlin.math.min(alcoholScore, unitsScore)
+            alcoholScore != null -> alcoholScore
+            unitsScore != null -> unitsScore
+            else -> null
+        }
+
+        val result = mutableListOf<DomainScore>()
+        if (exerciseScore != null) result.add(DomainScore("Training", exerciseScore))
+        if (stepsScore != null) result.add(DomainScore("Steps", stepsScore))
+        if (caloriesScore != null) result.add(DomainScore("Food", caloriesScore))
+        if (combinedAlcoholScore != null) result.add(DomainScore("Alcohol", combinedAlcoholScore))
+
+        android.util.Log.d("MyDayCards", "domainScores day=$dayKey -> " +
+            result.joinToString { "${it.id}=${it.score}" })
+
+        return result
+    }
 }
 
 typealias MomentumSourceStub = TodayFacadeMomentumSource

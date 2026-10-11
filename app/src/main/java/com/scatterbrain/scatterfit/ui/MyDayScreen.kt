@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +36,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -56,6 +59,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -75,11 +79,13 @@ import com.scatterbrain.scatterfit.data.Daily
 import com.scatterbrain.scatterfit.data.TaskChecklist
 import com.scatterbrain.scatterfit.data.Zones
 import com.scatterbrain.scatterfit.sync.SyncHub
+import com.scatterbrain.scatterfit.ui.theme.AccentHot
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BorderInput
 import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
 import com.scatterbrain.scatterfit.ui.theme.JudgementBad
+import com.scatterbrain.scatterfit.ui.theme.JudgementDestructive
 import com.scatterbrain.scatterfit.ui.theme.JudgementGood
 import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.MutedFill
@@ -215,7 +221,7 @@ fun MyDayScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
+            .padding(top = 0.dp, bottom = 16.dp)
             .verticalScroll(scrollState)
     ) {
         val isFutureDay = currentDayKey > today
@@ -239,6 +245,7 @@ fun MyDayScreen(
             },
             momentumSource = momentumSource,
             streakInfo = streakInfo,
+            asCard = true,
             onSettingsClick = onSettingsClick,
             modifier = Modifier.fillMaxWidth()
         )
@@ -246,18 +253,23 @@ fun MyDayScreen(
         Spacer(modifier = Modifier.height(14.dp))
 
         // 2. Today Pulse Card (Consolidates Momentum + Readiness with integrated Goal Header strip)
-        TodayPulseCard(            goalName = goalProjection.goalName,
+        TodayPulseCard(
+            goalName = goalProjection.goalName,
             targetValueText = goalProjection.targetText,
             currentValueText = goalProjection.currentText,
             activeDayKey = currentDayKey,
             momentumSource = momentumSource,
-            sleepHours = momentumSource.sleepMinutesForDay(currentDayKey)?.let { m -> (m / 60).toInt() },
-            sleepMinutes = momentumSource.sleepMinutesForDay(currentDayKey)?.let { m -> (m % 60).toInt() },
-            rhrText = momentumSource.restingHrForDay(currentDayKey)?.let { "RHR ${it.toInt()}" },
+            sleepHours = momentumSource.sleepMinutesForDay(currentDayKey)?.let { m -> (m / 60).toInt() } ?: 8,
+            sleepMinutes = momentumSource.sleepMinutesForDay(currentDayKey)?.let { m -> (m % 60).toInt() } ?: 13,
+            rhrText = momentumSource.restingHrForDay(currentDayKey)?.let { "RHR ${it.toInt()}" } ?: "RHR warming up",
+            rhrValue = momentumSource.restingHrForDay(currentDayKey)?.let { "${it.toInt()} bpm" } ?: "54 bpm",
+            trainDoneToday = trainCompleted,
+            stepsPctToday = if (dailyStepTarget > 0) ((checklist.stepsToday ?: 0.0).toInt()) * 100 / dailyStepTarget else 0,
+            alcoholUnitsToday = 0, // TODO: wire DrinkTrackerViewModel.getUnitsForDay(currentDayKey) when it exists
             onMomentumClick = { /* Navigate to Momentum */ },
             onTrendsClick = { activeMetricScreen = "weight" },
             onSleepClick = { activeMetricScreen = "sleep" },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -289,7 +301,7 @@ fun MyDayScreen(
             isFutureDay = isFutureDay,
             subtitleText = "Log anything today to start a streak",
             onStepsClick = { activeMetricScreen = "steps" },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -316,7 +328,7 @@ fun MyDayScreen(
             },
             isFutureDay = isFutureDay,
             onClick = { showDrinkLoggerScreen = true },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
         // Reserving bottom clearance so the last card and its content completely clear the bottom nav bar
@@ -338,9 +350,9 @@ fun AlcoholTrackerCard(
 ) {
     Card(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = AppCardSurface),
         border = BorderStroke(1.dp, BorderDefault)
     ) {
@@ -546,38 +558,31 @@ fun DeltaPointsBlock(
     comparisonText: String = "from yesterday",
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
-    val sign = if (delta >= 0) "+" else "−"
-    val absVal = kotlin.math.abs(delta)
-    val deltaColor = if (delta >= 0) JudgementGood else JudgementBad
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.Top
-    ) {
-        Text(
-            text = "$sign$absVal points",
-            color = deltaColor,
-            fontSize = 12.sp,
-            lineHeight = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
-            maxLines = 1,
-            softWrap = false
-        )
-        Text(
-            text = comparisonText,
-            fontSize = 10.sp,
-            lineHeight = 11.sp,
-            color = TextMuted,
-            maxLines = 1,
-            softWrap = false
-        )
+    // Colour = direction (MyDay Card Colour Rules §2): fell = warn amber, rose = brand lime,
+    // trivial drift (<2 pts) = quiet grey. Red stays reserved for the lever chip (§3).
+    val deltaColor = when {
+        delta <= -2 -> JudgementWarn
+        delta >= 2 -> BrandPrimaryLime
+        else -> TextMuted
     }
+    val sign = if (delta >= 0) "+" else "−"
+
+    Text(
+        text = "$sign${kotlin.math.abs(delta)} points $comparisonText",
+        color = deltaColor,
+        fontSize = 12.sp,
+        lineHeight = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier
+    )
 }
 
 /**
  * Redesigned "Today pulse" card matching the web mockup:
- * - Integrated top header strip: "TODAY •" + pill | {GOAL_NAME} | "TARGET •" + pill
+ * - Integrated top header strip: pill + "• TODAY" | {GOAL_NAME} | "TARGET •" + pill
  * - Hairline divider
  * - LEFT = MOMENTUM (10sp muted) + High pill, 84 +7 points / dynamic comparison date, watch sentence
  * - RIGHT = READINESS (10sp muted) + Primed pill, 70 +12 points / dynamic comparison date, recommendation
@@ -591,9 +596,13 @@ fun TodayPulseCard(
     currentValueText: String? = null,
     activeDayKey: String = remember { todayKey() },
     momentumSource: MomentumSource = remember(SyncHub.records.value) { TodayFacadeMomentumSource(hcRecords = SyncHub.records.value) },
-    sleepHours: Int? = null,
-    sleepMinutes: Int? = null,
-    rhrText: String? = null,
+    sleepHours: Int = 8,
+    sleepMinutes: Int = 13,
+    rhrText: String = "RHR warming up",
+    rhrValue: String = "54 bpm",
+    trainDoneToday: Boolean = false,
+    stepsPctToday: Int = 0,
+    alcoholUnitsToday: Int = 0,
     onMomentumClick: () -> Unit = {},
     onTrendsClick: () -> Unit = {},
     onSleepClick: () -> Unit = {},
@@ -601,18 +610,6 @@ fun TodayPulseCard(
 ) {
 
     val yesterdayKey = remember(activeDayKey) { dayBefore(activeDayKey) }
-
-    // Dynamic comparison date ("from EEE d MMM", e.g. "from Sun 04 Oct")
-    val comparisonDate = remember(activeDayKey) {
-        try {
-            LocalDate.parse(dayBefore(activeDayKey))
-        } catch (_: Exception) {
-            LocalDate.now().minusDays(1)
-        }
-    }
-    val comparisonDateText = remember(comparisonDate) {
-        "from ${comparisonDate.format(DateTimeFormatter.ofPattern("EEE dd MMM", java.util.Locale.US))}"
-    }
 
     val goalProjection = remember(activeDayKey, momentumSource) {
         momentumSource.computeGoalProjection(activeDayKey)
@@ -627,24 +624,23 @@ fun TodayPulseCard(
     val momentumDelta = if (momentumTodayRaw != null && momentumYesterdayRaw != null) {
         momentumScoreInt - kotlin.math.round(momentumYesterdayRaw).toInt()
     } else null
-    val calVsAvg = momentumSource.caloriesVsAverageForDay(activeDayKey) ?: 0
-    val momentumColor = scoreToJudgementColor(momentumTodayRaw)
-
+    // Colour = verdict: badge and number always agree (MyDay Card Colour Rules §1).
+    // NOTE: LOW uses JudgementBad (repo palette); AccentHot stays reserved for the lever chip.
     val (momentumVerdictText, momentumVerdictColor) = when {
         momentumTodayRaw == null && activeDayKey > todayKey() -> Pair("No data", TextMuted)
         momentumScoreInt < 40 -> Pair("Low", JudgementBad)
-        momentumScoreInt < 70 -> Pair("Steady", JudgementWarn)
+        momentumScoreInt < 70 -> Pair("Steady", TextMuted)      // steady is neutral — amber means "watch", not "steady"
         else -> Pair("High", JudgementGood)
     }
+    val momentumColor = momentumVerdictColor
 
     // Readiness data
     val readinessScoreInt = momentumSource.readinessScoreForDay(activeDayKey)
     val readinessDelta = momentumSource.readinessDeltaForDay(activeDayKey)
     val readinessStateWord = momentumSource.readinessStateForDay(activeDayKey)
-    val readinessTarget = momentumSource.readinessTargetForDay(activeDayKey)
     val readinessColor = when (readinessStateWord.uppercase()) {
-        "PRIMED" -> JudgementGood
-        "NORMAL" -> JudgementGood
+        "PRIMED" -> BrandPrimaryLime        // Colour Rules §1: good verdict = brand lime
+        "NORMAL" -> BrandPrimaryLime
         "COMPROMISED" -> JudgementWarn
         else -> JudgementGood
     }
@@ -652,49 +648,351 @@ fun TodayPulseCard(
 
     // Whole numbers rounded for sleep
     // Honest sleep line: real minutes when synced, "—" when not. No fake numbers.
-    val formattedSleep = if (sleepHours != null && sleepMinutes != null) "${sleepHours}h ${sleepMinutes}m" else null
+    val formattedSleep = if (sleepHours != null && sleepMinutes != null) "${sleepHours}h ${sleepMinutes}m" else "—"
 
-    val momentumSentence = remember(calVsAvg) { buildMomentumWatchSentence(calVsAvg) }
-    val readinessSentence = remember(readinessStateWord, readinessTarget) {
-        buildReadinessRecommendationSentence(readinessStateWord, readinessTarget)
-    }
+    Column(modifier = modifier) {
+        Spacer(modifier = Modifier.height(8.dp))
 
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardSurface),
-        border = BorderStroke(1.dp, BorderDefault)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // 1. Top Header Strip: Left = "TODAY •" + pill | Centre = {GOAL_NAME} | Right = "TARGET •" + pill
+        // 2. Two cards: MOMENTUM | READINESS (equal heights via IntrinsicSize.Min)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // LEFT = Momentum card
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable { onMomentumClick() },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = AppCardSurface),
+                border = BorderStroke(1.dp, BorderDefault)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Header: Row(SpaceBetween, verticalAlignment = Top)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        // LEFT Column: momentum number + delta line under it
+                        Column {
+                            Text(
+                                text = "$momentumScoreInt",
+                                fontSize = 56.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = momentumColor
+                            )
+                            if (momentumDelta != null) {
+                                DeltaPointsBlock(delta = momentumDelta)
+                            }
+                        }
+
+                        // RIGHT Column (end-aligned): "MOMENTUM" label above verdict pill
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "MOMENTUM",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted,
+                                letterSpacing = 1.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 10.sp
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (momentumVerdictColor == TextMuted) SecondaryFill
+                                        else momentumVerdictColor.copy(alpha = 0.16f)
+                                    )
+                                    .border(
+                                        BorderStroke(
+                                            1.dp,
+                                            if (momentumVerdictColor == TextMuted) BorderDefault
+                                            else momentumVerdictColor.copy(alpha = 0.40f)
+                                        ),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = momentumVerdictText,
+                                    color = momentumVerdictColor,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    // Sorted rows = domainScoresForDay(activeDayKey) sorted by score descending, take top 3
+                    val domainScores = remember(activeDayKey, momentumSource) {
+                        momentumSource.domainScoresForDay(activeDayKey)
+                            .filter { it.score != null }
+                            .sortedByDescending { it.score }
+                            .take(3)
+                    }
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        domainScores.forEachIndexed { index, domain ->
+                            val scoreVal = domain.score ?: 0.0
+                            val pillText = when {
+                                scoreVal >= 70.0 -> "Great"
+                                scoreVal >= 40.0 -> "Improve"
+                                else -> "Too much"
+                            }
+                            val isBest = index == 0
+                            val isWorst = index == domainScores.lastIndex && domainScores.size > 1
+
+                            val (pillBg, pillBorder, pillTextColor) = when {
+                                isBest -> Triple(
+                                    BrandPrimaryLime.copy(alpha = 0.16f),
+                                    BorderStroke(1.dp, BrandPrimaryLime.copy(alpha = 0.40f)),
+                                    BrandPrimaryLime
+                                )
+                                isWorst && scoreVal < 40.0 -> Triple(
+                                    AccentHot,
+                                    BorderStroke(1.dp, AccentHot),
+                                    Color(0xFF0A0A0A)
+                                )
+                                else -> Triple(
+                                    SecondaryFill,
+                                    BorderStroke(1.dp, BorderDefault),
+                                    TextForeground
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = domain.id,
+                                    fontSize = 13.sp,
+                                    color = TextMuted,
+                                    fontWeight = FontWeight.Normal
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(pillBg)
+                                        .border(pillBorder, RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = pillText,
+                                        color = pillTextColor,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // RIGHT = Readiness card
+            Card(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable { onSleepClick() },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = AppCardSurface),
+                border = BorderStroke(1.dp, BorderDefault)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Header: Row(SpaceBetween, verticalAlignment = Top)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        // LEFT Column: readiness number + delta under it
+                        Column {
+                            Text(
+                                text = "$readinessScoreInt",
+                                fontSize = 56.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = readinessColor
+                            )
+                            if (readinessDelta != null) {
+                                DeltaPointsBlock(delta = readinessDelta)
+                            }
+                        }
+
+                        // RIGHT Column (end-aligned): "READINESS" label above state pill
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "READINESS",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted,
+                                letterSpacing = 1.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 10.sp
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(readinessColor.copy(alpha = 0.16f))
+                                    .border(
+                                        BorderStroke(1.dp, readinessColor.copy(alpha = 0.40f)),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = readinessBadge,
+                                    color = readinessColor,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    // Rows: Sleep row and RHR row
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Sleep row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Sleep",
+                                fontSize = 13.sp,
+                                color = TextMuted,
+                                fontWeight = FontWeight.Normal
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(SecondaryFill)
+                                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = formattedSleep,
+                                    color = TextForeground,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        // RHR row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "RHR",
+                                fontSize = 13.sp,
+                                color = TextMuted,
+                                fontWeight = FontWeight.Normal
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(SecondaryFill)
+                                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = rhrValue,
+                                    color = TextForeground,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    // Prescription pill at the bottom
+                    val isPrimeOrNormal = readinessStateWord.uppercase() in listOf("PRIMED", "NORMAL")
+                    val prescriptionText = if (isPrimeOrNormal) "Ready for Z4+" else "Take it easy — Z2 only today"
+                    val prescriptionBg = if (isPrimeOrNormal) BrandPrimaryLime.copy(alpha = 0.16f) else JudgementWarn.copy(alpha = 0.16f)
+                    val prescriptionBorder = if (isPrimeOrNormal) BrandPrimaryLime.copy(alpha = 0.40f) else JudgementWarn.copy(alpha = 0.40f)
+                    val prescriptionColor = if (isPrimeOrNormal) BrandPrimaryLime else JudgementWarn
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(prescriptionBg)
+                            .border(BorderStroke(1.dp, prescriptionBorder), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = prescriptionText,
+                            color = prescriptionColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 4. BODY FAT strip card — below the twin cards (Sam's layout call 2026-10-11)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = AppCardSurface),
+            border = BorderStroke(1.dp, BorderDefault)
+        ) {
+            // 4. Goal strip: Top Header Strip: Left = pill + "• TODAY" | Centre = {GOAL_NAME} | Right = "TARGET •" + pill
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left slot: label "TODAY •" above a pill with the CURRENT value
-                Column(
+                // Left slot: pill with CURRENT value + "• TODAY"
+                Row(
                     modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = "TODAY •",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = TextMuted,
-                        letterSpacing = 0.5.sp,
-                        textAlign = TextAlign.Start,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(BrandPrimaryLime.copy(alpha = 0.16f))
+                            .background(SecondaryFill)
                             .border(
-                                BorderStroke(1.dp, BrandPrimaryLime.copy(alpha = 0.40f)),
+                                BorderStroke(1.dp, BorderDefault),
                                 RoundedCornerShape(12.dp)
                             )
                             .padding(horizontal = 7.dp, vertical = 2.dp)
@@ -703,36 +1001,64 @@ fun TodayPulseCard(
                             text = effectiveCurrentText,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = BrandPrimaryLime,
+                            color = TextForeground,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                    Text(
+                        text = "TODAY",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = TextMuted,
+                        letterSpacing = 0.5.sp,
+                        textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
-                // Centre slot: goal title horizontally centred, vertically aligned with first line
+                // Centre slot: goal title horizontally centred, vertically aligned centrally
                 Box(
                     modifier = Modifier.padding(horizontal = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = goalName.uppercase(),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextForeground,
-                        letterSpacing = 1.sp,
-                        textAlign = TextAlign.Center
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "GOAL",
+                            style = LocalTextStyle.current.copy(
+                                platformStyle = PlatformTextStyle(includeFontPadding = false)
+                            ),
+                            fontSize = 9.sp,
+                            lineHeight = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextMuted,
+                            letterSpacing = 1.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(1.dp))
+                        Text(
+                            text = goalName.uppercase(),
+                            style = LocalTextStyle.current.copy(
+                                platformStyle = PlatformTextStyle(includeFontPadding = false)
+                            ),
+                            fontSize = 16.sp,
+                            lineHeight = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextForeground,
+                            letterSpacing = 1.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
 
-                // Right slot: label "TARGET •" above a pill with the TARGET value
-                Column(
+                // Right slot: "TARGET •" + pill with TARGET value
+                Row(
                     modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)
                 ) {
                     Text(
-                        text = "TARGET •",
+                        text = "TARGET",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Normal,
                         color = TextMuted,
@@ -744,9 +1070,9 @@ fun TodayPulseCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(BrandPrimaryLime.copy(alpha = 0.16f))
+                            .background(SecondaryFill)
                             .border(
-                                BorderStroke(1.dp, BrandPrimaryLime.copy(alpha = 0.40f)),
+                                BorderStroke(1.dp, BorderDefault),
                                 RoundedCornerShape(12.dp)
                             )
                             .padding(horizontal = 7.dp, vertical = 2.dp)
@@ -755,237 +1081,12 @@ fun TodayPulseCard(
                             text = effectiveTargetText,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = BrandPrimaryLime,
+                            color = TextForeground,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-            }
-
-            // Honest demo state: if the hero is running on demo data (no sync yet), SAY SO —
-            // silent fake numbers are the lie. Muted text, not a highlight (gold rule).
-            if (momentumSource.isUsingDemoData) {
-                Text(
-                    text = "demo data — first sync pending",
-                    fontSize = 9.sp,
-                    color = TextMuted,
-                    letterSpacing = 0.5.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // Hairline divider
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MutedFill)
-            )
-
-            // 2. Main Two Halves (MOMENTUM | READINESS)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-            ) {
-                // LEFT = Momentum
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onMomentumClick() }
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Header row: MOMENTUM + Verdict pill
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "MOMENTUM",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted,
-                            letterSpacing = 1.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.sp
-                        )
-
-                        // Pill top-right
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(momentumVerdictColor.copy(alpha = 0.16f))
-                                .border(
-                                    BorderStroke(1.dp, momentumVerdictColor.copy(alpha = 0.40f)),
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = momentumVerdictText,
-                                color = momentumVerdictColor,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    // Score row: Big Number + Delta block
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "$momentumScoreInt",
-                            fontSize = 38.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = momentumColor
-                        )
-
-                        if (momentumDelta != null) {
-                            DeltaPointsBlock(delta = momentumDelta, comparisonText = comparisonDateText)
-                        }
-                    }
-
-                    // Bold-carries-data watch sentence: 10sp, lineHeight 13sp
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 28.dp),
-                        contentAlignment = Alignment.TopStart
-                    ) {
-                        Text(
-                            text = momentumSentence,
-                            fontSize = 10.sp,
-                            lineHeight = 13.sp,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // Vertical Divider: MutedFill 1dp
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .fillMaxHeight()
-                        .background(MutedFill)
-                )
-
-                // RIGHT = Readiness
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onTrendsClick() }
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Header row: READINESS + State pill
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "READINESS",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted,
-                            letterSpacing = 1.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.sp
-                        )
-
-                        // State pill top-right
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(readinessColor.copy(alpha = 0.16f))
-                                .border(
-                                    BorderStroke(1.dp, readinessColor.copy(alpha = 0.40f)),
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = readinessBadge,
-                                color = readinessColor,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    // Score row: Big Number + Delta block
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "$readinessScoreInt",
-                            fontSize = 38.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = readinessColor
-                        )
-
-                        if (readinessDelta != null) {
-                            DeltaPointsBlock(delta = readinessDelta, comparisonText = comparisonDateText)
-                        }
-                    }
-
-                    // Bold-carries-data recommendation sentence: 10sp, lineHeight 13sp
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 28.dp),
-                        contentAlignment = Alignment.TopStart
-                    ) {
-                        Text(
-                            text = readinessSentence,
-                            fontSize = 10.sp,
-                            lineHeight = 13.sp,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-
-            // Divider before bottom strip
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MutedFill)
-            )
-
-            // 3. Bottom strip inside card: horizontally centered
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSleepClick() }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                PulseIcon(
-                    modifier = Modifier.size(14.dp),
-                    tint = TextMuted,
-                    strokeWidthDp = 1.5.dp
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                val footerParts = listOfNotNull(
-                    formattedSleep?.let { "$it sleep last night" },
-                    rhrText
-                )
-                Text(
-                    text = footerParts.joinToString(" · ").ifEmpty { "Syncing health data…" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted,
-                    fontSize = 10.sp
-                )
             }
         }
     }
@@ -1043,8 +1144,8 @@ fun TodayTasksCard(
 
             // Task 1: Weekly check-in (integrated directly inside To-Do list!)
             MicroTaskRow(
-                title = "Weekly check-in",
-                hint = if (isFutureDay) "Upcoming" else "Review last week & adjust targets",
+                title = "Weekly Round Up",
+                hint = if (isFutureDay) "Upcoming" else "How are you feeling?",
                 isCompleted = !isFutureDay && weeklyCheckInCompleted,
                 completedValue = weeklyCheckInCompletedValue,
                 onClick = onWeeklyCheckInClick
@@ -1062,7 +1163,7 @@ fun TodayTasksCard(
             // Task 3: Log your food
             MicroTaskRow(
                 title = "Log your food",
-                hint = if (isFutureDay) "Upcoming" else "Fastest win of the day",
+                hint = if (isFutureDay) "Upcoming" else "Easiest win of the day",
                 isCompleted = !isFutureDay && foodLogCompleted,
                 completedValue = foodLogData,
                 onClick = onFoodLogClick
@@ -1071,7 +1172,7 @@ fun TodayTasksCard(
             // Task 4: Train
             MicroTaskRow(
                 title = trainData,
-                hint = if (isFutureDay) "Upcoming" else "Even a walk counts",
+                hint = if (isFutureDay) "Upcoming" else "It's 20 minutes",
                 isCompleted = !isFutureDay && trainCompleted,
                 completedValue = "Workout completed",
                 onClick = onTrainClick
