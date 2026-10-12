@@ -70,41 +70,22 @@ interface MomentumSource {
 }
 
 class TodayFacadeMomentumSource(
-    private val zone: ZoneId = ZoneId.systemDefault(),
-    private val settings: ScoringSettings = ScoringSettings(activeGoal = GoalPreset.FAT_LOSS, kcalTarget = 2270),
-    /** Real synced records (SyncHub). Null or empty per method -> demo month. */
-    private val hcRecords: Map<RecordMethod, List<HealthRecord>>? = null,
-) : MomentumSource {
-
-    private val now = Instant.now()
-    private val demoMonth = makeDemoRecords(now, zone)
-    /** True when there was no synced cache and we fell back to the demo month.
-     *  The UI must SHOW this — silent demo data is the lie we're killing. */
-    override val isUsingDemoData: Boolean = hcRecords == null || hcRecords.isEmpty()
-    private val recordsList: List<HealthRecord> = run {
-        val records = HashMap<RecordMethod, List<HealthRecord>>()
-        if (hcRecords != null && hcRecords.isNotEmpty()) {
-            for ((m, list) in hcRecords) if (list.isNotEmpty()) records[m] = list
-        } else {
-            for ((key, list) in demoMonth.records) {
-                val m = RecordMethod.entries.firstOrNull { it.name == key } ?: continue
-                records[m] = LocalRecordConvert.convertAll(m, list)
-            }
-        }
-        records.values.flatten()
-    }
     private val daily: AssembledDaily = run {
+        val now = Instant.now()
+        val zone = ZoneId.systemDefault()
+        val demoMonth = makeDemoRecords(now, zone)
         val records = HashMap<RecordMethod, List<HealthRecord>>()
-        if (hcRecords != null && hcRecords.isNotEmpty()) {
-            for ((m, list) in hcRecords) if (list.isNotEmpty()) records[m] = list
-        } else {
-            for ((key, list) in demoMonth.records) {
-                val m = RecordMethod.entries.firstOrNull { it.name == key } ?: continue
-                records[m] = LocalRecordConvert.convertAll(m, list)
-            }
+        for ((key, list) in demoMonth.records) {
+            val m = RecordMethod.entries.firstOrNull { it.name == key } ?: continue
+            records[m] = LocalRecordConvert.convertAll(m, list)
         }
         Daily.buildDailyDataFromMaps(records, Zones.DEFAULT_ZONES, zone, nowMs = now.toEpochMilli())
-    }
+    },
+    private val settings: ScoringSettings = ScoringSettings(activeGoal = GoalPreset.FAT_LOSS, kcalTarget = 2270),
+    private val zone: ZoneId = daily.zone,
+) : MomentumSource {
+
+    override val isUsingDemoData: Boolean = daily.steps.isEmpty() && daily.weight.isEmpty()
 
     private val cardCache = mutableMapOf<String, CardInputs>()
 
@@ -144,7 +125,7 @@ class TodayFacadeMomentumSource(
     override fun computeGoalProjection(today: String): GoalProjectionInfo {
         val todayDate = try { LocalDate.parse(today) } catch (_: Exception) { LocalDate.now(zone) }
         val startDate = try {
-            LocalDate.parse(demoMonth.keys.firstOrNull() ?: today)
+            LocalDate.parse(daily.steps.keys.minOrNull() ?: today)
         } catch (_: Exception) {
             todayDate
         }
@@ -155,8 +136,12 @@ class TodayFacadeMomentumSource(
         val targetVal = GoalTargetsStore.targetFor(primaryMetric)
         val targetText = formatGoalValue(targetVal, primaryMetric, settings.unitSystem)
 
-        val dayRecords = recordsList.filter { dayKeyFromIso(it.start, zone) == today }
-        val currentVal = currentPrimaryMetricValue(dayRecords, primaryMetric)
+        val currentVal = when (primaryMetric) {
+            GoalId.BODY_FAT -> daily.bodyFat[today] ?: daily.bodyFat.values.lastOrNull()
+            GoalId.WEIGHT -> daily.weight[today] ?: daily.weight.values.lastOrNull()
+            GoalId.RHR_TREND -> daily.restingHr[today] ?: daily.restingHr.values.lastOrNull()
+            else -> null
+        }
         val currentText = formatGoalValue(currentVal, primaryMetric, settings.unitSystem)
 
         val goalName = goalLabel[settings.activeGoal]?.uppercase() ?: "FAT LOSS"

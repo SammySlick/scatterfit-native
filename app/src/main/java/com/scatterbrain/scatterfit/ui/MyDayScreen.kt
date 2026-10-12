@@ -49,11 +49,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -226,14 +223,10 @@ fun MyDayScreen(
             .verticalScroll(scrollState)
     ) {
         val isFutureDay = currentDayKey > today
-        // Real synced HC records when present; demo month otherwise.
-        val hubRecords by SyncHub.records.collectAsState()
-        val momentumSource: MomentumSource? by produceState<MomentumSource?>(
-            initialValue = null,
-            hubRecords
-        ) {
-            value = withContext(Dispatchers.Default) {
-                TodayFacadeMomentumSource(hcRecords = hubRecords)
+        val momentumSource: MomentumSource? = remember(repoDaily) {
+            repoDaily?.let {
+                android.util.Log.d("MyDayCards", "momentum source on DailyRepository")
+                TodayFacadeMomentumSource(it)
             }
         }
 
