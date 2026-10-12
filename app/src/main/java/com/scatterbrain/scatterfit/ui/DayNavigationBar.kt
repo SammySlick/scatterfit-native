@@ -68,7 +68,7 @@ import java.util.Locale
 fun DayNavigationBar(
     selectedDayKey: String,
     onDaySelected: (String) -> Unit,
-    momentumSource: MomentumSource,
+    momentumSource: MomentumSource? = null,
     modifier: Modifier = Modifier,
     initialExpanded: Boolean = false,
     asCard: Boolean = false,
@@ -217,7 +217,7 @@ private fun WeekStripContent(
     weekStartMonday: LocalDate,
     selectedDayKey: String,
     todayKey: String,
-    momentumSource: MomentumSource,
+    momentumSource: MomentumSource? = null,
     streakInfo: StreakInfo,
     onSettingsClick: () -> Unit,
     onPrevWeek: () -> Unit,
@@ -415,9 +415,9 @@ private fun WeekStripContent(
                     val isSelected = dayKey == selectedDayKey
                     val isToday = dayKey == todayKey
                     val isFuture = dayKey > todayKey
-                    val score = momentumSource.momentumForDay(dayKey)
+                    val score = momentumSource?.momentumForDay(dayKey)
                     val initial = weekdayInitials.getOrElse(index) { "M" }
-                    val isLogged = momentumSource.isDayLogged(dayKey)
+                    val isLogged = momentumSource?.isDayLogged(dayKey) ?: false
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -465,7 +465,7 @@ private fun MonthGridContent(
     currentMonth: YearMonth,
     selectedDayKey: String,
     todayKey: String,
-    momentumSource: MomentumSource,
+    momentumSource: MomentumSource? = null,
     streakInfo: StreakInfo,
     onSettingsClick: () -> Unit,
     onPrevMonth: () -> Unit,
@@ -590,8 +590,8 @@ private fun MonthGridContent(
                     val isSelected = dayKey == selectedDayKey
                     val isToday = dayKey == todayKey
                     val isFuture = dayKey > todayKey
-                    val score = if (isCurrentMonth) momentumSource.momentumForDay(dayKey) else null
-                    val isLogged = if (isCurrentMonth) momentumSource.isDayLogged(dayKey) else false
+                    val score = if (isCurrentMonth) momentumSource?.momentumForDay(dayKey) else null
+                    val isLogged = if (isCurrentMonth) momentumSource?.isDayLogged(dayKey) ?: false else false
 
                     if (isCurrentMonth) {
                         Column(

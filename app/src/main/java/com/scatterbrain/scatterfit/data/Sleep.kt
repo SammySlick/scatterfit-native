@@ -74,12 +74,13 @@ object Sleep {
     private val SLEEP_STAGE_CODES = mapOf(
         1 to "AWAKE", 2 to "SLEEPING", 3 to "OUT_OF_BED", 4 to "LIGHT", 5 to "DEEP", 6 to "REM", 7 to "AWAKE",
     )
+    private val DIGITS_ONLY_REGEX = Regex("^\\d+$")
 
     private fun stageName(raw: JsonElement?): String {
         val n = (raw as? JsonPrimitive)?.intOrNull
         if (n != null) return SLEEP_STAGE_CODES[n] ?: "UNKNOWN"
         val s = (raw as? JsonPrimitive)?.contentOrNull ?: return "UNKNOWN"
-        return if (Regex("^\\d+$").matches(s)) SLEEP_STAGE_CODES[s.toInt()] ?: "UNKNOWN" else s.uppercase()
+        return if (DIGITS_ONLY_REGEX.matches(s)) SLEEP_STAGE_CODES[s.toInt()] ?: "UNKNOWN" else s.uppercase()
     }
 
     private class RawSession(val start: Long, val end: Long, val stages: List<Triple<Long, Long, String>>)

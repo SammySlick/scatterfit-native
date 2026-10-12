@@ -49,8 +49,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -231,14 +234,23 @@ fun MyDayScreen(
         val isFutureDay = currentDayKey > today
         // Real synced HC records when present; demo month otherwise.
         val hubRecords by SyncHub.records.collectAsState()
-        val momentumSource: MomentumSource = remember(hubRecords) { TodayFacadeMomentumSource(hcRecords = hubRecords) }
+        val momentumSource: MomentumSource? by produceState<MomentumSource?>(
+            initialValue = null,
+            hubRecords
+        ) {
+            value = withContext(Dispatchers.Default) {
+                TodayFacadeMomentumSource(hcRecords = hubRecords)
+            }
+        }
 
         val isTodayLogged = checklist.weighInCompleted || checklist.foodLogCompleted || trainCompleted || weeklyCheckInCompleted || drinkState.loggedDrinks.isNotEmpty()
         val streakInfo = remember(momentumSource, today, isTodayLogged) {
-            momentumSource.computeStreak(today = today, todayLoggedOverride = isTodayLogged)
+            momentumSource?.computeStreak(today = today, todayLoggedOverride = isTodayLogged)
+                ?: StreakInfo(count = 0, isTodayLogged = isTodayLogged, isAtRisk = false)
         }
         val goalProjection = remember(momentumSource, currentDayKey) {
-            momentumSource.computeGoalProjection(currentDayKey)
+            momentumSource?.computeGoalProjection(currentDayKey)
+                ?: GoalProjectionInfo(goalName = "FAT LOSS", elapsedText = "—", targetText = "—", currentText = "—", isOnTrack = false)
         }
 
         // 1. Day Navigation Bar: Calendar Card with merged gear, nav header, date range, streak & logged dots
@@ -263,10 +275,10 @@ fun MyDayScreen(
             currentValueText = goalProjection.currentText,
             activeDayKey = currentDayKey,
             momentumSource = momentumSource,
-            sleepHours = momentumSource.sleepMinutesForDay(currentDayKey)?.let { m -> (m / 60).toInt() } ?: 8,
-            sleepMinutes = momentumSource.sleepMinutesForDay(currentDayKey)?.let { m -> (m % 60).toInt() } ?: 13,
-            rhrText = momentumSource.restingHrForDay(currentDayKey)?.let { "RHR ${it.toInt()}" } ?: "RHR warming up",
-            rhrValue = momentumSource.restingHrForDay(currentDayKey)?.let { "${it.toInt()} bpm" } ?: "54 bpm",
+            sleepHours = momentumSource?.sleepMinutesForDay(currentDayKey)?.let { m -> (m / 60).toInt() } ?: 8,
+            sleepMinutes = momentumSource?.sleepMinutesForDay(currentDayKey)?.let { m -> (m % 60).toInt() } ?: 13,
+            rhrText = momentumSource?.restingHrForDay(currentDayKey)?.let { "RHR ${it.toInt()}" } ?: "RHR warming up",
+            rhrValue = momentumSource?.restingHrForDay(currentDayKey)?.let { "${it.toInt()} bpm" } ?: "54 bpm",
             trainDoneToday = trainCompleted,
             stepsPctToday = if (dailyStepTarget > 0) ((checklist.stepsToday ?: 0.0).toInt()) * 100 / dailyStepTarget else 0,
             alcoholUnitsToday = 0, // TODO: wire DrinkTrackerViewModel.getUnitsForDay(currentDayKey) when it exists
@@ -599,7 +611,7 @@ fun TodayPulseCard(
     targetValueText: String? = null,
     currentValueText: String? = null,
     activeDayKey: String = remember { todayKey() },
-    momentumSource: MomentumSource = remember(SyncHub.records.value) { TodayFacadeMomentumSource(hcRecords = SyncHub.records.value) },
+    momentumSource: MomentumSource?,
     sleepHours: Int = 8,
     sleepMinutes: Int = 13,
     rhrText: String = "RHR warming up",
@@ -613,17 +625,18 @@ fun TodayPulseCard(
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
     val goalProjection = remember(activeDayKey, momentumSource) {
-        momentumSource.computeGoalProjection(activeDayKey)
+        momentumSource?.computeGoalProjection(activeDayKey)
+            ?: GoalProjectionInfo(goalName = goalName, elapsedText = "—", targetText = targetValueText ?: "—", currentText = currentValueText ?: "—", isOnTrack = false)
     }
     val effectiveTargetText = targetValueText ?: goalProjection.targetText
     val effectiveCurrentText = currentValueText ?: goalProjection.currentText
 
     // Momentum data
-    val momentumTodayRaw = momentumSource.scoreForDay(activeDayKey)
+    val momentumTodayRaw = momentumSource?.scoreForDay(activeDayKey)
     val mBand = momentumBand(momentumTodayRaw ?: 0.0)
 
     // Readiness data
-    val readinessStateWord = momentumSource.readinessStateForDay(activeDayKey)
+    val readinessStateWord = momentumSource?.readinessStateForDay(activeDayKey) ?: "NORMAL"
     val rBand = readinessBand(readinessStateWord)
 
     Card(
