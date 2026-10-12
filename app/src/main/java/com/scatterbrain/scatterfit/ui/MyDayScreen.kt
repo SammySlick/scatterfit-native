@@ -82,7 +82,6 @@ import com.scatterbrain.scatterfit.data.Zones
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.ui.theme.AccentHot
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
-import com.scatterbrain.scatterfit.ui.theme.ZoneAccent
 import com.scatterbrain.scatterfit.ui.theme.momentumBand
 import com.scatterbrain.scatterfit.ui.theme.readinessBand
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
@@ -226,7 +225,7 @@ fun MyDayScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(top = 0.dp, bottom = 16.dp)
+            .padding(top = 8.dp, bottom = 16.dp)
             .verticalScroll(scrollState)
     ) {
         val isFutureDay = currentDayKey > today
@@ -255,7 +254,7 @@ fun MyDayScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // 2. Today Pulse Card (Consolidates Momentum + Readiness with integrated Goal Header strip)
         TodayPulseCard(
@@ -277,7 +276,7 @@ fun MyDayScreen(
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // 3. "Today" To-Do Checklist Card (Weekly Check-in & Steps integrated inside!)
         TodayTasksCard(
@@ -624,7 +623,6 @@ fun TodayPulseCard(
     val mBand = momentumBand(momentumTodayRaw ?: 0.0)
 
     // Readiness data
-    val readinessScoreInt = momentumSource.readinessScoreForDay(activeDayKey)
     val readinessStateWord = momentumSource.readinessStateForDay(activeDayKey)
     val rBand = readinessBand(readinessStateWord)
 
@@ -639,7 +637,7 @@ fun TodayPulseCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // LEFT: [29.6%] data pill (SecondaryFill bg, white bold) + "TODAY" (TextMuted)
@@ -752,62 +750,58 @@ fun TodayPulseCard(
                     .background(BorderDefault)
             )
 
-            // SECTION 2 — Two halves in a Row, separated by a VERTICAL 1dp hairline
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-            ) {
-                // LEFT HALF = MOMENTUM
-                Column(
+            // SECTION 2 — Column of two FULL-WIDTH rows, each with horizontal hairlines
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // ROW A — MOMENTUM
+                Row(
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .clickable { onMomentumClick() }
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Header Row: 7dp dot + "MOMENTUM" (10sp) ... verdict pill at row end
+                    // LEFT: weight(1f)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(if (momentumTodayRaw == null) TextMuted else mBand.color)
-                            )
-                            Text(
-                                text = "MOMENTUM",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.sp,
-                                color = if (momentumTodayRaw == null) TextMuted else mBand.color
-                            )
-                        }
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(if (momentumTodayRaw == null) TextMuted else mBand.color)
+                        )
+                        Text(
+                            text = "MOMENTUM",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            color = if (momentumTodayRaw == null) TextMuted else mBand.color,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
 
-                        // Verdict pill
+                    // CENTRE: unweighted verdict pill (centre-locked by symmetric weights)
+                    Box(
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (momentumTodayRaw == null) {
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(SecondaryFill)
                                     .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     text = "No data",
                                     color = TextMuted,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    softWrap = false
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
                                 )
                             }
                         } else {
@@ -816,244 +810,109 @@ fun TodayPulseCard(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(mBand.color.copy(alpha = 0.18f))
                                     .border(BorderStroke(1.dp, mBand.color), RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    .padding(horizontal = 12.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     text = mBand.label,
                                     color = mBand.color,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    softWrap = false
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
                                 )
                             }
                         }
                     }
 
-                    // Progress bar: fill fraction = (score/100).coIn(0,1), brush = horizontalGradient(AccentTeal, band.color); track = BorderDefault
-                    val mProgress = if (momentumTodayRaw != null) {
-                        (momentumTodayRaw.toFloat() / 100f).coerceIn(0f, 1f)
-                    } else 0f
-
+                    // RIGHT: weight(1f), end-aligned
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(7.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(BorderDefault)
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterEnd
                     ) {
-                        if (mProgress > 0f) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(fraction = mProgress)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(50))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(AccentTeal, mBand.color)
-                                        )
-                                    )
-                            )
-                        }
-                    }
-
-                    // "Holding you back:" + up to TWO lever pills (only when momentum has data)
-                    if (momentumTodayRaw != null) {
-                        val leverDomains = remember(activeDayKey, momentumSource) {
-                            momentumSource.domainScoresForDay(activeDayKey)
-                                .filter { it.score != null }
-                                .sortedBy { it.score ?: 100.0 }
-                                .take(2)
-                        }
-
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = "Holding you back:",
-                                fontSize = 10.sp,
-                                color = TextMuted,
-                                fontWeight = FontWeight.Normal
-                            )
-                            if (leverDomains.isNotEmpty()) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    leverDomains.forEach { domain ->
-                                        val displayName = when (domain.id.uppercase()) {
-                                            "EXERCISE", "TRAINING" -> "Training"
-                                            "STEPS" -> "Steps"
-                                            "CALORIES", "FOOD" -> "Food"
-                                            "ALCOHOL", "UNITS" -> "Alcohol"
-                                            else -> domain.id
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(mBand.color.copy(alpha = 0.18f))
-                                                .border(BorderStroke(1.dp, mBand.color), RoundedCornerShape(12.dp))
-                                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = displayName,
-                                                color = Color.White,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        Text(
+                            text = "View Breakdown ›",
+                            fontSize = 9.sp,
+                            color = TextMuted,
+                            textAlign = TextAlign.End,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
 
-                // Vertical 1dp hairline divider
+                // Hairline between ROW A and ROW B
                 Box(
                     modifier = Modifier
-                        .width(1.dp)
-                        .fillMaxHeight()
+                        .fillMaxWidth()
+                        .height(1.dp)
                         .background(BorderDefault)
                 )
 
-                // RIGHT HALF = READINESS
-                Column(
+                // ROW B — READINESS
+                Row(
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .clickable { onSleepClick() }
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Header Row: dot + "READINESS" in band.color, verdict pill = band.label
+                    // LEFT: weight(1f)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(rBand.color)
-                            )
-                            Text(
-                                text = "READINESS",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.sp,
-                                color = rBand.color
-                            )
-                        }
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(rBand.color)
+                        )
+                        Text(
+                            text = "READINESS",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            color = rBand.color,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
 
+                    // CENTRE: unweighted verdict pill (centre-locked by symmetric weights)
+                    Box(
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(rBand.color.copy(alpha = 0.18f))
                                 .border(BorderStroke(1.dp, rBand.color), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = rBand.label,
                                 color = rBand.color,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                softWrap = false
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
                             )
                         }
                     }
 
-                    // Progress bar: same geometry, fill fraction = readiness % value, gradient AccentTeal -> band.color
-                    val rProgress = (readinessScoreInt.toFloat() / 100f).coerceIn(0f, 1f)
+                    // RIGHT: weight(1f), end-aligned
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(7.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(BorderDefault)
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterEnd
                     ) {
-                        if (rProgress > 0f) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(fraction = rProgress)
-                                    .fillMaxHeight()
-                                    .clip(RoundedCornerShape(50))
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(AccentTeal, rBand.color)
-                                        )
-                                    )
-                            )
-                        }
-                    }
-
-                    // Prescription line:
-                    // PRIMED -> "Aim to push for" + pill ["Z4+"] in ZoneAccent (tint bg ZoneAccent 18%, ZoneAccent text, no border)
-                    // COMPROMISED -> "Take it easy" + pill ["Z2 only today"] same pink treatment
-                    // NORMAL -> "Standard training day" muted, no pill
-                    val stateUpper = readinessStateWord.uppercase()
-                    when (stateUpper) {
-                        "PRIMED" -> {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "Aim to push for",
-                                    fontSize = 10.sp,
-                                    color = TextMuted
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(ZoneAccent.copy(alpha = 0.18f))
-                                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Z4+",
-                                        color = ZoneAccent,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                        "COMPROMISED" -> {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "Take it easy",
-                                    fontSize = 10.sp,
-                                    color = TextMuted
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(ZoneAccent.copy(alpha = 0.18f))
-                                        .padding(horizontal = 7.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Z2 only today",
-                                        color = ZoneAccent,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                        else -> {
-                            Text(
-                                text = "Standard training day",
-                                fontSize = 10.sp,
-                                color = TextMuted
-                            )
-                        }
+                        Text(
+                            text = "View Breakdown ›",
+                            fontSize = 9.sp,
+                            color = TextMuted,
+                            textAlign = TextAlign.End,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
@@ -1072,7 +931,7 @@ fun TodayPulseCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSleepClick() }
-                    .padding(vertical = 10.dp, horizontal = 14.dp),
+                    .padding(vertical = 8.dp, horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
@@ -1126,7 +985,7 @@ fun TodayTasksCard(
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1252,7 +1111,7 @@ fun StepsTaskRow(
             .background(containerBg)
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -1377,7 +1236,7 @@ fun MicroTaskRow(
             .background(containerBg)
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
