@@ -19,12 +19,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,7 +45,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.scatterbrain.scatterfit.core.scoreToColorArgb
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
@@ -112,7 +115,8 @@ fun DayNavigationBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 2.dp, bottom = 2.dp),
+                .statusBarsPadding()
+                .padding(top = 0.dp, bottom = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (!isExpanded) {
@@ -190,11 +194,17 @@ private fun CardSurfaceBox(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 16.dp, bottomEnd = 16.dp))
             .background(AppCardSurface)
-            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(14.dp))
     ) {
         content()
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(BorderDefault)
+        )
     }
 }
 
@@ -261,18 +271,19 @@ private fun WeekStripContent(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // New header row: Gear far left, Nav + Date range centred, Streak counter far right
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Far Left: Gear icon
             IconButton(
                 onClick = onSettingsClick,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(28.dp)
             ) {
                 SettingsIcon(
                     modifier = Modifier.size(20.dp),
@@ -283,46 +294,50 @@ private fun WeekStripContent(
             // Centre: "< This week >" + date range under it
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(1.dp)
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    IconButton(
-                        onClick = onPrevWeek,
-                        modifier = Modifier.size(28.dp)
+                @OptIn(ExperimentalMaterial3Api::class)
+                @Suppress("DEPRECATION")
+                CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
+                        IconButton(
+                            onClick = onPrevWeek,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Text(
+                                text = "‹",
+                                fontSize = 20.sp,
+                                color = TextForeground,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(0.dp))
+
                         Text(
-                            text = "‹",
-                            fontSize = 20.sp,
-                            color = TextForeground,
-                            fontWeight = FontWeight.Bold
+                            text = weekLabel,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextForeground
                         )
-                    }
 
-                    Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(0.dp))
 
-                    Text(
-                        text = weekLabel,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextForeground
-                    )
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    IconButton(
-                        onClick = { if (canGoNextWeek) onNextWeek() },
-                        enabled = canGoNextWeek,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Text(
-                            text = "›",
-                            fontSize = 20.sp,
-                            color = if (canGoNextWeek) TextForeground else TextMuted.copy(alpha = 0.3f),
-                            fontWeight = FontWeight.Bold
-                        )
+                        IconButton(
+                            onClick = { if (canGoNextWeek) onNextWeek() },
+                            enabled = canGoNextWeek,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Text(
+                                text = "›",
+                                fontSize = 20.sp,
+                                color = if (canGoNextWeek) TextForeground else TextMuted.copy(alpha = 0.3f),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
@@ -389,11 +404,9 @@ private fun WeekStripContent(
                 }
             } else {
                 // Balance the gear on the left with empty spacer
-                Spacer(modifier = Modifier.size(36.dp))
+                Spacer(modifier = Modifier.size(28.dp))
             }
         }
-
-        Spacer(modifier = Modifier.height(2.dp))
 
         // Weekday initials + 7 Day circles + logged dot in columns
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -432,6 +445,7 @@ private fun WeekStripContent(
                             isToday = isToday,
                             isFuture = isFuture,
                             momentumScore = score,
+                            isLogged = isLogged,
                             circleSize = circleSize,
                             strokeWidth = strokeWidth,
                             onClick = { onDayClick(dayKey) }
@@ -495,13 +509,13 @@ private fun MonthGridContent(
     ) {
         // Month Header Row with Gear, Month Pill, and Streak
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = onSettingsClick,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(28.dp)
             ) {
                 SettingsIcon(modifier = Modifier.size(20.dp), tint = TextForeground)
             }
@@ -545,7 +559,7 @@ private fun MonthGridContent(
                     color = if (streakInfo.isAtRisk) JudgementWarn else BrandPrimaryLime
                 )
             } else {
-                Spacer(modifier = Modifier.size(36.dp))
+                Spacer(modifier = Modifier.size(28.dp))
             }
         }
 
@@ -598,6 +612,7 @@ private fun MonthGridContent(
                                 isToday = isToday,
                                 isFuture = isFuture,
                                 momentumScore = score,
+                                isLogged = isLogged,
                                 circleSize = 36.dp,
                                 strokeWidth = 2.5.dp,
                                 onClick = { onDayClick(dayKey) }
@@ -651,6 +666,7 @@ fun DayMomentumCircle(
     isToday: Boolean,
     isFuture: Boolean,
     momentumScore: Double?,
+    isLogged: Boolean = false,
     circleSize: Dp = 44.dp,
     strokeWidth: Dp = 3.dp,
     onClick: () -> Unit,
@@ -659,15 +675,13 @@ fun DayMomentumCircle(
     val ringColor = when {
         isSelected -> BrandPrimaryLime
         isToday -> BrandPrimaryLime
-        isFuture -> BorderDefault
-        momentumScore != null -> Color(scoreToColorArgb(momentumScore))
+        isLogged -> BrandPrimaryLime
         else -> BorderDefault
     }
 
     val fillColor = when {
         isSelected -> BrandPrimaryLime
         isToday -> BrandPrimaryLime.copy(alpha = 0.15f)
-        momentumScore != null -> ringColor.copy(alpha = 0.10f)
         else -> Color.Transparent
     }
 
@@ -700,6 +714,20 @@ fun DayMomentumCircle(
                 platformStyle = PlatformTextStyle(includeFontPadding = false)
             ),
             modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun DayNavigationBarPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        DayNavigationBar(
+            selectedDayKey = com.scatterbrain.scatterfit.core.todayKey(),
+            onDaySelected = {},
+            momentumSource = androidx.compose.runtime.remember { TodayFacadeMomentumSource() },
+            streakInfo = StreakInfo(1, isTodayLogged = true, isAtRisk = false),
+            asCard = true
         )
     }
 }

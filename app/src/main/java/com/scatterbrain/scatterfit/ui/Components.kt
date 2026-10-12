@@ -183,3 +183,17 @@ fun MetricDetailView(
         }
     }
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun ComponentsPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            CategoryFilterPill(label = "Steps", isSelected = true, onClick = {})
+            Spacer(modifier = Modifier.height(8.dp))
+            CategoryFilterPill(label = "Sleep", isSelected = false, onClick = {})
+            Spacer(modifier = Modifier.height(16.dp))
+            MetricDetailView(category = "Steps", selectedTimeRange = "7D", onTimeRangeSelected = {})
+        }
+    }
+}

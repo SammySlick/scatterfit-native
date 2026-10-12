@@ -66,3 +66,11 @@ fun GoalHeaderBar(
         )
     }
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun GoalHeaderBarPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        GoalHeaderBar()
+    }
+}

@@ -71,7 +71,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         SyncHub.init(this)
 
         when (HealthConnectClient.getSdkStatus(this)) {
@@ -88,6 +87,7 @@ class MainActivity : ComponentActivity() {
                 SyncHub.setStatus("Health Connect unavailable (unknown status ${HealthConnectClient.getSdkStatus(this)}).")
         }
 
+        enableEdgeToEdge()
         setContent {
             ScatterFitTheme {
                 var showDebug by remember { mutableStateOf(false) }

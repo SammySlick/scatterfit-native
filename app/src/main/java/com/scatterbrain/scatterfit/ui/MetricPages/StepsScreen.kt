@@ -13,3 +13,11 @@ import com.scatterbrain.scatterfit.ui.MetricScreen
 fun StepsScreen(onBackClick: () -> Unit, modifier: Modifier = Modifier) {
     MetricScreen(initialId = MetricId.STEPS, onBackClick = onBackClick, modifier = modifier)
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun StepsScreenPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        StepsScreen(onBackClick = {})
+    }
+}

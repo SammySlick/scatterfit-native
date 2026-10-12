@@ -13,3 +13,11 @@ import com.scatterbrain.scatterfit.ui.MetricScreen
 fun SleepScreen(onBackClick: () -> Unit, modifier: Modifier = Modifier) {
     MetricScreen(initialId = MetricId.SLEEP, onBackClick = onBackClick, modifier = modifier)
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun SleepScreenPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        SleepScreen(onBackClick = {})
+    }
+}

@@ -34,9 +34,19 @@ val ChartRed = Color(0xFFF14D4C)
 
 // Legacy / Compatibility Aliases
 val DarkCardSurface = AppCardSurface
+val AppRowSurface = MutedFill
 val TealHighlight = BrandPrimaryLime
 val DarkBackground = AppBackground
 val DarkBorderOutline = BorderDefault
 val StatusOnTarget = JudgementGood
 val StatusNearTarget = JudgementWarn
 val StatusOffTarget = JudgementBad
+
+// Colour System v2 tokens
+val StateBad     = Color(0xFFF05B54)
+val StateSlip    = Color(0xFFF29D1E)
+val StateRhythm  = Color(0xFFF0BB3B)
+val StateLocked  = Color(0xFF44B65E)
+val StatePeak    = Color(0xFF3FA9F5)
+val AccentTeal   = Color(0xFF15B6A4)
+val ZoneAccent   = Color(0xFFF17084)

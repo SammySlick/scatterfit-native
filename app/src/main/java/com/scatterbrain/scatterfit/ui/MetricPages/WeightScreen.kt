@@ -13,3 +13,11 @@ import com.scatterbrain.scatterfit.ui.MetricScreen
 fun WeightScreen(onBackClick: () -> Unit, modifier: Modifier = Modifier) {
     MetricScreen(initialId = MetricId.WEIGHT, onBackClick = onBackClick, modifier = modifier)
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun WeightScreenPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        WeightScreen(onBackClick = {})
+    }
+}

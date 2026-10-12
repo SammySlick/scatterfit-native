@@ -1,6 +1,9 @@
 package com.scatterbrain.scatterfit.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -123,5 +126,24 @@ fun AskChatIcon(
             color = tint,
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
+    }
+}
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun ScatterFitIconsPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SettingsIcon()
+            StreakIcon()
+            PulseIcon()
+            HeartPulseIcon()
+            LightningIcon()
+            CompassIcon()
+            AskChatIcon()
+        }
     }
 }
