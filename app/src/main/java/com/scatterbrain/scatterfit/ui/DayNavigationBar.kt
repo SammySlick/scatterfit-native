@@ -298,14 +298,12 @@ private fun WeekStripContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "<",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextForeground,
+                    ChevronLeftIcon(
+                        tint = TextForeground,
                         modifier = Modifier
                             .clickable(onClick = onPrevWeek)
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .size(8.dp)
                     )
 
                     Text(
@@ -319,14 +317,12 @@ private fun WeekStripContent(
                         )
                     )
 
-                    Text(
-                        text = ">",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (canGoNextWeek) TextForeground else TextMuted.copy(alpha = 0.3f),
+                    ChevronRightIcon(
+                        tint = if (canGoNextWeek) TextForeground else TextMuted.copy(alpha = 0.3f),
                         modifier = Modifier
                             .clickable(onClick = onNextWeek, enabled = canGoNextWeek)
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .size(8.dp)
                     )
                 }
 

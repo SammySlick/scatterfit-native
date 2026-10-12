@@ -38,8 +38,18 @@ class StoreDailySource(
     }
 
     companion object {
-        /** Assemble the daily maps from whatever the sync cache holds. Methods
-         *  not in [methods] stay empty, so a page only pays for what it reads. */
+        fun fromDaily(
+            ad: AssembledDaily,
+            pick: (AssembledDaily, String) -> Double?,
+            zone: ZoneId = ZoneId.systemDefault(),
+            nowMs: Long = System.currentTimeMillis(),
+        ): StoreDailySource = StoreDailySource(ad, pick, zone, nowMs)
+
+        /**
+         * @deprecated Use fromDaily with pre-assembled DailyRepository.daily instead of building on the UI thread.
+         * Assemble the daily maps from whatever the sync cache holds. Methods
+         * not in [methods] stay empty, so a page only pays for what it reads.
+         */
         fun fromStore(
             store: SyncStore,
             zone: ZoneId = ZoneId.systemDefault(),

@@ -12,6 +12,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,7 +26,8 @@ import com.scatterbrain.scatterfit.core.MetricId
 import com.scatterbrain.scatterfit.core.MetricRegistry
 import com.scatterbrain.scatterfit.core.metricTargetContext
 import com.scatterbrain.scatterfit.core.todayKey
-import com.scatterbrain.scatterfit.data.RealMetricSources
+import com.scatterbrain.scatterfit.data.DailyRepository
+import com.scatterbrain.scatterfit.data.StoreDailySource
 import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
 import com.scatterbrain.scatterfit.ui.theme.MutedFill
 import com.scatterbrain.scatterfit.ui.theme.OnPrimaryText
@@ -59,10 +61,12 @@ fun MetricScreen(
 ) {
     var currentId by remember { mutableStateOf(initialId) }
     val def = remember(currentId) { MetricRegistry.byId(currentId) }
-    // Real source when the cache is attached; otherwise the honest empty
-    // source. Demo stubs are gone for metric pages — no plausible fakes.
-    val real = remember(currentId) { RealMetricSources.forMetric(currentId) }
-    val source = real ?: remember(currentId) { EmptyMetricSource() }
+    val repoDaily by DailyRepository.daily.collectAsState()
+    val source: MetricSource = remember(currentId, repoDaily) {
+        repoDaily?.let { ad ->
+            StoreDailySource.fromDaily(ad, def.valueFrom)
+        } ?: EmptyMetricSource()
+    }
 
     // Hero: newest value in the last HISTORY_DAYS window.
     val latest = remember(source) { source.latest() }

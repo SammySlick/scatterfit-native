@@ -80,6 +80,7 @@ import java.time.format.DateTimeFormatter
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.core.dayBefore
 import com.scatterbrain.scatterfit.data.Daily
+import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.data.TaskChecklist
 import com.scatterbrain.scatterfit.data.Zones
 import com.scatterbrain.scatterfit.sync.SyncHub
@@ -155,15 +156,8 @@ fun MyDayScreen(
 
     // DERIVED checklist: completed-ness comes from the day's data — sync OR a
     // manual record write (weigh-in dialog / food logger). No boolean ticks.
-    val checklistRecords = SyncHub.records.collectAsState().value
-    val checklistDaily = remember(checklistRecords) {
-        checklistRecords?.let {
-            Daily.buildDailyDataFromMaps(
-                it, Zones.DEFAULT_ZONES, ZoneId.systemDefault(),
-                nowMs = System.currentTimeMillis(),
-            )
-        }
-    }
+    val repoDaily by DailyRepository.daily.collectAsState()
+    val checklistDaily = repoDaily
     val checklist = remember(checklistDaily, currentDayKey, dailyCalorieTarget) {
         TaskChecklist.derive(
             daily = checklistDaily,
@@ -650,10 +644,11 @@ fun TodayPulseCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(AccentTeal.copy(alpha = 0.10f))
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // LEFT: [29.6%] data pill (SecondaryFill bg, white bold) + "TODAY" (TextMuted)
+                // LEFT: [29.6%] data pill (teal border, white bold) + "TODAY" (TextMuted)
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
@@ -663,7 +658,7 @@ fun TodayPulseCard(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(SecondaryFill)
-                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                            .border(BorderStroke(1.dp, AccentTeal), RoundedCornerShape(12.dp))
                             .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -760,17 +755,21 @@ fun TodayPulseCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(BorderDefault)
+                    .background(AccentTeal.copy(alpha = 0.25f))
             )
 
             // SECTION 2 — Column of two FULL-WIDTH rows, each with horizontal hairlines
             Column(modifier = Modifier.fillMaxWidth()) {
+                val mColor = if (momentumTodayRaw == null) TextMuted else mBand.color
+                val mBg = if (momentumTodayRaw == null) Color.Transparent else mBand.color.copy(alpha = 0.14f)
+
                 // ROW A — MOMENTUM
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(mBg)
                         .clickable { onMomentumClick() }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // LEFT: weight(1f)
@@ -783,129 +782,32 @@ fun TodayPulseCard(
                             modifier = Modifier
                                 .size(7.dp)
                                 .clip(CircleShape)
-                                .background(if (momentumTodayRaw == null) TextMuted else mBand.color)
+                                .background(mColor)
                         )
                         Text(
                             text = "MOMENTUM",
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.sp,
-                            color = if (momentumTodayRaw == null) TextMuted else mBand.color,
+                            color = mColor,
                             maxLines = 1,
                             softWrap = false
                         )
                     }
 
-                    // CENTRE: unweighted verdict pill (centre-locked by symmetric weights)
-                    Box(
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (momentumTodayRaw == null) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(SecondaryFill)
-                                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "No data",
-                                    color = TextMuted,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                            }
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(mBand.color.copy(alpha = 0.18f))
-                                    .border(BorderStroke(1.dp, mBand.color), RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 10.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = mBand.label,
-                                    color = mBand.color,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-
-                    // RIGHT: weight(1f), end-aligned
-                    Box(
-                        modifier = Modifier.weight(1f),
-                        contentAlignment = Alignment.CenterEnd
-                    ) {
-                        Text(
-                            text = "View Breakdown ›",
-                            fontSize = 10.sp,
-                            color = TextMuted,
-                            textAlign = TextAlign.End,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-
-                // Hairline between ROW A and ROW B
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(BorderDefault)
-                )
-
-                // ROW B — READINESS
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSleepClick() }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // LEFT: weight(1f)
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(rBand.color)
-                        )
-                        Text(
-                            text = "READINESS",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp,
-                            color = rBand.color,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-
-                    // CENTRE: unweighted verdict pill (centre-locked by symmetric weights)
+                    // CENTRE: unweighted verdict pill (OUTLINE ONLY)
                     Box(
                         modifier = Modifier.padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(rBand.color.copy(alpha = 0.18f))
-                                .border(BorderStroke(1.dp, rBand.color), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 10.dp, vertical = 2.dp)
+                                .border(BorderStroke(1.dp, mColor), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 14.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = rBand.label,
-                                color = rBand.color,
+                                text = if (momentumTodayRaw == null) "No data" else mBand.label,
+                                color = mColor,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
@@ -918,14 +820,111 @@ fun TodayPulseCard(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.CenterEnd
                     ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "VIEW BREAKDOWN",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = mColor,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                            ChevronRightIcon(
+                                modifier = Modifier.size(8.dp),
+                                tint = mColor
+                            )
+                        }
+                    }
+                }
+
+                // Hairline between ROW A and ROW B
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(AccentTeal.copy(alpha = 0.25f))
+                )
+
+                // ROW B — READINESS
+                val rColor = if (momentumSource == null) TextMuted else rBand.color
+                val rBg = if (momentumSource == null) Color.Transparent else rBand.color.copy(alpha = 0.14f)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(rBg)
+                        .clickable { onSleepClick() }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // LEFT: weight(1f)
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(rColor)
+                        )
                         Text(
-                            text = "View Breakdown ›",
-                            fontSize = 10.sp,
-                            color = TextMuted,
-                            textAlign = TextAlign.End,
+                            text = "READINESS",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            color = rColor,
                             maxLines = 1,
                             softWrap = false
                         )
+                    }
+
+                    // CENTRE: unweighted verdict pill (OUTLINE ONLY)
+                    Box(
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .border(BorderStroke(1.dp, rColor), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 14.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = if (momentumSource == null) "No data" else rBand.label,
+                                color = rColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    // RIGHT: weight(1f), end-aligned
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "VIEW BREAKDOWN",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = rColor,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                            ChevronRightIcon(
+                                modifier = Modifier.size(8.dp),
+                                tint = rColor
+                            )
+                        }
                     }
                 }
             }
@@ -935,7 +934,7 @@ fun TodayPulseCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(BorderDefault)
+                    .background(AccentTeal.copy(alpha = 0.25f))
             )
 
             // SECTION 3 — Bottom strip inside the card:
@@ -944,7 +943,7 @@ fun TodayPulseCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSleepClick() }
-                    .padding(vertical = 8.dp, horizontal = 14.dp),
+                    .padding(vertical = 10.dp, horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {

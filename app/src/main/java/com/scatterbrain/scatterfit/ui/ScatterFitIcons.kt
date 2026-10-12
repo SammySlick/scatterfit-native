@@ -129,6 +129,32 @@ fun AskChatIcon(
     }
 }
 
+@Composable
+fun ChevronRightIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_chevron_right),
+        contentDescription = "Chevron Next",
+        tint = tint,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun ChevronLeftIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_chevron_left),
+        contentDescription = "Chevron Prev",
+        tint = tint,
+        modifier = modifier
+    )
+}
+
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 @Composable
 fun ScatterFitIconsPreview() {
