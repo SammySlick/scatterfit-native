@@ -810,7 +810,7 @@ fun TodayPulseCard(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(mBand.color.copy(alpha = 0.18f))
                                     .border(BorderStroke(1.dp, mBand.color), RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                                    .padding(horizontal = 10.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = mBand.label,
@@ -830,7 +830,7 @@ fun TodayPulseCard(
                     ) {
                         Text(
                             text = "View Breakdown ›",
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             color = TextMuted,
                             textAlign = TextAlign.End,
                             maxLines = 1,
@@ -888,7 +888,7 @@ fun TodayPulseCard(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(rBand.color.copy(alpha = 0.18f))
                                 .border(BorderStroke(1.dp, rBand.color), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                                .padding(horizontal = 10.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = rBand.label,
@@ -907,7 +907,7 @@ fun TodayPulseCard(
                     ) {
                         Text(
                             text = "View Breakdown ›",
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             color = TextMuted,
                             textAlign = TextAlign.End,
                             maxLines = 1,

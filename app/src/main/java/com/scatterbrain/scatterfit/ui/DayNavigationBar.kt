@@ -23,12 +23,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +43,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scatterbrain.scatterfit.core.todayKey
+import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
@@ -272,11 +270,11 @@ private fun WeekStripContent(
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         // New header row: Gear far left, Nav + Date range centred, Streak counter far right
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -287,66 +285,60 @@ private fun WeekStripContent(
             ) {
                 SettingsIcon(
                     modifier = Modifier.size(20.dp),
-                    tint = TextForeground
+                    tint = AccentTeal
                 )
             }
 
-            // Centre: "< This week >" + date range under it
+            // Centre: "< This week >" on line 1, date range on line 2
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                @OptIn(ExperimentalMaterial3Api::class)
-                @Suppress("DEPRECATION")
-                CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        IconButton(
-                            onClick = onPrevWeek,
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Text(
-                                text = "‹",
-                                fontSize = 20.sp,
-                                color = TextForeground,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "<",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground,
+                        modifier = Modifier
+                            .clickable(onClick = onPrevWeek)
+                            .padding(horizontal = 4.dp)
+                    )
 
-                        Spacer(modifier = Modifier.width(0.dp))
-
-                        Text(
-                            text = weekLabel,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextForeground
+                    Text(
+                        text = weekLabel,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground,
+                        lineHeight = 13.sp,
+                        style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
                         )
+                    )
 
-                        Spacer(modifier = Modifier.width(0.dp))
-
-                        IconButton(
-                            onClick = { if (canGoNextWeek) onNextWeek() },
-                            enabled = canGoNextWeek,
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Text(
-                                text = "›",
-                                fontSize = 20.sp,
-                                color = if (canGoNextWeek) TextForeground else TextMuted.copy(alpha = 0.3f),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                    Text(
+                        text = ">",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (canGoNextWeek) TextForeground else TextMuted.copy(alpha = 0.3f),
+                        modifier = Modifier
+                            .clickable(onClick = onNextWeek, enabled = canGoNextWeek)
+                            .padding(horizontal = 4.dp)
+                    )
                 }
 
-                // Date range under week nav: "6 – 12 Oct", muted grey, small
                 Text(
                     text = dateRangeText,
                     fontSize = 10.sp,
                     color = TextMuted,
-                    fontWeight = FontWeight.Normal
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = 11.sp,
+                    style = TextStyle(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    )
                 )
             }
 
@@ -378,26 +370,26 @@ private fun WeekStripContent(
                         }
                     }
                 } else {
-                    // Solid lime streak
+                    // Solid teal streak
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(BrandPrimaryLime.copy(alpha = 0.16f))
+                            .background(AccentTeal.copy(alpha = 0.16f))
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            StreakIcon(
-                                modifier = Modifier.size(13.dp),
-                                tint = BrandPrimaryLime
-                            )
                             Text(
                                 text = "${streakInfo.count}",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = BrandPrimaryLime
+                                color = AccentTeal
+                            )
+                            StreakIcon(
+                                modifier = Modifier.size(13.dp),
+                                tint = AccentTeal
                             )
                         }
                     }
@@ -429,7 +421,7 @@ private fun WeekStripContent(
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
                         Text(
                             text = initial,
@@ -454,9 +446,9 @@ private fun WeekStripContent(
                         // Small dot under each day that was fully logged
                         Box(
                             modifier = Modifier
-                                .size(4.dp)
+                                .size(5.dp)
                                 .clip(CircleShape)
-                                .background(if (isLogged) BrandPrimaryLime else Color.Transparent)
+                                .background(if (isLogged) AccentTeal else Color.Transparent)
                         )
                     }
                 }
@@ -623,7 +615,7 @@ private fun MonthGridContent(
                                 modifier = Modifier
                                     .size(3.dp)
                                     .clip(CircleShape)
-                                    .background(if (isLogged) BrandPrimaryLime else Color.Transparent)
+                                    .background(if (isLogged) AccentTeal else Color.Transparent)
                             )
                         }
                     } else {
@@ -673,21 +665,21 @@ fun DayMomentumCircle(
     modifier: Modifier = Modifier
 ) {
     val ringColor = when {
-        isSelected -> BrandPrimaryLime
-        isToday -> BrandPrimaryLime
-        isLogged -> BrandPrimaryLime
+        isSelected -> AccentTeal
+        isToday -> AccentTeal
+        isLogged -> AccentTeal
         else -> BorderDefault
     }
 
     val fillColor = when {
-        isSelected -> BrandPrimaryLime
-        isToday -> BrandPrimaryLime.copy(alpha = 0.15f)
+        isSelected -> AccentTeal
+        isToday -> AccentTeal.copy(alpha = 0.15f)
         else -> Color.Transparent
     }
 
     val textColor = when {
         isSelected -> OnPrimaryText // black text on filled lime
-        isToday -> BrandPrimaryLime
+        isToday -> AccentTeal
         isFuture -> TextMuted.copy(alpha = 0.40f)
         else -> TextForeground
     }
