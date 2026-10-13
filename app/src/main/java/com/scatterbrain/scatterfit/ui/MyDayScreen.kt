@@ -1695,3 +1695,54 @@ fun MyDayScreenPreview() {
         MyDayScreen()
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+fun TodayPulseCardPreview() {
+    ScatterFitTheme {
+        TodayPulseCard(
+            goalName = "FAT LOSS",
+            targetValueText = "17%",
+            currentValueText = "29.6%",
+            momentumSource = TodayFacadeMomentumSource(),
+            sleepHours = 8,
+            sleepMinutes = 13,
+            rhrText = "54 RHR"
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TodayTasksCardPreview() {
+    ScatterFitTheme {
+        TodayTasksCard(
+            weeklyCheckInCompleted = false,
+            onWeeklyCheckInClick = {},
+            weighInCompleted = true,
+            weighInData = "84.2kg",
+            onWeighInClick = {},
+            foodLogCompleted = false,
+            foodLogData = "345 / 1,800 kcal",
+            onFoodLogClick = {},
+            trainCompleted = false,
+            trainData = "HIIT 20 mins",
+            onTrainClick = {},
+            stepsToday = 8420,
+            dailyStepTarget = 10000
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AlcoholTrackerCardPreview() {
+    ScatterFitTheme {
+        AlcoholTrackerCard(
+            totalSpent = "£0.00",
+            alcoholFreeDays = 7,
+            unitsConsumed = 0,
+            targetDrinkDays = 2
+        )
+    }
+}

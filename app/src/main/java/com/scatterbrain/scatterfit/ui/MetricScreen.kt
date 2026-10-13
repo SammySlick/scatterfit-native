@@ -149,3 +149,14 @@ private fun MetricChipRow(active: MetricId, onPick: (MetricId) -> Unit) {
         }
     }
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun MetricScreenPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        MetricScreen(
+            initialId = MetricId.STEPS,
+            onBackClick = {}
+        )
+    }
+}

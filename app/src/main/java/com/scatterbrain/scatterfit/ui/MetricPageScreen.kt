@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -526,5 +527,22 @@ private fun MetricChartCard(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun MetricPageScreenPreview() {
+    com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme {
+        MetricPageScreen(
+            title = "Steps",
+            heroValue = "8,420",
+            heroUnit = "steps",
+            heroScore = 85.0,
+            insightSentence = "Pacing well ahead of your 7-day average.",
+            chartType = MetricChartType.BAR,
+            metricSource = EmptyMetricSource(),
+            onBackClick = {}
+        )
     }
 }
