@@ -46,7 +46,7 @@ class ConsistencySummaryTest {
         assertEquals("0/7 · 0.0k", get(all, "Steps").rightEdge)
         assertEquals("0/7 · 0 kcal", get(all, "Calories").rightEdge)
         assertEquals("0/7 nights", get(all, "Sleep").rightEdge)
-        assertEquals("0/7m", get(all, "Z2 Training").rightEdge)
+        assertEquals("0/90m", get(all, "Z2 Training").rightEdge)
     }
 
     // ---- sections: worst-average first, 3 / 3 / rest, unlogged sink below ----
@@ -78,12 +78,12 @@ class ConsistencySummaryTest {
 
     @Test fun `steps - logged days, on-target days and weekly total`() {
         val data = DailyData().withSteps(
-            day(0) to 9000.0, day(1) to 12000.0, day(2) to 11000.0, // 3 logged, 2 on target
+            day(0) to 5000.0, day(1) to 12000.0, day(2) to 11000.0, // 3 logged, 2 on target (5000 = score 50 < 60)
         )
         val s = get(summaries(data), "Steps")
         assertEquals(3, s.loggedDays)
         assertEquals(2, s.onTargetDays)
-        assertEquals("3/7 · 3.2k", s.rightEdge)
+        assertEquals("3/7 · 2.8k", s.rightEdge)
     }
 
     @Test fun `calories - weekly total and over-target delta across logged days only`() {
