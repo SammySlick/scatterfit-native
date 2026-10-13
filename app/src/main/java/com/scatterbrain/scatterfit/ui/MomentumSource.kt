@@ -219,7 +219,7 @@ class TodayFacadeMomentumSource(
     override fun consistencySeries(dayKey: String): List<GoalSeries> = getCard(dayKey).goals
 
     override fun consistencySummaries(dayKey: String): List<ConsistencySummary> =
-        computeConsistencySummaries(daily, settings, 7, dayKey)
+        computeConsistencySummaries(TodayFacade.toCoreDaily(daily), settings, 7, dayKey)
 
     override fun zone2MinutesForDay(dayKey: String): Double? = daily.hrZones[dayKey]?.z2
 
