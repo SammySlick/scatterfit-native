@@ -1,5 +1,6 @@
 package com.scatterbrain.scatterfit.ui
 
+import com.scatterbrain.scatterfit.core.ConsistencySummary
 import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.GoalPreset
 import com.scatterbrain.scatterfit.core.GoalSeries
@@ -8,6 +9,7 @@ import com.scatterbrain.scatterfit.core.dayBefore
 import com.scatterbrain.scatterfit.core.dayKeyFromIso
 import com.scatterbrain.scatterfit.core.goalLabel
 import com.scatterbrain.scatterfit.core.lastNDayKeys
+import com.scatterbrain.scatterfit.core.computeConsistencySummaries
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.AssembledDaily
 import com.scatterbrain.scatterfit.data.CardInputs
@@ -69,6 +71,8 @@ interface MomentumSource {
 
     fun domainScoresForDay(dayKey: String): List<DomainScore>
     fun consistencySeries(dayKey: String): List<GoalSeries> = emptyList()
+    /** AAG summaries for the Momentum — Breakdown screen (see ConsistencySummary.kt). */
+    fun consistencySummaries(dayKey: String): List<ConsistencySummary> = emptyList()
     fun zone2MinutesForDay(dayKey: String): Double? = null
     val sleepTargetHours: Double get() = 8.0
 }
@@ -213,6 +217,9 @@ class TodayFacadeMomentumSource(
     override fun restingHrForDay(dayKey: String): Double? = daily.restingHr[dayKey]
 
     override fun consistencySeries(dayKey: String): List<GoalSeries> = getCard(dayKey).goals
+
+    override fun consistencySummaries(dayKey: String): List<ConsistencySummary> =
+        computeConsistencySummaries(daily, settings, 7, dayKey)
 
     override fun zone2MinutesForDay(dayKey: String): Double? = daily.hrZones[dayKey]?.z2
 

@@ -52,7 +52,11 @@ data class ScoringSettings(
     val bodyFatRatePerWeek: Double = 0.3,
     val drinkDaysPerWeek: Int = 2,
     val unitsPerWeek: Int = 14,
-    val z3Target: Int = 45, // web DEFAULT_SETTINGS z3Target = 45 (Z3+ pace target: z3+z4+z5)
+    // Per-zone weekly MINUTE targets — port of web DEFAULT_SETTINGS (Sam's zones
+    // interview Q5, 2026-10-05): Z2 90 · Z3 45 · Z4 30 · Z5 15 min/week. Z3+ maths
+    // elsewhere sums z3+z4+z5, which stays correct under per-zone semantics.
+    val z2Target: Int = 90,
+    val z3Target: Int = 45,
     val z4Target: Int = 30,
     val z5Target: Int = 15,
     val weekMode: WeekMode = "monday",
