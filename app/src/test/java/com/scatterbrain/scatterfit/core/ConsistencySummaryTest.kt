@@ -7,7 +7,8 @@ import org.junit.Test
 
 /**
  * Acceptance tests for computeConsistencySummaries (AAG layer, decided
- * 2026-10-13). Every test pins todayKey — never real wall-clock.
+ * 2026-10-13; square grammar = tolerance bands per Sam's mockup 2026-10-14).
+ * Every test pins todayKey — never real wall-clock.
  */
 class ConsistencySummaryTest {
 
@@ -83,7 +84,7 @@ class ConsistencySummaryTest {
         val s = get(summaries(data), "Steps")
         assertEquals(3, s.loggedDays)
         assertEquals(2, s.onTargetDays)
-        assertEquals("28.0k", s.rightEdge)
+        assertEquals("28,000/70,000", s.rightEdge)
     }
 
     @Test fun `calories - weekly total and over-target delta across logged days only`() {
@@ -91,7 +92,7 @@ class ConsistencySummaryTest {
             day(0) to 2000.0, day(1) to 2500.0, // 2 logged: 4500 vs 2×2270 (Sam default) = -40 under
         )
         val s = get(summaries(data, ScoringSettings(kcalTarget = 2270)), "Calories")
-        assertEquals("4,500 kcal", s.rightEdge)
+        assertEquals("4,500/15,890 kcal", s.rightEdge)
         assertTrue(s.sentence.contains("40 kcal under target across 2 logged days"))
     }
 
@@ -110,7 +111,7 @@ class ConsistencySummaryTest {
         val s = get(summaries(data), "Sleep")
         assertEquals(3, s.loggedDays)
         assertEquals(2, s.onTargetDays)
-        assertEquals("23h 30m", s.rightEdge)
+        assertEquals("23h 30m/56h", s.rightEdge)
         assertTrue(s.sentence.contains("Avg 7h 50m"))
         assertTrue(s.sentence.contains("on target 2 of 3 nights"))
         // squares: met nights in Locked In band, short nights in Slipping band
@@ -167,5 +168,131 @@ class ConsistencySummaryTest {
         val s = get(summaries(data), "Steps")
         // oneSidedScore(10000 vs 10000) = 100 (on); 9500 slightly under (score <60? band check via count)
         assertTrue(s.onTargetDays >= 1 && s.onTargetDays <= 2)
+    }
+    // ---- square bands: the mockup grammar (2026-10-14) ----
+
+    @Test fun `bands - calories two-sided tolerance around target`() {
+        val data = DailyData().withCal(
+            day(0) to 2500.0, // |0| <= 150 -> GREEN
+            day(1) to 2800.0, // |300| <= 500 -> ORANGE
+            day(2) to 3300.0, // |800| > 500 -> RED
+        )
+        val sq = get(summaries(data), "Calories").squares
+        assertEquals(SquareBand.GREEN, sq[0].band)
+        assertEquals(SquareBand.ORANGE, sq[1].band)
+        assertEquals(SquareBand.RED, sq[2].band)
+        assertEquals(1, get(summaries(data), "Calories").onTargetDays)
+    }
+
+    @Test fun `bands - calories custom tolerance from settings`() {
+        val data = DailyData().withCal(day(0) to 2800.0)
+        val loose = get(summaries(data, ScoringSettings(kcalTarget = 2500,
+            tolerances = ToleranceSettings(kcalGreen = 300))), "Calories")
+        assertEquals(SquareBand.GREEN, loose.squares[0].band) // |300| <= 300
+        val tight = get(summaries(data, ScoringSettings(kcalTarget = 2500,
+            tolerances = ToleranceSettings(kcalGreen = 100))), "Calories")
+        assertEquals(SquareBand.ORANGE, tight.squares[0].band)
+    }
+
+    @Test fun `bands - steps one-sided floors`() {
+        val data = DailyData().withSteps(
+            day(0) to 10000.0, day(1) to 7000.0, day(2) to 6999.0,
+        )
+        val sq = get(summaries(data), "Steps").squares
+        assertEquals(SquareBand.GREEN, sq[0].band)
+        assertEquals(SquareBand.ORANGE, sq[1].band)
+        assertEquals(SquareBand.RED, sq[2].band)
+    }
+
+    @Test fun `bands - protein two-sided around target`() {
+        val data = DailyData().withProtein(
+            day(0) to 150.0,  // |−10| <= 20 GREEN
+            day(1) to 120.0,  // |−40| <= 50 ORANGE
+            day(2) to 100.0,  // |−60| > 50 RED
+            day(3) to 190.0,  // |+30| ORANGE (two-sided, symmetric with calories)
+        )
+        val sq = get(summaries(data), "Protein").squares
+        assertEquals(SquareBand.GREEN, sq[0].band)
+        assertEquals(SquareBand.ORANGE, sq[1].band)
+        assertEquals(SquareBand.RED, sq[2].band)
+        assertEquals(SquareBand.ORANGE, sq[3].band)
+    }
+
+    @Test fun `bands - sleep within 60 min of target is orange`() {
+        val data = DailyData().withSleep(
+            day(0) to NightTotal(8.0 * 60),          // met -> GREEN
+            day(1) to NightTotal(7.5 * 60),          // 30 min short -> ORANGE
+            day(2) to NightTotal(6.5 * 60),          // 90 min short -> RED
+        )
+        val sq = get(summaries(data), "Sleep").squares
+        assertEquals(SquareBand.GREEN, sq[0].band)
+        assertEquals(SquareBand.ORANGE, sq[1].band)
+        assertEquals(SquareBand.RED, sq[2].band)
+    }
+
+    @Test fun `bands - exercise green when trained, grey when not, never red`() {
+        val data = DailyData().withTraining(day(0) to 45.0)
+        val sq = get(summaries(data), "Exercise").squares
+        assertEquals(SquareBand.GREEN, sq[0].band)
+        assertTrue(sq.drop(1).all { it.band == SquareBand.GREY })
+    }
+
+    @Test fun `bands - alcohol vs daily share of weekly budget`() {
+        val data = DailyData().withUnits(
+            day(0) to 2.0, // == 14/7 allowance -> GREEN
+            day(1) to 3.5, // +1.5 over -> ORANGE
+            day(2) to 5.0, // +3 over -> RED
+        )
+        val sq = get(summaries(data), "Alcohol").squares
+        assertEquals(SquareBand.GREEN, sq[0].band)
+        assertEquals(SquareBand.ORANGE, sq[1].band)
+        assertEquals(SquareBand.RED, sq[2].band)
+    }
+
+    @Test fun `bands - z2 vs daily share of 90m`() {
+        val data = DailyData().withZ2(
+            day(0) to HrZones(z2 = 20.0),  // >= 90/7 -> GREEN
+            day(1) to HrZones(z2 = 8.0),   // >= half share -> ORANGE
+            day(2) to HrZones(z2 = 1.0),   // below -> RED
+        )
+        val sq = get(summaries(data), "Z2 Training").squares
+        assertEquals(SquareBand.GREEN, sq[0].band)
+        assertEquals(SquareBand.ORANGE, sq[1].band)
+        assertEquals(SquareBand.RED, sq[2].band)
+    }
+
+    @Test fun `bands - unlogged days are grey and never a fake zero`() {
+        val data = DailyData().withSteps(day(0) to 12000.0)
+        val sq = get(summaries(data), "Steps").squares
+        assertTrue(sq[0].logged)
+        assertEquals(SquareBand.GREEN, sq[0].band)
+        assertTrue(sq.drop(1).all { !it.logged && it.band == SquareBand.GREY })
+    }
+
+    // ---- today lines ----
+
+    @Test fun `today lines - value vs daily target, honest when unlogged`() {
+        val data = DailyData()
+            .withSteps(TODAY to 3689.0)
+            .withCal(TODAY to 589.0)
+        val all = summaries(data)
+        assertEquals("3,689/10,000 steps today", get(all, "Steps").todayLine)
+        assertEquals("589/2,500 kcal today", get(all, "Calories").todayLine)
+        assertEquals("Not logged today", get(all, "Protein").todayLine)
+        assertEquals("Not logged today", get(all, "Sleep").todayLine)
+        assertEquals("No session today", get(all, "Exercise").todayLine)
+        assertEquals("Not logged today", get(all, "Alcohol").todayLine)
+        assertEquals("Not logged today", get(all, "Z2 Training").todayLine)
+    }
+
+    @Test fun `today lines - sleep and exercise formats`() {
+        val data = DailyData()
+            .withSleep(TODAY to NightTotal(7.0 * 60))
+            .withTraining(TODAY to 45.0)
+            .withZ2(TODAY to HrZones(z2 = 20.0))
+        val all = summaries(data)
+        assertEquals("7h 0m/8h today", get(all, "Sleep").todayLine)
+        assertEquals("45 min today", get(all, "Exercise").todayLine)
+        assertEquals("20/13m today", get(all, "Z2 Training").todayLine)
     }
 }

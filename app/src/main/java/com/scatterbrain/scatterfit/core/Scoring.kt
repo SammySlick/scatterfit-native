@@ -69,6 +69,9 @@ data class ScoringSettings(
     val sex: com.scatterbrain.scatterfit.core.MifflinStJeor.Sex = com.scatterbrain.scatterfit.core.MifflinStJeor.Sex.MALE,
     val sexCustom: String = "",
     val bmrFormula: BmrFormula = BmrFormula.MALE,
+    // Per-metric AAG tolerance bands (ConsistencySummary.kt, 2026-10-14) —
+    // user changeable in the metric's target settings; display-only.
+    val tolerances: ToleranceSettings = ToleranceSettings(),
 )
 
 enum class UnitSystem { METRIC, IMPERIAL }
