@@ -83,6 +83,8 @@ import com.scatterbrain.scatterfit.data.Zones
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.ui.theme.AccentHot
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
+import com.scatterbrain.scatterfit.ui.theme.StateLocked
+import com.scatterbrain.scatterfit.ui.theme.StateSlip
 import com.scatterbrain.scatterfit.ui.theme.momentumBand
 import com.scatterbrain.scatterfit.ui.theme.readinessBand
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
@@ -155,6 +157,12 @@ fun MyDayScreen(
     // manual record write (weigh-in dialog / food logger). No boolean ticks.
     val repoDaily by DailyRepository.daily.collectAsState()
     val checklistDaily = repoDaily
+    val momentumSource: MomentumSource? = remember(repoDaily) {
+        repoDaily?.let {
+            android.util.Log.d("MyDayCards", "momentum source on DailyRepository")
+            TodayFacadeMomentumSource(it)
+        }
+    }
     val checklist = remember(checklistDaily, currentDayKey, dailyCalorieTarget) {
         TaskChecklist.derive(
             daily = checklistDaily,
@@ -205,6 +213,16 @@ fun MyDayScreen(
             )
             return
         }
+        "breakdown" -> {
+            if (momentumSource != null) {
+                ConsistencyBreakdownScreen(
+                    momentumSource = momentumSource,
+                    dayKey = currentDayKey,
+                    onBackClick = { activeMetricScreen = null }
+                )
+            }
+            return
+        }
     }
 
     if (showDrinkLoggerScreen) {
@@ -223,12 +241,6 @@ fun MyDayScreen(
             .verticalScroll(scrollState)
     ) {
         val isFutureDay = currentDayKey > today
-        val momentumSource: MomentumSource? = remember(repoDaily) {
-            repoDaily?.let {
-                android.util.Log.d("MyDayCards", "momentum source on DailyRepository")
-                TodayFacadeMomentumSource(it)
-            }
-        }
 
         val isTodayLogged = checklist.weighInCompleted || checklist.foodLogCompleted || trainCompleted || weeklyCheckInCompleted || drinkState.loggedDrinks.isNotEmpty()
         val streakInfo = remember(momentumSource, today, isTodayLogged) {
@@ -269,7 +281,7 @@ fun MyDayScreen(
             trainDoneToday = trainCompleted,
             stepsPctToday = if (dailyStepTarget > 0) ((checklist.stepsToday ?: 0.0).toInt()) * 100 / dailyStepTarget else 0,
             alcoholUnitsToday = 0, // TODO: wire DrinkTrackerViewModel.getUnitsForDay(currentDayKey) when it exists
-            onMomentumClick = { /* Navigate to Momentum */ },
+            onMomentumClick = { activeMetricScreen = "breakdown" },
             onTrendsClick = { activeMetricScreen = "weight" },
             onSleepClick = { activeMetricScreen = "sleep" },
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
@@ -564,8 +576,8 @@ fun DeltaPointsBlock(
     // Colour = direction (MyDay Card Colour Rules §2): fell = warn amber, rose = brand lime,
     // trivial drift (<2 pts) = quiet grey. Red stays reserved for the lever chip (§3).
     val deltaColor = when {
-        delta <= -2 -> JudgementWarn
-        delta >= 2 -> BrandPrimaryLime
+        delta <= -2 -> StateSlip
+        delta >= 2 -> StateLocked
         else -> TextMuted
     }
     val sign = if (delta >= 0) "+" else "−"

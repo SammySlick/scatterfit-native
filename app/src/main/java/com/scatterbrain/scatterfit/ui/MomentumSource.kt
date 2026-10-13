@@ -2,6 +2,7 @@ package com.scatterbrain.scatterfit.ui
 
 import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.GoalPreset
+import com.scatterbrain.scatterfit.core.GoalSeries
 import com.scatterbrain.scatterfit.core.ScoringSettings
 import com.scatterbrain.scatterfit.core.dayBefore
 import com.scatterbrain.scatterfit.core.dayKeyFromIso
@@ -67,6 +68,8 @@ interface MomentumSource {
     val isUsingDemoData: Boolean get() = false
 
     fun domainScoresForDay(dayKey: String): List<DomainScore>
+    fun consistencySeries(dayKey: String): List<GoalSeries> = emptyList()
+    fun zone2MinutesForDay(dayKey: String): Double? = null
 }
 
 class TodayFacadeMomentumSource(
@@ -207,6 +210,10 @@ class TodayFacadeMomentumSource(
     }
 
     override fun restingHrForDay(dayKey: String): Double? = daily.restingHr[dayKey]
+
+    override fun consistencySeries(dayKey: String): List<GoalSeries> = getCard(dayKey).goals
+
+    override fun zone2MinutesForDay(dayKey: String): Double? = daily.hrZones[dayKey]?.z2
 
     override fun domainScoresForDay(dayKey: String): List<DomainScore> {
         val card = getCard(dayKey)
