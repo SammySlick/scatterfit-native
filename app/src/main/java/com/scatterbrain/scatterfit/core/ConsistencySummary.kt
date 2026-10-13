@@ -84,7 +84,7 @@ fun computeConsistencySummaries(
         val under = sq.count { it.logged && it.score!! < ON_TARGET_SCORE }
         out.add(ConsistencySummary(
             GoalId.STEPS, "Steps", null, logged == 0, sq, logged, sq.onTargetCount(),
-            rightEdge = "$logged/$days · ${"%.1fk".format(total / 1000.0)}",
+            rightEdge = if (logged == 0) "—" else "%.1fk".format(total / 1000.0),
             sentence = if (logged == 0) "No steps logged in the last 7 days"
             else "Under ${"%,d".format(s.stepTarget)} on $under of $logged logged days — ${"%.1fk".format(total / 1000.0)} steps this week",
         ))
@@ -99,7 +99,7 @@ fun computeConsistencySummaries(
         else total - s.kcalTarget * loggedKeys.size
         out.add(ConsistencySummary(
             GoalId.CALORIES, "Calories", null, loggedKeys.isEmpty(), sq, loggedKeys.size, sq.onTargetCount(),
-            rightEdge = "${loggedKeys.size}/$days · ${fmtInt(total)} kcal",
+            rightEdge = if (loggedKeys.isEmpty()) "—" else "${fmtInt(total)} kcal",
             sentence = when {
                 loggedKeys.isEmpty() -> "No calories logged in the last 7 days"
                 delta!! > 0 -> "${fmtInt(delta)} kcal over target across ${loggedKeys.size} logged days"
@@ -116,7 +116,7 @@ fun computeConsistencySummaries(
         val avg = if (logged == 0) null else total / logged
         out.add(ConsistencySummary(
             GoalId.PROTEIN, "Protein", null, logged == 0, sq, logged, sq.onTargetCount(),
-            rightEdge = "$logged/$days · ${fmtInt(total)}g",
+            rightEdge = if (logged == 0) "—" else "${fmtInt(total)}g",
             sentence = if (avg == null) "No protein logged in the last 7 days"
             else "Logged-day average ${avg.roundToInt()}g vs ${s.proteinTarget}g target",
         ))
@@ -138,7 +138,11 @@ fun computeConsistencySummaries(
         val onTarget = sq.count { (it.score ?: 0.0) >= ON_TARGET_SCORE }
         out.add(ConsistencySummary(
             GoalId.SLEEP, "Sleep", null, sq.none { it.logged }, sq, sq.count { it.logged }, onTarget,
-            rightEdge = "$onTarget/$days nights",
+            rightEdge = if (avgMin == null) "—"
+            else {
+                val t = nights.sum().roundToInt()
+                "${t / 60}h ${t % 60}m"
+            },
             sentence = if (avgMin == null) "No sleep records in the last 7 days"
             else {
                 val m = avgMin.roundToInt()
@@ -153,7 +157,7 @@ fun computeConsistencySummaries(
         val totalMin = weeklySum(data.trainingMinutes)
         out.add(ConsistencySummary(
             GoalId.EXERCISE, "Exercise", null, sessions == 0, sq, sessions, sq.onTargetCount(),
-            rightEdge = "$sessions/$days",
+            rightEdge = if (sessions == 0) "—" else "$sessions sessions",
             sentence = if (sessions == 0) "No training in the last 7 days"
             else "Trained $sessions of the last $days days — ${totalMin.roundToInt()} min this week",
         ))

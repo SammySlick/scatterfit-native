@@ -43,9 +43,9 @@ class ConsistencySummaryTest {
         assertTrue(all.all { it.section == null })
         assertEquals(0, all.sumOf { it.loggedDays })
         // right edges still show the honest shape
-        assertEquals("0/7 · 0.0k", get(all, "Steps").rightEdge)
-        assertEquals("0/7 · 0 kcal", get(all, "Calories").rightEdge)
-        assertEquals("0/7 nights", get(all, "Sleep").rightEdge)
+        assertEquals("—", get(all, "Steps").rightEdge)
+        assertEquals("—", get(all, "Calories").rightEdge)
+        assertEquals("—", get(all, "Sleep").rightEdge)
         assertEquals("0/90m", get(all, "Z2 Training").rightEdge)
     }
 
@@ -83,7 +83,7 @@ class ConsistencySummaryTest {
         val s = get(summaries(data), "Steps")
         assertEquals(3, s.loggedDays)
         assertEquals(2, s.onTargetDays)
-        assertEquals("3/7 · 28.0k", s.rightEdge)
+        assertEquals("28.0k", s.rightEdge)
     }
 
     @Test fun `calories - weekly total and over-target delta across logged days only`() {
@@ -91,7 +91,7 @@ class ConsistencySummaryTest {
             day(0) to 2000.0, day(1) to 2500.0, // 2 logged: 4500 vs 2×2270 (Sam default) = -40 under
         )
         val s = get(summaries(data, ScoringSettings(kcalTarget = 2270)), "Calories")
-        assertEquals("2/7 · 4,500 kcal", s.rightEdge)
+        assertEquals("4,500 kcal", s.rightEdge)
         assertTrue(s.sentence.contains("40 kcal under target across 2 logged days"))
     }
 
@@ -110,7 +110,7 @@ class ConsistencySummaryTest {
         val s = get(summaries(data), "Sleep")
         assertEquals(3, s.loggedDays)
         assertEquals(2, s.onTargetDays)
-        assertEquals("2/7 nights", s.rightEdge)
+        assertEquals("23h 30m", s.rightEdge)
         assertTrue(s.sentence.contains("Avg 7h 50m"))
         assertTrue(s.sentence.contains("on target 2 of 3 nights"))
         // squares: met nights in Locked In band, short nights in Slipping band
@@ -130,7 +130,7 @@ class ConsistencySummaryTest {
         val data = DailyData().withTraining(day(0) to 45.0, day(1) to 30.0)
         val s = get(summaries(data), "Exercise")
         assertEquals(2, s.loggedDays)
-        assertEquals("2/7", s.rightEdge)
+        assertEquals("2 sessions", s.rightEdge)
         assertTrue(s.sentence.contains("Trained 2 of the last 7 days — 75 min this week"))
     }
 
