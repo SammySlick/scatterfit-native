@@ -573,8 +573,8 @@ fun DeltaPointsBlock(
     comparisonText: String = "from yesterday",
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
-    // Colour = direction (MyDay Card Colour Rules §2): fell = warn amber, rose = brand lime,
-    // trivial drift (<2 pts) = quiet grey. Red stays reserved for the lever chip (§3).
+    // Colour = direction: fell = StateSlip #F29D1E, rose = StateLocked #44B65E,
+    // under 2 pts = TextMuted #92979E, per Colour System v2. Never red.
     val deltaColor = when {
         delta <= -2 -> StateSlip
         delta >= 2 -> StateLocked

@@ -70,6 +70,7 @@ interface MomentumSource {
     fun domainScoresForDay(dayKey: String): List<DomainScore>
     fun consistencySeries(dayKey: String): List<GoalSeries> = emptyList()
     fun zone2MinutesForDay(dayKey: String): Double? = null
+    val sleepTargetHours: Double get() = 8.0
 }
 
 class TodayFacadeMomentumSource(
@@ -214,6 +215,8 @@ class TodayFacadeMomentumSource(
     override fun consistencySeries(dayKey: String): List<GoalSeries> = getCard(dayKey).goals
 
     override fun zone2MinutesForDay(dayKey: String): Double? = daily.hrZones[dayKey]?.z2
+
+    override val sleepTargetHours: Double get() = settings.sleepTargetHours
 
     override fun domainScoresForDay(dayKey: String): List<DomainScore> {
         val card = getCard(dayKey)
