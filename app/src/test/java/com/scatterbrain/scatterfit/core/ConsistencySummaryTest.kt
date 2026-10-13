@@ -83,7 +83,7 @@ class ConsistencySummaryTest {
         val s = get(summaries(data), "Steps")
         assertEquals(3, s.loggedDays)
         assertEquals(2, s.onTargetDays)
-        assertEquals("3/7 · 2.8k", s.rightEdge)
+        assertEquals("3/7 · 28.0k", s.rightEdge)
     }
 
     @Test fun `calories - weekly total and over-target delta across logged days only`() {
