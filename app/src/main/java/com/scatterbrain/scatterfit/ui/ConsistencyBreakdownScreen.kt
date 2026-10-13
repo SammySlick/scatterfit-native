@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -23,19 +24,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scatterbrain.scatterfit.core.ConsistencySection
+import com.scatterbrain.scatterfit.core.ConsistencySummary
+import com.scatterbrain.scatterfit.core.SquareBand
 import com.scatterbrain.scatterfit.core.dayBefore
-import com.scatterbrain.scatterfit.core.lastNDayKeys
-import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
+import com.scatterbrain.scatterfit.ui.theme.StateBad
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
+import com.scatterbrain.scatterfit.ui.theme.StateRhythm
 import com.scatterbrain.scatterfit.ui.theme.StateSlip
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
@@ -59,39 +64,13 @@ fun ConsistencyBreakdownScreen(
     val yesterdayScore = momentumSource.momentumForDay(yesterdayKey)?.let { kotlin.math.round(it).toInt() }
     val delta = if (momentumScoreInt != null && yesterdayScore != null) momentumScoreInt - yesterdayScore else null
 
-    // 7-day window ending at dayKey
-    val sevenDays = remember(dayKey) { lastNDayKeys(7, dayKey) }
-
-    // Consistency series from source
-    val seriesList = remember(momentumSource, dayKey) {
-        momentumSource.consistencySeries(dayKey)
+    // AAG consistency summaries from the momentum source
+    val summaries = remember(momentumSource, dayKey) {
+        momentumSource.consistencySummaries(dayKey)
     }
 
-    // Gate empty state on whether ANY series has ANY non-null score in the 7-day window
-    val hasAnyData = remember(seriesList, sevenDays) {
-        seriesList.any { series ->
-            val dayMap = series.days.associate { it.day to it.score }
-            sevenDays.any { dayMap[it] != null }
-        }
-    }
+    val isAllUnlogged = summaries.isEmpty() || summaries.all { it.section == null || it.unlogged }
 
-    // Sort weakest-first: series with zero non-null scores sort to the bottom;
-    // measured series sort by average ascending; ties broken by latest.
-    val sortedSeries = remember(seriesList, sevenDays) {
-        seriesList.sortedWith(
-            compareBy<com.scatterbrain.scatterfit.core.GoalSeries> { series ->
-                val dayMap = series.days.associate { it.day to it.score }
-                val scores = sevenDays.mapNotNull { dayMap[it] }
-                if (scores.isEmpty()) 1 else 0
-            }.thenBy { series ->
-                val dayMap = series.days.associate { it.day to it.score }
-                val scores = sevenDays.mapNotNull { dayMap[it] }
-                if (scores.isNotEmpty()) scores.average() else Double.MAX_VALUE
-            }.thenBy { it.latest ?: 0.0 }
-        )
-    }
-
-    val titleText = if (momentumScoreRaw == null) "No data yet — Breakdown" else "${mBand.label} — Breakdown"
     val pillLabel = if (momentumScoreRaw == null) "No data yet" else mBand.label
     val pillColor = if (momentumScoreRaw == null) TextMuted else mBand.color
 
@@ -100,7 +79,8 @@ fun ConsistencyBreakdownScreen(
             .fillMaxSize()
             .background(AppBackground)
             .padding(16.dp)
-            .verticalScroll(scrollState),
+            .verticalScroll(scrollState)
+            .padding(bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 1. TOP BAR: reuse the metric-page chrome pattern exactly
@@ -120,7 +100,7 @@ fun ConsistencyBreakdownScreen(
             }
 
             Text(
-                text = titleText,
+                text = "Momentum — Breakdown",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextForeground
@@ -152,130 +132,186 @@ fun ConsistencyBreakdownScreen(
             }
         }
 
-        // 3. METRIC ROWS + Special rows, or Empty state
-        if (!hasAnyData) {
+        // 3. BODY: Sections in fixed order, followed by unlogged metrics
+        if (isAllUnlogged) {
             Text(
                 text = "Log something to see consistency.",
                 fontSize = 13.sp,
-                color = TextMuted
+                color = TextMuted,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
         } else {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Metric series rows
-                sortedSeries.forEach { series ->
-                    val dayMap = remember(series) { series.days.associate { it.day to it.score } }
-                    val squares = sevenDays.map { k -> dayMap[k]?.let { momentumBand(it).color } }
-                    val nonNullCount = sevenDays.count { dayMap[it] != null }
-
-                    ConsistencyRow(
-                        name = series.name,
-                        squares = squares,
-                        countText = "$nonNullCount/7"
-                    )
-                }
-
-                // 4. SLEEP ROW (special) — wired through ScoringSettings.sleepTargetHours * 60
-                val sleepTargetMinutes = momentumSource.sleepTargetHours * 60.0
-                val sleepSquares = sevenDays.map { k ->
-                    momentumSource.sleepMinutesForDay(k)?.let { mins ->
-                        if (mins >= sleepTargetMinutes) StateLocked else StateSlip
-                    }
-                }
-                val sleepNightsMet = sevenDays.count { (momentumSource.sleepMinutesForDay(it) ?: 0.0) >= sleepTargetMinutes }
-
-                ConsistencyRow(
-                    name = "Sleep",
-                    squares = sleepSquares,
-                    countText = "$sleepNightsMet/7"
+                val sections = listOf(
+                    Triple(ConsistencySection.NEED_WORK, "NEED WORK", StateSlip),
+                    Triple(ConsistencySection.GOING_STEADY, "GOING STEADY", StateRhythm),
+                    Triple(ConsistencySection.GOOD_WORK, "GOOD WORK", StateLocked),
                 )
 
-                // 5. ZONE ROW (special) — filled when z2 >= 20 min/day
-                val zoneSquares = sevenDays.map { k ->
-                    momentumSource.zone2MinutesForDay(k)?.let { z2 ->
-                        if (z2 >= 20.0) StateLocked else StateSlip
+                sections.forEach { (sec, label, underlineColor) ->
+                    val sectionSummaries = summaries.filter { it.section == sec }
+                    if (sectionSummaries.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                color = TextMuted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(2.dp)
+                                    .background(underlineColor)
+                            )
+                        }
+                        sectionSummaries.forEach { summary ->
+                            ConsistencyRow(summary = summary)
+                        }
                     }
                 }
-                val z2DaysMet = sevenDays.count { (momentumSource.zone2MinutesForDay(it) ?: 0.0) >= 20.0 }
 
-                ConsistencyRow(
-                    name = "Zone 2 Minutes",
-                    squares = zoneSquares,
-                    countText = "$z2DaysMet/7"
-                )
+                // Metrics with section == null (unlogged) render after ALL sections, with NO header
+                val unloggedSummaries = summaries.filter { it.section == null || it.unlogged }
+                unloggedSummaries.forEach { summary ->
+                    ConsistencyRow(summary = summary)
+                }
             }
         }
     }
 }
 
 /**
- * Consolidated consistency row: Card frame with 1dp AccentTeal border (12dp radius),
- * left metric title, centre 7-day mini-grid of 14dp squares, and right consistency count.
+ * Metric row matching Sam's mockup geometry:
+ * AppCardSurface, 14dp padding, 12dp radius, NO border.
+ * - Tier 1: title + 12dp chevron on left, 7 squares on right (14dp, 3dp gap, RoundedCornerShape(3.dp)).
+ *   Square color comes from sq.band: GREEN -> StateLocked, ORANGE -> StateSlip, RED -> StateBad, GREY -> outline.
+ * - Tier 2: todayLine (11sp, TextMuted, right-aligned).
+ * - Tier 3: sentence (14sp, TextForeground) on left, rightEdge (13sp Bold, TextForeground) right-aligned on same line.
+ * - Vertical: 8dp between tiers inside each card.
  */
 @Composable
 private fun ConsistencyRow(
-    name: String,
-    squares: List<Color?>,
-    countText: String,
+    summary: ConsistencySummary,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = AppCardSurface),
-        border = BorderStroke(1.dp, AccentTeal)
+        border = null
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // LEFT: metric name
-            Text(
-                text = name,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextForeground,
-                modifier = Modifier.weight(1f)
-            )
-
-            // CENTRE: 7-DAY MINI-GRID
+            // Tier 1: title + 12dp chevron (left), squares row (right)
             Row(
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                squares.forEach { color ->
-                    if (color != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(14.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(color.copy(alpha = 0.9f))
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(14.dp)
-                                .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
-                        )
+                Row(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = summary.name.uppercase(),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    ChevronRightIcon(
+                        modifier = Modifier.size(12.dp),
+                        tint = TextMuted
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    summary.squares.forEach { sq ->
+                        when (sq.band) {
+                            SquareBand.GREEN -> Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(StateLocked)
+                            )
+                            SquareBand.ORANGE -> Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(StateSlip)
+                            )
+                            SquareBand.RED -> Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(StateBad)
+                            )
+                            SquareBand.GREY -> Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
+                            )
+                        }
                     }
                 }
             }
 
-            // RIGHT: consistency count (e.g. "5/7")
-            Box(
-                modifier = Modifier.weight(0.4f),
-                contentAlignment = Alignment.CenterEnd
+            // Tier 2: todayLine (under squares, right-aligned)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
                 Text(
-                    text = countText,
-                    fontSize = 13.sp,
+                    text = summary.todayLine,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = TextMuted,
+                    textAlign = TextAlign.End,
+                    maxLines = 1
+                )
+            }
+
+            // Tier 3: sentence (left) and rightEdge (right-aligned) on the same line
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = summary.sentence,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = TextMuted,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = summary.rightEdge,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextMuted
+                    color = TextForeground,
+                    maxLines = 1,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.padding(start = 8.dp)
                 )
             }
         }
