@@ -28,6 +28,8 @@ import kotlin.math.roundToInt
  * spec; when they land, only this file's session rule changes.
  */
 
+enum class ConsistencySection { NEED_WORK, GOING_STEADY, GOOD_WORK }
+
 enum class SquareBand { GREEN, ORANGE, RED, GREY }
 
 /**
