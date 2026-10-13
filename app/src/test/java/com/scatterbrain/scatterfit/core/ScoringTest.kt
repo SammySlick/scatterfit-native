@@ -28,7 +28,7 @@ class ScoringTest {
     }
 
     private fun calSeries(data: DailyData): GoalSeries =
-        computeGoalSeries(data, ScoringSettings(), 7).first { it.id == GoalId.CALORIES }
+        computeGoalSeries(data, ScoringSettings(), 7, TODAY).first { it.id == GoalId.CALORIES }
 
     private fun rhrSeries(data: DailyData): GoalSeries =
         computeGoalSeries(data, ScoringSettings(), 1, TODAY).first { it.id == GoalId.RHR_TREND }
