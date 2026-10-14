@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,8 @@ import com.scatterbrain.scatterfit.data.StoreDailySource
 import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
 import com.scatterbrain.scatterfit.ui.theme.MutedFill
 import com.scatterbrain.scatterfit.ui.theme.OnPrimaryText
+import com.scatterbrain.scatterfit.ui.theme.StateLocked
+import com.scatterbrain.scatterfit.ui.theme.StateSlip
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import java.time.ZoneId
@@ -95,7 +98,7 @@ fun MetricScreen(
         heroUnit = def.unit.ifEmpty { when (currentId) { MetricId.SLEEP -> "last night"; MetricId.STEPS -> "yesterday"; else -> "" } },
         heroScore = latest?.score,
         verdictLabel = context.verdict.takeIf { it != "Not enough data" },
-        verdictTone = null, // MetricPageScreen colours verdicts; tone by metric type TODO with real data
+        verdictTone = verdictTone(context.verdict),
         insightSentence = buildString {
             append(context.comparison)
             context.action?.let { append("  "); append(it) }
@@ -159,4 +162,12 @@ fun MetricScreenPreview() {
             onBackClick = {}
         )
     }
+}
+
+/** Verdict pill tone: green only for "On target"; everything else orange.
+ *  Red is reserved for genuinely bad — a slightly-off week is a slip, not a fail.
+ *  (Mirrors the tolerance-band grammar on the breakdown screen.) */
+fun verdictTone(verdict: String): Color = when (verdict) {
+    "On target" -> StateLocked
+    else -> StateSlip
 }
