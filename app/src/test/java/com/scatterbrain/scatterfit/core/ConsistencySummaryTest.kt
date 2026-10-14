@@ -12,10 +12,13 @@ import org.junit.Test
  */
 class ConsistencySummaryTest {
 
-    private val TODAY = "2026-10-06"
+    // 2026-10-11 is a SUNDAY: trailing-7 and the calendar week (Mon..Sun)
+    // coincide exactly, so fixtures stay valid after the 2026-10-14 switch to
+    // calendar weeks. A separate mid-week test pins the partial-week shape.
+    private val TODAY = "2026-10-11"
 
-    private fun day(n: Int): String { // 30 Sep .. 06 Oct 2026, real rollover
-        val d = java.time.LocalDate.of(2026, 9, 30).plusDays(n.toLong())
+    private fun day(n: Int): String { // Mon 05 .. Sun 11 Oct 2026, real week
+        val d = java.time.LocalDate.of(2026, 10, 5).plusDays(n.toLong())
         return d.toString()
     }
 
@@ -51,6 +54,23 @@ class ConsistencySummaryTest {
     }
 
     // ---- sections: worst-average first, 3 / 3 / rest, unlogged sink below ----
+
+    @Test fun `calendar week - mid-week Wednesday leaves Thu-Sun unlogged, sums are partial`() {
+        // Wednesday 2026-10-07: week = Mon 05 .. Sun 11; only Mon+Tue have data.
+        val data = DailyData()
+            .withSteps("2026-10-05" to 12000.0, "2026-10-06" to 11000.0)
+            .withCal("2026-10-05" to 2500.0, "2026-10-06" to 2800.0)
+        val all = computeConsistencySummaries(data, ScoringSettings(), 7, "2026-10-07")
+        val steps = get(all, "Steps")
+        assertEquals(7, steps.squares.size) // full week, not 7 trailing days
+        assertEquals("2026-10-05", steps.squares.first().day)
+        assertEquals("2026-10-11", steps.squares.last().day)
+        // Mon+Tue logged; Wed..Sun unlogged (present/future)
+        assertEquals(2, steps.squares.count { it.logged })
+        assertEquals("23,000/70,000", steps.rightEdge)
+        val sun = steps.squares.last()
+        assertTrue(!sun.logged)
+    }
 
     @Test fun `sections - measured worst-first, unlogged rendered below all sections`() {
         // Deliberately extreme fixtures: steps far under target (bad), calories
@@ -132,7 +152,7 @@ class ConsistencySummaryTest {
         val s = get(summaries(data), "Exercise")
         assertEquals(2, s.loggedDays)
         assertEquals("2 sessions", s.rightEdge)
-        assertTrue(s.sentence.contains("Trained 2 of the last 7 days — 75 min this week"))
+        assertTrue(s.sentence.contains("Trained 2 days this week — 75 min this week"))
     }
 
     @Test fun `alcohol - weekly units vs weekly budget`() {

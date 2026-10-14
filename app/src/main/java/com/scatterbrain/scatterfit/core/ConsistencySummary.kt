@@ -1,5 +1,7 @@
 package com.scatterbrain.scatterfit.core
 
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -153,8 +155,12 @@ fun computeConsistencySummaries(
     todayKey: String? = null,
 ): List<ConsistencySummary> {
     val series = computeGoalSeries(data, s, days, todayKey).associateBy { it.id }
-    val keys = lastNDayKeys(days, todayKey)
-    val today = keys.last()
+    // CALENDAR WEEK (Mon..Sun), not trailing-7 — Sam caught the mismatch on the
+    // 2026-10-14 tap-through: trailing squares filled unrecorded future days and
+    // sums couldn't match weekly targets. Future days are real keys whose maps
+    // hold nothing, so they render grey/unlogged automatically.
+    val keys = calendarWeekKeys(todayKey)
+    val today = todayKey ?: LocalDate.now(ZoneId.systemDefault()).toString()
 
     fun weeklySum(map: Map<String, Double>, positiveOnly: Boolean = false): Double =
         keys.sumOf { k -> (map[k] ?: 0.0).let { if (positiveOnly && it <= 0.0) 0.0 else it } }
@@ -186,7 +192,7 @@ fun computeConsistencySummaries(
             rightEdge = if (logged == 0) "—" else "${fmtInt(total)}/${fmtInt((s.stepTarget * 7).toDouble())}",
             todayLine = if (data.steps[today] == null) "Not logged today"
             else "${fmtInt(data.steps[today]!!)}/${fmtInt(s.stepTarget.toDouble())} steps today",
-            sentence = if (logged == 0) "No steps logged in the last 7 days"
+            sentence = if (logged == 0) "No steps logged this week"
             else {
                 val under = stepSquares.count { it.logged && it.band != SquareBand.GREEN }
                 "Under ${"%,d".format(s.stepTarget)} on $under of $logged logged days — ${fmtInt(total)} steps this week"
@@ -211,7 +217,7 @@ fun computeConsistencySummaries(
             todayLine = if ((data.caloriesEaten[today] ?: 0.0) <= 0.0) "Not logged today"
             else "${fmtInt(data.caloriesEaten[today]!!)}/${fmtInt(s.kcalTarget.toDouble())} kcal today",
             sentence = when {
-                loggedKeys.isEmpty() -> "No calories logged in the last 7 days"
+                loggedKeys.isEmpty() -> "No calories logged this week"
                 delta!! > 0 -> "${fmtInt(delta)} kcal over target across ${loggedKeys.size} logged days"
                 delta < 0 -> "${fmtInt(-delta)} kcal under target across ${loggedKeys.size} logged days"
                 else -> "Exactly on target across ${loggedKeys.size} logged days"
@@ -230,7 +236,7 @@ fun computeConsistencySummaries(
             rightEdge = if (logged == 0) "—" else "${fmtInt(total)}/${fmtInt((s.proteinTarget * 7).toDouble())}g",
             todayLine = if (data.protein[today] == null || data.protein[today]!! <= 0.0) "Not logged today"
             else "${fmtInt(data.protein[today]!!)}/${fmtInt(s.proteinTarget.toDouble())}g today",
-            sentence = if (logged == 0) "No protein logged in the last 7 days"
+            sentence = if (logged == 0) "No protein logged this week"
             else "Logged-day average ${(total / logged).roundToInt()}g vs ${s.proteinTarget}g target",
         ))
     }
@@ -253,7 +259,7 @@ fun computeConsistencySummaries(
             rightEdge = if (avgMin == null) "—" else "${hm(nights.sum().roundToInt())}/${"%.0f".format(s.sleepTargetHours * 7)}h",
             todayLine = if (data.sleep[today] == null) "Not logged today"
             else "${hm(data.sleep[today]!!.totalMin.roundToInt())}/${"%.0f".format(s.sleepTargetHours)}h today",
-            sentence = if (avgMin == null) "No sleep records in the last 7 days"
+            sentence = if (avgMin == null) "No sleep records this week"
             else {
                 val m = avgMin.roundToInt()
                 "Avg ${hm(m)} vs ${"%.0f".format(s.sleepTargetHours)}h target — on target ${squares.count { it.band == SquareBand.GREEN }} of ${nights.size} nights"
@@ -276,8 +282,8 @@ fun computeConsistencySummaries(
             rightEdge = if (sessions == 0) "—" else "$sessions sessions",
             todayLine = if (data.trainingMinutes[today]?.let { it > 0 } == true)
                 "${data.trainingMinutes[today]!!.roundToInt()} min today" else "No session today",
-            sentence = if (sessions == 0) "No training in the last 7 days"
-            else "Trained $sessions of the last $days days — ${totalMin.roundToInt()} min this week",
+            sentence = if (sessions == 0) "No training this week"
+            else "Trained $sessions days this week — ${totalMin.roundToInt()} min this week",
         ))
     }
 

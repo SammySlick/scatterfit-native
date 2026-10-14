@@ -45,6 +45,16 @@ fun lastNDayKeys(n: Int, endKey: String? = null, zone: ZoneId = ZoneId.systemDef
     return (n - 1 downTo 0).map { end.minusDays(it.toLong()).toString() }
 }
 
+/** Calendar week (Mon..Sun) containing endKey. Future days are included as
+ *  keys so squares/sums cover the WHOLE week — lookups against daily maps
+ *  return null for days that haven't happened yet, rendering grey. Matches
+ *  weekly targets (steps 70k, kcal 14,000, Z2 90m). */
+fun calendarWeekKeys(endKey: String? = null, zone: ZoneId = ZoneId.systemDefault()): List<String> {
+    val end = endKey?.let { LocalDate.parse(it) } ?: LocalDate.now(zone)
+    val monday = end.minusDays(end.dayOfWeek.value.toLong() - 1)
+    return (0..6).map { monday.plusDays(it.toLong()).toString() }
+}
+
 private fun mondayOffset(key: String): Int =
     LocalDate.parse(key).dayOfWeek.value - DayOfWeek.MONDAY.value // Mon=0 .. Sun=6
 
