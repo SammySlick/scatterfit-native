@@ -230,7 +230,6 @@ class SyncEngineTest {
         assertTrue(snapshots.all { it.containsKey(RecordMethod.WEIGHT) })
     }
 
-}
 
     @Test
     fun `fast-path (today-only) sync never advances cursors on a fresh install`() = runTest {
@@ -292,3 +291,4 @@ class SyncEngineTest {
         assertEquals(1, again.records.size)
         assertEquals(null, again.cursorMs)
     }
+}
