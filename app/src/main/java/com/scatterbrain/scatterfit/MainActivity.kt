@@ -17,6 +17,7 @@ import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.sync.SyncService
 import com.scatterbrain.scatterfit.ui.DebugScreen
 import com.scatterbrain.scatterfit.ui.MainAppScreen
+import com.scatterbrain.scatterfit.ui.SettingsScreen
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -91,11 +92,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ScatterFitTheme {
+                var showSettings by remember { mutableStateOf(false) }
                 var showDebug by remember { mutableStateOf(false) }
                 if (showDebug) {
                     DebugScreen(onBack = { showDebug = false })
+                } else if (showSettings) {
+                    SettingsScreen(
+                        onBack = { showSettings = false },
+                        onOpenDebug = { showDebug = true }
+                    )
                 } else {
-                    MainAppScreen(onSettingsClick = { showDebug = true })
+                    MainAppScreen(onSettingsClick = { showSettings = true })
                 }
             }
         }
