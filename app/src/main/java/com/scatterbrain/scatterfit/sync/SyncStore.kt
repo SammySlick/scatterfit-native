@@ -56,21 +56,22 @@ class SyncStore(private val dir: File) {
         write(method, cursorMs, records, stampLastFullSync = nowMs)
 
     fun saveRecords(method: RecordMethod, records: List<HealthRecord>) {
-        val existing = load(method).lastFullSyncMs
-        write(method, load(method).cursorMs, records, keepLastFullSync = existing != null)
+        write(method, load(method).cursorMs, records)
     }
 
+    /** Writes cursor + records. Any existing lastFullSync stamp is PRESERVED
+     *  unless [stampLastFullSync] is provided (full-pass save) — a fast-path
+     *  or per-slice save must never wipe the marker that a lookback completed. */
     private fun write(
         method: RecordMethod,
         cursorMs: Long?,
         records: List<HealthRecord>,
         stampLastFullSync: Long? = null,
-        keepLastFullSync: Boolean = false,
     ) {
-        val preservedLastFullSync = if (keepLastFullSync) load(method).lastFullSyncMs else null
+        val preservedLastFullSync = stampLastFullSync ?: load(method).lastFullSyncMs
         val fields = buildMap {
             cursorMs?.let { put("cursor", JsonPrimitive(it)) }
-            (stampLastFullSync ?: preservedLastFullSync)?.let { put("lastFullSync", JsonPrimitive(it)) }
+            preservedLastFullSync?.let { put("lastFullSync", JsonPrimitive(it)) }
             put("records", JsonArray(records.map { toJson(it) }))
         }
         val obj = JsonObject(fields)
