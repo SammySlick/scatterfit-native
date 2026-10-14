@@ -38,9 +38,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
-import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
 import com.scatterbrain.scatterfit.ui.theme.JudgementGood
 import com.scatterbrain.scatterfit.ui.theme.MutedFill
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
@@ -130,7 +130,7 @@ fun DrinkPickerModal(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSelected) BrandPrimaryLime else SecondaryFill)
+                                .background(if (isSelected) AccentTeal else SecondaryFill)
                                 .clickable { daySelection = day }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
@@ -153,7 +153,7 @@ fun DrinkPickerModal(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = BrandPrimaryLime,
+                        focusedBorderColor = AccentTeal,
                         unfocusedBorderColor = BorderDefault,
                         focusedContainerColor = MutedFill,
                         unfocusedContainerColor = MutedFill
@@ -171,15 +171,15 @@ fun DrinkPickerModal(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isSel) BrandPrimaryLime.copy(alpha = 0.2f) else MutedFill)
-                                .border(1.dp, if (isSel) BrandPrimaryLime else BorderDefault, RoundedCornerShape(16.dp))
+                                .background(if (isSel) AccentTeal.copy(alpha = 0.2f) else MutedFill)
+                                .border(1.dp, if (isSel) AccentTeal else BorderDefault, RoundedCornerShape(16.dp))
                                 .clickable { selectedCategory = cat }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text = cat,
                                 fontSize = 11.sp,
-                                color = if (isSel) BrandPrimaryLime else TextMuted,
+                                color = if (isSel) AccentTeal else TextMuted,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -197,7 +197,7 @@ fun DrinkPickerModal(
                             modifier = Modifier.padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text("Custom Drink & Units Calculator", style = MaterialTheme.typography.labelMedium, color = BrandPrimaryLime, fontWeight = FontWeight.Bold)
+                            Text("Custom Drink & Units Calculator", style = MaterialTheme.typography.labelMedium, color = AccentTeal, fontWeight = FontWeight.Bold)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedTextField(
                                     value = customAbv,
@@ -205,7 +205,7 @@ fun DrinkPickerModal(
                                     label = { Text("ABV %", color = TextMuted) },
                                     modifier = Modifier.weight(1f),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = BrandPrimaryLime,
+                                        focusedBorderColor = AccentTeal,
                                         unfocusedBorderColor = BorderDefault,
                                         focusedContainerColor = AppCardSurface,
                                         unfocusedContainerColor = AppCardSurface
@@ -217,7 +217,7 @@ fun DrinkPickerModal(
                                     label = { Text("Volume (ml)", color = TextMuted) },
                                     modifier = Modifier.weight(1f),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = BrandPrimaryLime,
+                                        focusedBorderColor = AccentTeal,
                                         unfocusedBorderColor = BorderDefault,
                                         focusedContainerColor = AppCardSurface,
                                         unfocusedContainerColor = AppCardSurface
@@ -245,8 +245,8 @@ fun DrinkPickerModal(
                                     .fillMaxWidth()
                                     .clickable { selectedDrink = drink },
                                 shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(containerColor = if (isSel) BrandPrimaryLime.copy(alpha = 0.15f) else MutedFill),
-                                border = BorderStroke(1.dp, if (isSel) BrandPrimaryLime else BorderDefault)
+                                colors = CardDefaults.cardColors(containerColor = if (isSel) AccentTeal.copy(alpha = 0.15f) else MutedFill),
+                                border = BorderStroke(1.dp, if (isSel) AccentTeal else BorderDefault)
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -259,7 +259,7 @@ fun DrinkPickerModal(
                                         Text(text = drink.name, color = TextForeground, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         Text(text = "${drink.abv}% ABV · ${drink.volumeMl}ml", color = TextMuted, fontSize = 11.sp)
                                     }
-                                    Text(text = "%.1f Units".format(drink.units), color = BrandPrimaryLime, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(text = "%.1f Units".format(drink.units), color = AccentTeal, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                             }
                         }
@@ -275,7 +275,7 @@ fun DrinkPickerModal(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isSel) BrandPrimaryLime else MutedFill)
+                                    .background(if (isSel) AccentTeal else MutedFill)
                                     .clickable { selectedStomachState = state }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
@@ -298,7 +298,7 @@ fun DrinkPickerModal(
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandPrimaryLime, contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = Color.Black)
             ) {
                 Text("Log Drink", fontWeight = FontWeight.Bold)
             }

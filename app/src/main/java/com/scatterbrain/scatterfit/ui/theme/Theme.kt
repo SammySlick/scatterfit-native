@@ -40,10 +40,10 @@ val LocalJudgmentColors = staticCompositionLocalOf {
 }
 
 private val DarkColorScheme = darkColorScheme(
-    primary = BrandPrimaryLime,
+    primary = AccentTeal,
     onPrimary = OnPrimaryText,
-    primaryContainer = BrandPrimaryLime.copy(alpha = 0.15f),
-    onPrimaryContainer = BrandPrimaryLime,
+    primaryContainer = AccentTeal.copy(alpha = 0.15f),
+    onPrimaryContainer = AccentTeal,
     secondary = SecondaryFill,
     onSecondary = TextForeground,
     background = AppBackground,
@@ -93,7 +93,7 @@ fun ThemePreview() {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Brand Lime", color = BrandPrimaryLime)
+            Text("Accent Teal", color = AccentTeal)
             Text("Judgement Good", color = JudgementGood)
             Text("Judgement Warn", color = JudgementWarn)
             Text("Judgement Bad", color = JudgementBad)

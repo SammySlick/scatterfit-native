@@ -18,7 +18,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.scatterbrain.scatterfit.R
-import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
+import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 
@@ -38,7 +38,7 @@ fun SettingsIcon(
 @Composable
 fun StreakIcon(
     modifier: Modifier = Modifier,
-    tint: Color = BrandPrimaryLime
+    tint: Color = AccentTeal
 ) {
     Icon(
         painter = painterResource(id = R.drawable.ic_streak),
@@ -78,7 +78,7 @@ fun HeartPulseIcon(
 @Composable
 fun LightningIcon(
     modifier: Modifier = Modifier,
-    tint: Color = BrandPrimaryLime
+    tint: Color = AccentTeal
 ) {
     Icon(
         painter = painterResource(id = R.drawable.ic_lightning),

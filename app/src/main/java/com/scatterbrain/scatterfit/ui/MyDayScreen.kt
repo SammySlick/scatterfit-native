@@ -1,6 +1,7 @@
 package com.scatterbrain.scatterfit.ui
 
 import android.annotation.SuppressLint
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -90,7 +91,6 @@ import com.scatterbrain.scatterfit.ui.theme.readinessBand
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BorderInput
-import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
 import com.scatterbrain.scatterfit.ui.theme.JudgementBad
 import com.scatterbrain.scatterfit.ui.theme.JudgementDestructive
 import com.scatterbrain.scatterfit.ui.theme.JudgementGood
@@ -194,6 +194,14 @@ fun MyDayScreen(
     var showDrinkLoggerScreen by remember { mutableStateOf(false) }
     var activeMetricScreen by remember { mutableStateOf<String?>(null) }
     var activeMetricId by remember { mutableStateOf<com.scatterbrain.scatterfit.core.MetricId?>(null) }
+
+    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen) {
+        when {
+            activeMetricId != null -> activeMetricId = null
+            activeMetricScreen != null -> activeMetricScreen = null
+            showDrinkLoggerScreen -> showDrinkLoggerScreen = false
+        }
+    }
 
     when {
         activeMetricId != null -> {
@@ -405,15 +413,15 @@ fun AlcoholTrackerCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(BrandPrimaryLime.copy(alpha = 0.16f))
-                            .border(BorderStroke(1.dp, BrandPrimaryLime.copy(alpha = 0.40f)), RoundedCornerShape(12.dp))
+                            .background(AccentTeal.copy(alpha = 0.16f))
+                            .border(BorderStroke(1.dp, AccentTeal.copy(alpha = 0.40f)), RoundedCornerShape(12.dp))
                             .clickable { onClick() }
                             .padding(horizontal = 8.dp, vertical = 2.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "+ log",
-                            color = BrandPrimaryLime,
+                            color = AccentTeal,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -478,7 +486,7 @@ fun AlcoholTrackerCard(
                                 )
                                 Text(
                                     text = "+",
-                                    color = if (isFutureDay) TextMuted else BrandPrimaryLime,
+                                    color = if (isFutureDay) TextMuted else AccentTeal,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -498,7 +506,7 @@ fun AlcoholTrackerCard(
                 ) {
                     Text(
                         text = "Log your first drink →",
-                        color = BrandPrimaryLime,
+                        color = AccentTeal,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -1029,7 +1037,7 @@ fun TodayTasksCard(
                 Text(
                     text = headerSubtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isFutureDay) BrandPrimaryLime else TextMuted
+                    color = if (isFutureDay) AccentTeal else TextMuted
                 )
             }
 
@@ -1236,7 +1244,7 @@ fun StepsTaskRow(
                             .fillMaxWidth(fraction = progress)
                             .height(6.dp)
                             .clip(CircleShape)
-                            .background(BrandPrimaryLime)
+                            .background(AccentTeal)
                     )
                 }
             }
@@ -1345,7 +1353,7 @@ fun WeighInDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextForeground,
                         unfocusedTextColor = TextForeground,
-                        focusedBorderColor = BrandPrimaryLime,
+                        focusedBorderColor = AccentTeal,
                         unfocusedBorderColor = BorderDefault
                     )
                 )
@@ -1357,7 +1365,7 @@ fun WeighInDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextForeground,
                         unfocusedTextColor = TextForeground,
-                        focusedBorderColor = BrandPrimaryLime,
+                        focusedBorderColor = AccentTeal,
                         unfocusedBorderColor = BorderDefault
                     )
                 )
@@ -1369,7 +1377,7 @@ fun WeighInDialog(
                     onSubmitWeight(weightInput, bodyFatInput)
                     onDismiss()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = BrandPrimaryLime, contentColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = Color.Black)
             ) {
                 Text("Save", fontWeight = FontWeight.Bold)
             }
@@ -1581,7 +1589,7 @@ fun WeeklyCheckInDialog(
                 ) {
                     Text(
                         text = suggestedActionText,
-                        color = BrandPrimaryLime,
+                        color = AccentTeal,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.5.sp
                     )
@@ -1600,7 +1608,7 @@ fun WeeklyCheckInDialog(
                             onDismiss()
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = BrandPrimaryLime,
+                            containerColor = AccentTeal,
                             contentColor = OnPrimaryText
                         ),
                         modifier = Modifier.fillMaxWidth(),
@@ -1629,7 +1637,7 @@ fun WeeklyCheckInDialog(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Add New Target", color = BrandPrimaryLime, fontWeight = FontWeight.SemiBold)
+                        Text("Add New Target", color = AccentTeal, fontWeight = FontWeight.SemiBold)
                     }
                 }
             } else {
@@ -1649,9 +1657,9 @@ fun WeeklyCheckInDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextForeground,
                             unfocusedTextColor = TextForeground,
-                            focusedBorderColor = BrandPrimaryLime,
+                            focusedBorderColor = AccentTeal,
                             unfocusedBorderColor = BorderInput,
-                            cursorColor = BrandPrimaryLime
+                            cursorColor = AccentTeal
                         )
                     )
                     Row(
@@ -1671,7 +1679,7 @@ fun WeeklyCheckInDialog(
                                 onDismiss()
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = BrandPrimaryLime,
+                                containerColor = AccentTeal,
                                 contentColor = OnPrimaryText
                             ),
                             modifier = Modifier.weight(1f),

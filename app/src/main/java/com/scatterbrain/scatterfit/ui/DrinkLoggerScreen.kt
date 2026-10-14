@@ -58,11 +58,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BorderInput
-import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
 import com.scatterbrain.scatterfit.ui.theme.JudgementGood
 import com.scatterbrain.scatterfit.ui.theme.MutedFill
 import com.scatterbrain.scatterfit.ui.theme.OnPrimaryText
@@ -211,7 +211,7 @@ fun DrinkLoggerContent(
                             Text(
                                 text = if (isFutureDay) "$activeDayTitle · Upcoming" else "$activeDayTitle · Tap any drink to log in real-time",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (isFutureDay) BrandPrimaryLime else TextMuted,
+                                color = if (isFutureDay) AccentTeal else TextMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -283,9 +283,9 @@ fun DrinkLoggerContent(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextForeground,
                             unfocusedTextColor = TextForeground,
-                            focusedBorderColor = BrandPrimaryLime,
+                            focusedBorderColor = AccentTeal,
                             unfocusedBorderColor = BorderInput,
-                            cursorColor = BrandPrimaryLime,
+                            cursorColor = AccentTeal,
                             focusedContainerColor = AppCardSurface,
                             unfocusedContainerColor = AppCardSurface
                         )
@@ -298,14 +298,14 @@ fun DrinkLoggerContent(
                     ) {
                         items(categories) { category ->
                             val isSelected = category.equals(dailyState.selectedCategory, ignoreCase = true)
-                            val pillBg = if (isSelected) BrandPrimaryLime else SecondaryFill
+                            val pillBg = if (isSelected) AccentTeal else SecondaryFill
                             val pillTextColor = if (isSelected) OnPrimaryText else TextMuted
 
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(16.dp))
                                     .background(pillBg)
-                                    .border(BorderStroke(1.dp, if (isSelected) BrandPrimaryLime else BorderDefault), RoundedCornerShape(16.dp))
+                                    .border(BorderStroke(1.dp, if (isSelected) AccentTeal else BorderDefault), RoundedCornerShape(16.dp))
                                     .clickable { onCategorySelect(category) }
                                     .padding(horizontal = 14.dp, vertical = 6.dp)
                             ) {
@@ -380,17 +380,17 @@ fun DrinkDayPickerStrip(
             val isFuture = key > today
 
             val containerBg = when {
-                isSelected -> BrandPrimaryLime.copy(alpha = 0.20f)
+                isSelected -> AccentTeal.copy(alpha = 0.20f)
                 isToday -> AppCardSurface
                 else -> MutedFill.copy(alpha = 0.5f)
             }
             val borderColor = when {
-                isSelected -> BrandPrimaryLime
+                isSelected -> AccentTeal
                 isToday -> BorderInput
                 else -> BorderDefault
             }
             val textColor = when {
-                isSelected -> BrandPrimaryLime
+                isSelected -> AccentTeal
                 isToday -> TextForeground
                 isFuture -> TextMuted.copy(alpha = 0.6f)
                 else -> TextMuted
@@ -421,12 +421,12 @@ fun DrinkDayPickerStrip(
                         text = dayNo,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isSelected) BrandPrimaryLime else if (isFuture) TextMuted else TextForeground
+                        color = if (isSelected) AccentTeal else if (isFuture) TextMuted else TextForeground
                     )
                     if (isToday) {
                         Text("today", fontSize = 8.sp, color = TextMuted)
                     } else if (isSelected) {
-                        Text("●", fontSize = 8.sp, color = BrandPrimaryLime)
+                        Text("●", fontSize = 8.sp, color = AccentTeal)
                     } else {
                         Spacer(modifier = Modifier.height(10.dp))
                     }
@@ -554,7 +554,7 @@ fun DrinkLibraryItemRow(
                     modifier = Modifier
                         .size(width = 60.dp, height = 36.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(BrandPrimaryLime)
+                        .background(AccentTeal)
                         .clickable { onLogClick() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -714,7 +714,7 @@ fun DailyTotalsCard(
                 MetricSummaryItem(
                     label = "TOTAL UNITS",
                     value = String.format(Locale.US, "%.1f", dailyState.totalUnits),
-                    accentColor = if (dailyState.totalUnits > 0) BrandPrimaryLime else TextForeground,
+                    accentColor = if (dailyState.totalUnits > 0) AccentTeal else TextForeground,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -834,7 +834,7 @@ fun LoggedDrinksSection(
                         ) {
                             Text(
                                 text = timeStr,
-                                color = BrandPrimaryLime,
+                                color = AccentTeal,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -925,14 +925,14 @@ fun LoggedDrinkTimePickerDialog(
                     val days = listOf("Today" to false, "Yesterday" to true)
                     days.forEach { (label, isYesterday) ->
                         val isSelected = selectedDayIsYesterday == isYesterday
-                        val bg = if (isSelected) BrandPrimaryLime else SecondaryFill
+                        val bg = if (isSelected) AccentTeal else SecondaryFill
                         val textColor = if (isSelected) OnPrimaryText else TextMuted
 
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(bg)
-                                .border(BorderStroke(1.dp, if (isSelected) BrandPrimaryLime else BorderDefault), RoundedCornerShape(16.dp))
+                                .border(BorderStroke(1.dp, if (isSelected) AccentTeal else BorderDefault), RoundedCornerShape(16.dp))
                                 .clickable { selectedDayIsYesterday = isYesterday }
                                 .padding(horizontal = 16.dp, vertical = 6.dp)
                         ) {
@@ -954,16 +954,16 @@ fun LoggedDrinkTimePickerDialog(
                         clockDialColor = SecondaryFill,
                         clockDialSelectedContentColor = OnPrimaryText,
                         clockDialUnselectedContentColor = TextForeground,
-                        selectorColor = BrandPrimaryLime,
+                        selectorColor = AccentTeal,
                         containerColor = AppCardSurface,
                         periodSelectorBorderColor = BorderDefault,
-                        periodSelectorSelectedContainerColor = BrandPrimaryLime,
+                        periodSelectorSelectedContainerColor = AccentTeal,
                         periodSelectorUnselectedContainerColor = SecondaryFill,
                         periodSelectorSelectedContentColor = OnPrimaryText,
                         periodSelectorUnselectedContentColor = TextForeground,
-                        timeSelectorSelectedContainerColor = BrandPrimaryLime.copy(alpha = 0.2f),
+                        timeSelectorSelectedContainerColor = AccentTeal.copy(alpha = 0.2f),
                         timeSelectorUnselectedContainerColor = SecondaryFill,
-                        timeSelectorSelectedContentColor = BrandPrimaryLime,
+                        timeSelectorSelectedContentColor = AccentTeal,
                         timeSelectorUnselectedContentColor = TextForeground
                     )
                 )
@@ -996,7 +996,7 @@ fun LoggedDrinkTimePickerDialog(
                     onConfirmTime(finalTimestamp)
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandPrimaryLime,
+                    containerColor = AccentTeal,
                     contentColor = OnPrimaryText
                 )
             ) {

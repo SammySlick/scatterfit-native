@@ -55,9 +55,13 @@ import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
+import androidx.compose.ui.text.style.TextAlign
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 import kotlin.math.roundToInt
 
 data class MethodDebugInfo(
@@ -105,20 +109,26 @@ fun formatSdkStatus(status: Int): String = when (status) {
 
 private data class MetricValueRow(
     val label: String,
-    val valueText: String,
-    val dayText: String,
+    val todayValueText: String,
+    val lastRecordText: String,
 )
 
-private fun formatMetricAge(dayKey: String, today: LocalDate = LocalDate.now()): String {
-    val date = runCatching { LocalDate.parse(dayKey) }.getOrNull() ?: return dayKey
-    val daysAgo = ChronoUnit.DAYS.between(date, today).toInt()
+private fun formatLastRecordLine(
+    key: String?,
+    formattedValue: String?,
+    today: LocalDate = LocalDate.now(),
+): String {
+    if (key == null || formattedValue == null) return "no records"
+    val date = runCatching { LocalDate.parse(key) }.getOrNull()
+    val dayName = date?.dayOfWeek?.getDisplayName(TextStyle.FULL, Locale.US) ?: key
+    val daysAgo = if (date != null) ChronoUnit.DAYS.between(date, today).toInt() else 0
     val ageStr = when {
         daysAgo == 0 -> "today"
         daysAgo == 1 -> "1d ago"
         daysAgo > 1 -> "${daysAgo}d ago"
         else -> "${-daysAgo}d future"
     }
-    return "$dayKey · $ageStr"
+    return "Last daily record: $dayName — $formattedValue ($ageStr)"
 }
 
 private fun extractLatestMetric(
@@ -127,44 +137,57 @@ private fun extractLatestMetric(
     formatValue: (Double) -> String,
     today: LocalDate,
 ): MetricValueRow {
+    val todayKey = today.format(DateTimeFormatter.ISO_LOCAL_DATE)
+    val todayVal = map?.get(todayKey)
+    val todayValueText = if (todayVal != null) formatValue(todayVal) else "Nothing logged today"
+
     val nonNullEntries = map ?: emptyMap()
     val maxKey = nonNullEntries.keys.maxOrNull()
-    return if (maxKey != null) {
-        val v = nonNullEntries[maxKey]!!
-        MetricValueRow(
-            label = label,
-            valueText = formatValue(v),
-            dayText = formatMetricAge(maxKey, today)
-        )
-    } else {
-        MetricValueRow(
-            label = label,
-            valueText = "—",
-            dayText = "no records"
-        )
-    }
+    val lastVal = if (maxKey != null) nonNullEntries[maxKey] else null
+    val lastRecordText = formatLastRecordLine(
+        key = maxKey,
+        formattedValue = lastVal?.let { formatValue(it) },
+        today = today
+    )
+
+    return MetricValueRow(
+        label = label,
+        todayValueText = todayValueText,
+        lastRecordText = lastRecordText
+    )
 }
 
 private fun extractLatestSleep(
     map: Map<String, SleepNight>?,
     today: LocalDate,
 ): MetricValueRow {
-    val maxKey = map?.keys?.maxOrNull()
-    val night = maxKey?.let { map[it] }
-    return if (maxKey != null && night != null && night.totalMin > 0.0) {
-        val mins = night.totalMin.roundToInt()
-        MetricValueRow(
-            label = "Sleep",
-            valueText = "${mins / 60}h ${mins % 60}m",
-            dayText = formatMetricAge(maxKey, today)
-        )
+    val todayKey = today.format(DateTimeFormatter.ISO_LOCAL_DATE)
+    val todayNight = map?.get(todayKey)
+    val todayValueText = if (todayNight != null && todayNight.totalMin > 0.0) {
+        val mins = todayNight.totalMin.roundToInt()
+        "${mins / 60}h ${mins % 60}m"
     } else {
-        MetricValueRow(
-            label = "Sleep",
-            valueText = "—",
-            dayText = "no records"
-        )
+        "Nothing logged today"
     }
+
+    val validEntries = map?.filterValues { it.totalMin > 0.0 } ?: emptyMap()
+    val maxKey = validEntries.keys.maxOrNull()
+    val lastNight = if (maxKey != null) validEntries[maxKey] else null
+    val lastValStr = lastNight?.let {
+        val mins = it.totalMin.roundToInt()
+        "${mins / 60}h ${mins % 60}m"
+    }
+    val lastRecordText = formatLastRecordLine(
+        key = maxKey,
+        formattedValue = lastValStr,
+        today = today
+    )
+
+    return MetricValueRow(
+        label = "Sleep",
+        todayValueText = todayValueText,
+        lastRecordText = lastRecordText
+    )
 }
 
 private fun extractLatestHr(
@@ -172,20 +195,25 @@ private fun extractLatestHr(
     zone: ZoneId = ZoneId.systemDefault(),
     today: LocalDate,
 ): MetricValueRow {
-    return if (pair != null) {
-        val dayKey = dayKeyFromIso(pair.second, zone)
-        MetricValueRow(
-            label = "Latest Heart Rate",
-            valueText = "${pair.first.roundToInt()} bpm",
-            dayText = formatMetricAge(dayKey, today)
-        )
+    val todayKey = today.format(DateTimeFormatter.ISO_LOCAL_DATE)
+    val dayKey = pair?.let { dayKeyFromIso(it.second, zone) }
+    val todayValueText = if (dayKey == todayKey && pair != null) {
+        "${pair.first.roundToInt()} bpm"
     } else {
-        MetricValueRow(
-            label = "Latest Heart Rate",
-            valueText = "—",
-            dayText = "no records"
-        )
+        "Nothing logged today"
     }
+
+    val lastRecordText = formatLastRecordLine(
+        key = dayKey,
+        formattedValue = pair?.let { "${it.first.roundToInt()} bpm" },
+        today = today
+    )
+
+    return MetricValueRow(
+        label = "Latest Heart Rate",
+        todayValueText = todayValueText,
+        lastRecordText = lastRecordText
+    )
 }
 
 @Composable
@@ -243,7 +271,7 @@ fun DebugScreen(
                 today = todayDate
             ),
             extractLatestMetric(
-                label = MetricRegistry.byId(MetricId.PROTEIN).label,
+                label = "Protein",
                 map = ad?.protein,
                 formatValue = { MetricRegistry.format(MetricRegistry.byId(MetricId.PROTEIN), it) },
                 today = todayDate
@@ -394,33 +422,36 @@ fun DebugScreen(
                         )
 
                         for (num in todayNumbers) {
-                            Row(
+                            Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                Text(
-                                    text = num.label,
-                                    fontSize = 12.sp,
-                                    color = TextForeground,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Column(
-                                    horizontalAlignment = Alignment.End,
-                                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = num.valueText,
+                                        text = num.label,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextForeground
+                                        color = TextForeground,
+                                        modifier = Modifier.weight(1f)
                                     )
                                     Text(
-                                        text = num.dayText,
-                                        fontSize = 11.sp,
-                                        color = TextMuted
+                                        text = num.todayValueText,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (num.todayValueText == "Nothing logged today") TextMuted else TextForeground,
+                                        textAlign = TextAlign.End
                                     )
                                 }
+                                Text(
+                                    text = num.lastRecordText,
+                                    fontSize = 11.sp,
+                                    color = TextMuted,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.End
+                                )
                             }
                         }
                     }

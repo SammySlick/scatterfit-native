@@ -29,7 +29,7 @@ import com.scatterbrain.scatterfit.core.metricTargetContext
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.data.StoreDailySource
-import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
+import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.MutedFill
 import com.scatterbrain.scatterfit.ui.theme.OnPrimaryText
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
@@ -138,7 +138,7 @@ private fun MetricChipRow(active: MetricId, onPick: (MetricId) -> Unit) {
             Box(
                 modifier = Modifier
                     .wrapContentWidth()
-                    .background(if (selected) BrandPrimaryLime else MutedFill, RoundedCornerShape(50))
+                    .background(if (selected) AccentTeal else MutedFill, RoundedCornerShape(50))
                     .clickable { onPick(def.id) }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {

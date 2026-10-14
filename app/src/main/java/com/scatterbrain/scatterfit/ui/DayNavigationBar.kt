@@ -46,7 +46,6 @@ import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
-import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
 import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.OnPrimaryText
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
@@ -544,7 +543,7 @@ private fun MonthGridContent(
                     text = "🔥 ${streakInfo.count}",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (streakInfo.isAtRisk) JudgementWarn else BrandPrimaryLime
+                    color = if (streakInfo.isAtRisk) JudgementWarn else AccentTeal
                 )
             } else {
                 Spacer(modifier = Modifier.size(28.dp))

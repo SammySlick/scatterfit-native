@@ -52,9 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scatterbrain.scatterfit.core.lastNDayKeys
 import com.scatterbrain.scatterfit.core.todayKey
+import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
-import com.scatterbrain.scatterfit.ui.theme.BrandPrimaryLime
 import com.scatterbrain.scatterfit.ui.theme.JudgementBad
 import com.scatterbrain.scatterfit.ui.theme.JudgementGood
 import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
@@ -246,9 +246,9 @@ fun MetricPageScreen(
         ) {
             MetricPeriod.entries.forEach { period ->
                 val isSelected = period == selectedPeriod
-                val chipBg = if (isSelected) BrandPrimaryLime.copy(alpha = 0.16f) else MutedFill
-                val chipBorder = if (isSelected) BrandPrimaryLime else BorderDefault
-                val chipText = if (isSelected) BrandPrimaryLime else TextForeground
+                val chipBg = if (isSelected) AccentTeal.copy(alpha = 0.16f) else MutedFill
+                val chipBorder = if (isSelected) AccentTeal else BorderDefault
+                val chipText = if (isSelected) AccentTeal else TextForeground
 
                 Box(
                     modifier = Modifier
@@ -294,7 +294,7 @@ fun MetricPageScreen(
                     modifier = Modifier
                         .size(6.dp)
                         .clip(CircleShape)
-                        .background(BrandPrimaryLime)
+                        .background(AccentTeal)
                 )
                 Text(
                     text = insightSentence,
@@ -424,7 +424,7 @@ private fun MetricChartCard(
                         text = formatValue(pt.value),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = BrandPrimaryLime
+                        color = AccentTeal
                     )
                 }
             } else {
@@ -477,7 +477,7 @@ private fun MetricChartCard(
                         val y = h - barHeight
                         val isSelected = i == selectedIndex
 
-                        val barColor = if (isSelected) BrandPrimaryLime else BrandPrimaryLime.copy(alpha = 0.60f)
+                        val barColor = if (isSelected) AccentTeal else AccentTeal.copy(alpha = 0.60f)
 
                         drawRoundRect(
                             color = barColor,
@@ -501,7 +501,7 @@ private fun MetricChartCard(
                             val y2 = h - (((p2.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 16.dp.toPx()) + 8.dp.toPx())
 
                             drawLine(
-                                color = BrandPrimaryLime,
+                                color = AccentTeal,
                                 start = Offset(x1, y1),
                                 end = Offset(x2, y2),
                                 strokeWidth = 2.dp.toPx(),
@@ -518,7 +518,7 @@ private fun MetricChartCard(
                             val isSelected = i == selectedIndex
 
                             drawCircle(
-                                color = if (isSelected) TextForeground else BrandPrimaryLime,
+                                color = if (isSelected) TextForeground else AccentTeal,
                                 radius = if (isSelected) 5.dp.toPx() else 3.dp.toPx(),
                                 center = Offset(x, y)
                             )

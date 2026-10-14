@@ -23,10 +23,11 @@ val TextFaintDark = Color(0xFF79818D)
 
 val BorderDefault = Color.White.copy(alpha = 0.10f)
 val BorderInput = Color.White.copy(alpha = 0.14f)
-val RingFocus = Color(0xFFA2E126).copy(alpha = 0.60f)
+val AccentTeal   = Color(0xFF15B6A4)
+val RingFocus = AccentTeal.copy(alpha = 0.60f)
 
 // Brand & Chart Colours
-val BrandPrimaryLime = Color(0xFFA3E635)    // THE brand colour: primary buttons, active state, momentum score
+val BrandPrimaryLime = AccentTeal    // Retired: aliased to AccentTeal
 val OnPrimaryText = Color(0xFF0A0A0A)
 val ChartBlue = Color(0xFF43B4D4)
 val ChartAmber = Color(0xFFF0BB3B)
@@ -35,7 +36,7 @@ val ChartRed = Color(0xFFF14D4C)
 // Legacy / Compatibility Aliases
 val DarkCardSurface = AppCardSurface
 val AppRowSurface = MutedFill
-val TealHighlight = BrandPrimaryLime
+val TealHighlight = AccentTeal
 val DarkBackground = AppBackground
 val DarkBorderOutline = BorderDefault
 val StatusOnTarget = JudgementGood
@@ -48,5 +49,4 @@ val StateSlip    = Color(0xFFF29D1E)
 val StateRhythm  = Color(0xFFF0BB3B)
 val StateLocked  = Color(0xFF44B65E)
 val StatePeak    = Color(0xFF3FA9F5)
-val AccentTeal   = Color(0xFF15B6A4)
 val ZoneAccent   = Color(0xFFF17084)
