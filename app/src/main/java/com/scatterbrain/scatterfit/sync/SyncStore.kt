@@ -42,10 +42,22 @@ class SyncStore(private val dir: File) {
         }
     }
 
-    fun save(method: RecordMethod, cursorMs: Long, records: List<HealthRecord>) {
-        val obj = JsonObject(
-            mapOf("cursor" to JsonPrimitive(cursorMs), "records" to JsonArray(records.map { toJson(it) })),
-        )
+    fun save(method: RecordMethod, cursorMs: Long, records: List<HealthRecord>) =
+        write(method, cursorMs, records)
+
+    /** Persist records WITHOUT touching the cursor. Fast-path syncs (app-open
+     *  today-only reads) use this on a fresh install, where the backfill
+     *  cursor is still null: saving today's rows must not manufacture a
+     *  cursor, or the next full sync would skip the 120-day lookback. */
+    fun saveRecords(method: RecordMethod, records: List<HealthRecord>) =
+        write(method, load(method).cursorMs, records)
+
+    private fun write(method: RecordMethod, cursorMs: Long?, records: List<HealthRecord>) {
+        val fields = buildMap {
+            cursorMs?.let { put("cursor", JsonPrimitive(it)) }
+            put("records", JsonArray(records.map { toJson(it) }))
+        }
+        val obj = JsonObject(fields)
         val f = file(method)
         val tmp = File(f.parentFile, f.name + ".tmp")
         tmp.writeText(obj.toString())

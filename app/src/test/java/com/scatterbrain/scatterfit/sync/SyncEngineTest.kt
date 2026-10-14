@@ -231,3 +231,64 @@ class SyncEngineTest {
     }
 
 }
+
+    @Test
+    fun `fast-path (today-only) sync never advances cursors on a fresh install`() = runTest {
+        val e = engine()
+
+        // Fresh install: backfill cursor is null. An app-open fast path wins the
+        // race against the first full sync — it reads today and saves records.
+        e.sync(windowFromOverride = NOW) { _, from, _, _ ->
+            assertTrue("fast path must read only today", from >= NOW - 24L * 60 * 60 * 1000)
+            mapOf(RecordMethod.STEPS to listOf(steps("2026-06-20T10:00:00Z")))
+        }
+
+        val state = e.store.load(RecordMethod.STEPS)
+        assertTrue("records must persist from the fast path", state.records.isNotEmpty())
+        assertEquals("fast path must NOT manufacture a cursor", null, state.cursorMs)
+
+        // The next FULL pass therefore still reads the full lookback window.
+        var capturedFrom = 0L
+        e.sync { _, from, _, _ ->
+            capturedFrom = from
+            emptyMap()
+        }
+        assertEquals("backfill must not be skipped", NOW - SyncEngine.LOOKBACK_MS - SyncEngine.OVERLAP_MS, capturedFrom)
+    }
+
+    @Test
+    fun `fast-path sync keeps an existing backfill cursor mid-lookback`() = runTest {
+        val e = engine()
+        val dayMs = 24L * 60 * 60 * 1000
+        val midBackfillCursor = NOW - SyncEngine.LOOKBACK_MS + 40 * dayMs
+
+        // Backfill part-way through: 40 days of history read, cursor parked there.
+        e.store.save(RecordMethod.STEPS, midBackfillCursor, listOf(steps("2026-07-20T10:00:00Z")))
+
+        // App opens: fast path reads today only. Cursor must stay at the
+        // mid-backfill position so the next full pass resumes the lookback.
+        e.sync(windowFromOverride = NOW) { _, _, _, _ ->
+            mapOf(RecordMethod.STEPS to listOf(steps("2026-06-20T10:00:00Z")))
+        }
+        assertEquals("fast path must not drag a mid-backfill cursor to now",
+            midBackfillCursor, e.store.load(RecordMethod.STEPS).cursorMs)
+        assertEquals(2, e.store.load(RecordMethod.STEPS).records.size)
+    }
+
+    @Test
+    fun `saveRecords preserves a null cursor`() = runTest {
+        val dir = tmp.newFolder()
+        val store = SyncStore(dir)
+        store.saveRecords(RecordMethod.STEPS, listOf(steps("2026-06-20T10:00:00Z")))
+
+        val state = store.load(RecordMethod.STEPS)
+        assertEquals(1, state.records.size)
+        assertEquals(null, state.cursorMs)
+
+        // And a null cursor round-trips through the temp-file write path
+        // (second write over the same file keeps it null, records replaced).
+        store.saveRecords(RecordMethod.STEPS, listOf(steps("2026-06-21T10:00:00Z")))
+        val again = store.load(RecordMethod.STEPS)
+        assertEquals(1, again.records.size)
+        assertEquals(null, again.cursorMs)
+    }

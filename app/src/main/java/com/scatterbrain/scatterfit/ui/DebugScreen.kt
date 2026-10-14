@@ -88,8 +88,24 @@ fun computeMethodDebugInfo(
         val diffMs = state.cursorMs - lookbackStart
         (diffMs / dayMs).toInt().coerceIn(0, targetDays)
     }
-    val progressText = "$days/$targetDays days backfilled"
-    val progressFraction = if (targetDays > 0) (days.toFloat() / targetDays.toFloat()).coerceIn(0f, 1f) else 0f
+    // "Backfilled N days" measures distance from the window's OLDEST edge —
+    // it only means something while the initial backfill is incomplete (the
+    // cursor has not yet reached now - lookback). Past that, cursor position
+    // is pure STALENESS: a completed sync's cursor was set at completion, so
+    // it decays one day per day and would forever show "119/120". Complete
+    // means the cursor has crossed the window edge; then show the honest
+    // pair: history state + how long since the last pass.
+    val backfillComplete = state.cursorMs != null && state.cursorMs >= nowMs - targetMs
+    val age = if (state.cursorMs == null) "" else " · synced ${formatAge(nowMs - state.cursorMs)}"
+    val progressText = when {
+        state.cursorMs == null -> "0/$targetDays days backfilled"
+        backfillComplete && method == RecordMethod.HEART_RATE -> "Live window: $targetDays days$age"
+        backfillComplete -> "History complete$age"
+        method == RecordMethod.HEART_RATE -> "Live window: $days/$targetDays days$age"
+        else -> "$days/$targetDays days backfilled$age"
+    }
+    val progressFraction = if (backfillComplete) 1f
+    else if (targetDays > 0) (days.toFloat() / targetDays.toFloat()).coerceIn(0f, 1f) else 0f
     return MethodDebugInfo(
         method = method,
         recordCount = recordCount,
@@ -104,6 +120,15 @@ fun formatSdkStatus(status: Int): String = when (status) {
     HealthConnectClient.SDK_UNAVAILABLE -> "SDK_UNAVAILABLE"
     HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> "SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED"
     else -> "UNKNOWN ($status)"
+}
+
+/** Human age of a gap in ms: "12m ago", "3h ago", "2d ago". Clamps negative
+ *  gaps (clock skew / emulator time jumps) to "just now". */
+internal fun formatAge(gapMs: Long): String = when {
+    gapMs < 60_000L -> "just now"
+    gapMs < 3_600_000L -> "${gapMs / 60_000L}m ago"
+    gapMs < 86_400_000L -> "${gapMs / 3_600_000L}h ago"
+    else -> "${gapMs / 86_400_000L}d ago"
 }
 
 private data class MetricValueRow(
@@ -499,7 +524,7 @@ fun DebugScreen(
                                 color = TextMuted
                             )
                             Text(
-                                text = if (info.method == RecordMethod.HEART_RATE) "Live window: 2 days" else info.progressText,
+                                text = info.progressText,
                                 fontSize = 12.sp,
                                 color = TextMuted
                             )

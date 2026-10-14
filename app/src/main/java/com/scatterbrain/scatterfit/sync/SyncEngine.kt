@@ -75,6 +75,19 @@ class SyncEngine(
         val byKey = HashMap<RecordMethod, LinkedHashMap<String, HealthRecord>>()
         val sliceCount = HashMap<RecordMethod, Int>()
         val attempted = HashMap<RecordMethod, Boolean>() // reader touched this method at all
+
+        // Fast-path guard (windowFromOverride = app-open today-only sync): a
+        // fast read must NEVER advance the backfill cursors. If it did, a fresh
+        // install whose first sync is today-only would set cursor=now and the
+        // 120-day lookback would never run (data-skip, the 2026-10-09 failure
+        // class). So: load each method's cursor ONCE up front, and both the
+        // per-slice saves and the final save write that same cursor — records
+        // are persisted, cursors stay where they were. The next FULL pass
+        // (scheduled sync) re-reads the overlap window idempotently.
+        val fastPathCursor = if (windowFromOverride != null) {
+            methods.associateWith { store.load(it).cursorMs }
+        } else null
+
         for (m in methods) {
             val existing = store.load(m).records
             val map = LinkedHashMap<String, HealthRecord>(existing.size + 64)
@@ -91,7 +104,13 @@ class SyncEngine(
             merged[m] = out
             sliceCount[m] = (sliceCount[m] ?: 0) + sliceRecords.size
             fetchedBy[m] = sliceCount[m] ?: 0
-            store.save(m, sliceCursor, out) // cursor advances per slice: killed sync resumes
+            // Cursor advances per slice: killed sync resumes. Fast path keeps
+            // the method's pre-sync cursor (null stays null via saveRecords).
+            if (fastPathCursor != null && fastPathCursor[m] == null) {
+                store.saveRecords(m, out)
+            } else {
+                store.save(m, fastPathCursor?.get(m) ?: sliceCursor, out)
+            }
             // Progress snapshot = every method (cache + committed slices), so
             // untouched methods keep showing their cached data while we work.
             onProgress(methods.associateWith { m2 -> pruneFor(m2, ArrayList(byKey.getValue(m2).values), now) })
@@ -118,9 +137,16 @@ class SyncEngine(
             // already counted (their return map is the same records).
             if ((sliceCount[m] ?: 0) == 0) fetchedBy[m] = newRecords.size
             merged[m] = out
-            val currentCursor = store.load(m).cursorMs
-            val finalCursor = if (windowFromOverride != null) (currentCursor ?: now) else now
-            store.save(m, finalCursor, out) // final cursor: window was fully read
+            // Final save: full passes set the cursor to now (window fully
+            // read). Fast passes keep the pre-sync cursor — records persist,
+            // backfill position untouched (fresh install: cursor stays null
+            // via saveRecords, so the next full pass does the full lookback).
+            if (windowFromOverride != null) {
+                val fastCursor = fastPathCursor?.get(m)
+                if (fastCursor != null) store.save(m, fastCursor, out) else store.saveRecords(m, out)
+            } else {
+                store.save(m, now, out)
+            }
             for (r in out) {
                 val s = parseMillis(r.start) ?: continue
                 if (s < earliest) earliest = s
