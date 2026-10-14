@@ -89,20 +89,26 @@ fun computeMethodDebugInfo(
         (diffMs / dayMs).toInt().coerceIn(0, targetDays)
     }
     // "Backfilled N days" measures distance from the window's OLDEST edge —
-    // it only means something while the initial backfill is incomplete (the
-    // cursor has not yet reached now - lookback). Past that, cursor position
-    // is pure STALENESS: a completed sync's cursor was set at completion, so
-    // it decays one day per day and would forever show "119/120". Complete
-    // means the cursor has crossed the window edge; then show the honest
-    // pair: history state + how long since the last pass.
-    val backfillComplete = state.cursorMs != null && state.cursorMs >= nowMs - targetMs
-    val age = if (state.cursorMs == null) "" else " · synced ${formatAge(nowMs - state.cursorMs)}"
+    // it only means something while the initial lookback is still running.
+    // Past that, the cursor is pure staleness and "119/120" is a lie. The
+    // honest completion signal is lastFullSyncMs, stamped only by FULL sync
+    // passes: mid-backfill cursors live between the window edge and now,
+    // so cursor position alone cannot tell "complete but stale" from
+    // "halfway through the first lookback". Pre-stamp caches (installed
+    // before this field existed) fall back to the old counting text.
+    val backfillComplete = state.lastFullSyncMs != null
+    val age = when {
+        backfillComplete -> " · synced ${formatAge(nowMs - state.lastFullSyncMs!!)}"
+        state.cursorMs == null -> ""
+        else -> "" // mid-backfill: "synced N ago" is meaningless while the pass is running
+    }
     val progressText = when {
-        state.cursorMs == null -> "0/$targetDays days backfilled"
+        state.cursorMs == null && !backfillComplete ->
+            if (method == RecordMethod.HEART_RATE) "Live window: $targetDays days" else "0/$targetDays days backfilled"
         backfillComplete && method == RecordMethod.HEART_RATE -> "Live window: $targetDays days$age"
         backfillComplete -> "History complete$age"
-        method == RecordMethod.HEART_RATE -> "Live window: $days/$targetDays days$age"
-        else -> "$days/$targetDays days backfilled$age"
+        method == RecordMethod.HEART_RATE -> "Live window: $days/$targetDays days"
+        else -> "$days/$targetDays days backfilled"
     }
     val progressFraction = if (backfillComplete) 1f
     else if (targetDays > 0) (days.toFloat() / targetDays.toFloat()).coerceIn(0f, 1f) else 0f

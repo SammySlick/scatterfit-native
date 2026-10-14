@@ -245,6 +245,7 @@ class SyncEngineTest {
         val state = e.store.load(RecordMethod.STEPS)
         assertTrue("records must persist from the fast path", state.records.isNotEmpty())
         assertEquals("fast path must NOT manufacture a cursor", null, state.cursorMs)
+        assertEquals("fast path must NOT stamp the full-sync marker", null, state.lastFullSyncMs)
 
         // The next FULL pass therefore still reads the full lookback window.
         var capturedFrom = 0L
@@ -269,9 +270,11 @@ class SyncEngineTest {
         e.sync(windowFromOverride = NOW) { _, _, _, _ ->
             mapOf(RecordMethod.STEPS to listOf(steps("2026-06-20T10:00:00Z")))
         }
+        val after = e.store.load(RecordMethod.STEPS)
         assertEquals("fast path must not drag a mid-backfill cursor to now",
-            midBackfillCursor, e.store.load(RecordMethod.STEPS).cursorMs)
-        assertEquals(2, e.store.load(RecordMethod.STEPS).records.size)
+            midBackfillCursor, after.cursorMs)
+        assertEquals("fast path must not stamp completion mid-backfill", null, after.lastFullSyncMs)
+        assertEquals(2, after.records.size)
     }
 
     @Test
@@ -290,5 +293,27 @@ class SyncEngineTest {
         val again = store.load(RecordMethod.STEPS)
         assertEquals(1, again.records.size)
         assertEquals(null, again.cursorMs)
+    }
+
+    @Test
+    fun `full sync stamps lastFullSync, fast path never does`() = runTest {
+        val e = engine()
+
+        // Full pass: stamps.
+        e.sync { _, _, _, _ ->
+            mapOf(RecordMethod.STEPS to listOf(steps("2026-06-20T10:00:00Z")))
+        }
+        val full = e.store.load(RecordMethod.STEPS)
+        assertEquals(NOW, full.lastFullSyncMs)
+        assertEquals(NOW, full.cursorMs)
+
+        // Fast pass afterwards: stamp and cursor untouched, records persist.
+        e.sync(windowFromOverride = NOW) { _, _, _, _ ->
+            mapOf(RecordMethod.STEPS to listOf(steps("2026-06-21T10:00:00Z")))
+        }
+        val after = e.store.load(RecordMethod.STEPS)
+        assertEquals("fast path keeps the full-sync stamp", NOW, after.lastFullSyncMs)
+        assertEquals("fast path keeps the cursor", NOW, after.cursorMs)
+        assertEquals(2, after.records.size)
     }
 }

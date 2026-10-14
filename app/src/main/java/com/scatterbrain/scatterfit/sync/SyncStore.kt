@@ -21,7 +21,7 @@ import java.io.File
  *  Pure File IO on an injected [File] — no Android Context, JVM-testable. */
 class SyncStore(private val dir: File) {
 
-    data class MethodState(val cursorMs: Long?, val records: List<HealthRecord>)
+    data class MethodState(val cursorMs: Long?, val records: List<HealthRecord>, val lastFullSyncMs: Long? = null)
 
     init {
         dir.mkdirs()
@@ -33,10 +33,11 @@ class SyncStore(private val dir: File) {
         return try {
             val obj = Json.parseToJsonElement(f.readText()).jsonObject
             val cursor = obj["cursor"]?.jsonPrimOrNull()?.toLongOrNull()
+            val lastFullSync = obj["lastFullSync"]?.jsonPrimOrNull()?.toLongOrNull()
             val records = obj["records"]?.jsonArray?.mapNotNull { el ->
                 (el as? JsonObject)?.let(::toRecord)
             } ?: emptyList()
-            MethodState(cursor, records)
+            MethodState(cursor, records, lastFullSync)
         } catch (_: Exception) {
             MethodState(null, emptyList()) // corrupt cache = cold start, not a crash
         }
@@ -49,12 +50,27 @@ class SyncStore(private val dir: File) {
      *  today-only reads) use this on a fresh install, where the backfill
      *  cursor is still null: saving today's rows must not manufacture a
      *  cursor, or the next full sync would skip the 120-day lookback. */
-    fun saveRecords(method: RecordMethod, records: List<HealthRecord>) =
-        write(method, load(method).cursorMs, records)
+    /** Full-pass save: persists the cursor AND stamps lastFullSync (the full
+     *  lookback window has now been read end-to-end at this instant). */
+    fun saveFull(method: RecordMethod, cursorMs: Long, records: List<HealthRecord>, nowMs: Long) =
+        write(method, cursorMs, records, stampLastFullSync = nowMs)
 
-    private fun write(method: RecordMethod, cursorMs: Long?, records: List<HealthRecord>) {
+    fun saveRecords(method: RecordMethod, records: List<HealthRecord>) {
+        val existing = load(method).lastFullSyncMs
+        write(method, load(method).cursorMs, records, keepLastFullSync = existing != null)
+    }
+
+    private fun write(
+        method: RecordMethod,
+        cursorMs: Long?,
+        records: List<HealthRecord>,
+        stampLastFullSync: Long? = null,
+        keepLastFullSync: Boolean = false,
+    ) {
+        val preservedLastFullSync = if (keepLastFullSync) load(method).lastFullSyncMs else null
         val fields = buildMap {
             cursorMs?.let { put("cursor", JsonPrimitive(it)) }
+            (stampLastFullSync ?: preservedLastFullSync)?.let { put("lastFullSync", JsonPrimitive(it)) }
             put("records", JsonArray(records.map { toJson(it) }))
         }
         val obj = JsonObject(fields)

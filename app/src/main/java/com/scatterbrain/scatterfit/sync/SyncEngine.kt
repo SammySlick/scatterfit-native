@@ -142,10 +142,13 @@ class SyncEngine(
             // backfill position untouched (fresh install: cursor stays null
             // via saveRecords, so the next full pass does the full lookback).
             if (windowFromOverride != null) {
+                // Fast pass: records persist, cursor AND lastFullSync stamp stay
+                // untouched — an app-open today-only read is not a completed
+                // lookback and must never claim one.
                 val fastCursor = fastPathCursor?.get(m)
                 if (fastCursor != null) store.save(m, fastCursor, out) else store.saveRecords(m, out)
             } else {
-                store.save(m, now, out)
+                store.saveFull(m, now, out, nowMs = now) // full pass: window read end-to-end
             }
             for (r in out) {
                 val s = parseMillis(r.start) ?: continue
