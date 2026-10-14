@@ -1,6 +1,11 @@
 package com.scatterbrain.scatterfit.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,9 +16,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -21,10 +26,16 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +51,7 @@ import com.scatterbrain.scatterfit.core.dayBefore
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
+import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.StateBad
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
@@ -48,6 +60,11 @@ import com.scatterbrain.scatterfit.ui.theme.StateSlip
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import com.scatterbrain.scatterfit.ui.theme.momentumBand
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private var savedBreakdownScrollPosition: Int = 0
 
 @Composable
 fun ConsistencyBreakdownScreen(
@@ -57,7 +74,20 @@ fun ConsistencyBreakdownScreen(
     modifier: Modifier = Modifier,
     onMetricClick: (MetricId) -> Unit = {},
 ) {
-    val scrollState = rememberScrollState()
+    val scrollState = rememberSaveable(saver = ScrollState.Saver) {
+        ScrollState(savedBreakdownScrollPosition)
+    }
+
+    LaunchedEffect(scrollState.value) {
+        savedBreakdownScrollPosition = scrollState.value
+    }
+
+    val handleBack = {
+        savedBreakdownScrollPosition = 0
+        onBackClick()
+    }
+
+    BackHandler(onBack = handleBack)
 
     // Current momentum score & band
     val momentumScoreRaw = momentumSource.momentumForDay(dayKey)
@@ -75,16 +105,27 @@ fun ConsistencyBreakdownScreen(
 
     val isAllUnlogged = summaries.isEmpty() || summaries.all { it.section == null || it.unlogged }
 
-    val pillLabel = if (momentumScoreRaw == null) "No data yet" else mBand.label
+    val pillText = if (momentumScoreRaw == null) "No data yet" else "$momentumScoreInt ${mBand.label}"
     val pillColor = if (momentumScoreRaw == null) TextMuted else mBand.color
+
+    // Date line at very top: e.g. "Tuesday 14 October"
+    val dateHeader = remember(dayKey) {
+        runCatching {
+            val date = LocalDate.parse(dayKey)
+            date.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.US))
+        }.getOrDefault(dayKey)
+    }
+
+    // Accordion state: only one row expanded at a time
+    var expandedMetricKey by rememberSaveable { mutableStateOf<String?>(null) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(AppBackground)
-            .padding(16.dp)
             .verticalScroll(scrollState)
-            .padding(bottom = 8.dp),
+            .navigationBarsPadding()
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 1. TOP BAR: reuse the metric-page chrome pattern exactly
@@ -94,7 +135,7 @@ fun ConsistencyBreakdownScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             IconButton(
-                onClick = onBackClick,
+                onClick = handleBack,
                 modifier = Modifier.size(36.dp)
             ) {
                 ChevronLeftIcon(
@@ -111,28 +152,47 @@ fun ConsistencyBreakdownScreen(
             )
         }
 
-        // 2. HEADER BLOCK: the band verdict pill + DeltaPointsBlock
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .border(BorderStroke(1.dp, pillColor), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = pillLabel,
-                    color = pillColor,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1
-                )
-            }
+        // Date line at the very top of breakdown, above the momentum header
+        Text(
+            text = dateHeader,
+            fontSize = 12.sp,
+            color = TextMuted
+        )
 
-            if (delta != null) {
-                DeltaPointsBlock(delta = delta)
+        // 2. HEADER INFO BLOCK: pill (score number + band name) and delta sentence grouped in DarkCardSurface card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+            border = BorderStroke(1.dp, BorderDefault)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Box(
+                    modifier = Modifier
+                        .border(BorderStroke(1.dp, pillColor), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = pillText,
+                        color = pillColor,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+
+                if (delta != null) {
+                    DeltaPointsBlock(
+                        delta = delta,
+                        comparisonText = "this week vs yesterday"
+                    )
+                }
             }
         }
 
@@ -180,7 +240,15 @@ fun ConsistencyBreakdownScreen(
                             )
                         }
                         sectionSummaries.forEach { summary ->
-                            ConsistencyRow(summary = summary, onMetricClick = onMetricClick)
+                            val isExpanded = expandedMetricKey == summary.name
+                            ConsistencyRow(
+                                summary = summary,
+                                isExpanded = isExpanded,
+                                onToggleExpand = {
+                                    expandedMetricKey = if (isExpanded) null else summary.name
+                                },
+                                onMetricClick = onMetricClick
+                            )
                         }
                     }
                 }
@@ -188,22 +256,21 @@ fun ConsistencyBreakdownScreen(
                 // Metrics with section == null (unlogged) render after ALL sections, with NO header
                 val unloggedSummaries = summaries.filter { it.section == null || it.unlogged }
                 unloggedSummaries.forEach { summary ->
-                    ConsistencyRow(summary = summary, onMetricClick = onMetricClick)
+                    val isExpanded = expandedMetricKey == summary.name
+                    ConsistencyRow(
+                        summary = summary,
+                        isExpanded = isExpanded,
+                        onToggleExpand = {
+                            expandedMetricKey = if (isExpanded) null else summary.name
+                        },
+                        onMetricClick = onMetricClick
+                    )
                 }
             }
         }
     }
 }
 
-/**
- * Metric row matching Sam's mockup geometry:
- * AppCardSurface, 14dp padding, 12dp radius, NO border.
- * - Tier 1: title + 12dp chevron on left, 7 squares on right (14dp, 3dp gap, RoundedCornerShape(3.dp)).
- *   Square color comes from sq.band: GREEN -> StateLocked, ORANGE -> StateSlip, RED -> StateBad, GREY -> outline.
- * - Tier 2: todayLine (11sp, TextMuted, right-aligned).
- * - Tier 3: sentence (14sp, TextForeground) on left, rightEdge (13sp Bold, TextForeground) right-aligned on same line.
- * - Vertical: 8dp between tiers inside each card.
- */
 private fun GoalId.toMetricId(): MetricId? = when (this) {
     GoalId.STEPS -> MetricId.STEPS
     GoalId.CALORIES -> MetricId.CALORIES_EATEN
@@ -216,19 +283,35 @@ private fun GoalId.toMetricId(): MetricId? = when (this) {
     GoalId.Z4PLUS -> MetricId.TRAINING_MINUTES
 }
 
+/**
+ * Metric row matching Sam's mockup geometry:
+ * AppCardSurface, 14dp padding, 12dp radius, NO border.
+ * Accordion:
+ * - COLLAPSED: Tier 1 only (title + chevron, squares, rightEdge).
+ * - EXPANDED: Tier 1 (title + rotated chevron, squares), Tier 2 (todayLine), Tier 3 (sentence + rightEdge).
+ * - Row body tap toggles expand/collapse; chevron tap opens metric page when summary.id != null.
+ */
 @Composable
 private fun ConsistencyRow(
     summary: ConsistencySummary,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
     modifier: Modifier = Modifier,
     onMetricClick: (MetricId) -> Unit = {},
 ) {
     val metricId = summary.id?.toMetricId()
-    val isClickable = metricId != null
+    val isMetricClickable = metricId != null
+
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (isExpanded) 90f else 0f,
+        animationSpec = tween(durationMillis = 225),
+        label = "chevronRotation"
+    )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (metricId != null) Modifier.clickable { onMetricClick(metricId) } else Modifier),
+            .clickable(onClick = onToggleExpand),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = AppCardSurface),
         border = null
@@ -236,10 +319,11 @@ private fun ConsistencyRow(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize(animationSpec = tween(durationMillis = 225))
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Tier 1: title + 12dp chevron (left), squares row (right)
+            // Tier 1: title + chevron (left), squares row (middle), rightEdge (right when collapsed)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -261,82 +345,109 @@ private fun ConsistencyRow(
                     ChevronRightIcon(
                         modifier = Modifier
                             .size(12.dp)
-                            .then(if (metricId != null) Modifier.clickable { onMetricClick(metricId) } else Modifier),
-                        tint = if (isClickable) TextMuted else TextMuted.copy(alpha = 0.3f)
+                            .rotate(chevronRotation)
+                            .then(
+                                if (isMetricClickable) {
+                                    Modifier.clickable { onMetricClick(metricId) }
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                        tint = if (isMetricClickable) TextMuted else TextMuted.copy(alpha = 0.3f)
                     )
                 }
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    summary.squares.forEach { sq ->
-                        when (sq.band) {
-                            SquareBand.GREEN -> Box(
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(StateLocked)
-                            )
-                            SquareBand.ORANGE -> Box(
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(StateSlip)
-                            )
-                            SquareBand.RED -> Box(
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(StateBad)
-                            )
-                            SquareBand.GREY -> Box(
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
-                            )
+                    // Squares (7 calendar-week squares, Mon..Sun)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        summary.squares.forEach { sq ->
+                            when (sq.band) {
+                                SquareBand.GREEN -> Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(StateLocked)
+                                )
+                                SquareBand.ORANGE -> Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(StateSlip)
+                                )
+                                SquareBand.RED -> Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(StateBad)
+                                )
+                                SquareBand.GREY -> Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
+                                )
+                            }
                         }
+                    }
+
+                    // When collapsed, rightEdge sits on the right of Tier 1
+                    if (!isExpanded) {
+                        Text(
+                            text = summary.rightEdge,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextForeground,
+                            maxLines = 1,
+                            textAlign = TextAlign.End
+                        )
                     }
                 }
             }
 
-            // Tier 2: todayLine (under squares, right-aligned)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                Text(
-                    text = summary.todayLine,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = TextMuted,
-                    textAlign = TextAlign.End,
-                    maxLines = 1
-                )
-            }
+            if (isExpanded) {
+                // Tier 2: todayLine (under squares, right-aligned)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = summary.todayLine,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = TextMuted,
+                        textAlign = TextAlign.End,
+                        maxLines = 1
+                    )
+                }
 
-            // Tier 3: sentence (left) and rightEdge (right-aligned) on the same line
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = summary.sentence,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = TextMuted,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = summary.rightEdge,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextForeground,
-                    maxLines = 1,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+                // Tier 3: sentence (left) and rightEdge (right-aligned) on the same line
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = summary.sentence,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = TextMuted,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = summary.rightEdge,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground,
+                        maxLines = 1,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
             }
         }
     }
