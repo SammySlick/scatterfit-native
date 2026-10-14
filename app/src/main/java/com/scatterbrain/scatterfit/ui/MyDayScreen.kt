@@ -193,32 +193,41 @@ fun MyDayScreen(
     }
     var showDrinkLoggerScreen by remember { mutableStateOf(false) }
     var activeMetricScreen by remember { mutableStateOf<String?>(null) }
+    var activeMetricId by remember { mutableStateOf<com.scatterbrain.scatterfit.core.MetricId?>(null) }
 
-    when (activeMetricScreen) {
-        "steps" -> {
+    when {
+        activeMetricId != null -> {
+            MetricScreen(
+                initialId = activeMetricId!!,
+                onBackClick = { activeMetricId = null }
+            )
+            return
+        }
+        activeMetricScreen == "steps" -> {
             com.scatterbrain.scatterfit.ui.MetricPages.StepsScreen(
                 onBackClick = { activeMetricScreen = null }
             )
             return
         }
-        "sleep" -> {
+        activeMetricScreen == "sleep" -> {
             com.scatterbrain.scatterfit.ui.MetricPages.SleepScreen(
                 onBackClick = { activeMetricScreen = null }
             )
             return
         }
-        "weight" -> {
+        activeMetricScreen == "weight" -> {
             com.scatterbrain.scatterfit.ui.MetricPages.WeightScreen(
                 onBackClick = { activeMetricScreen = null }
             )
             return
         }
-        "breakdown" -> {
+        activeMetricScreen == "breakdown" -> {
             if (momentumSource != null) {
                 ConsistencyBreakdownScreen(
                     momentumSource = momentumSource,
                     dayKey = currentDayKey,
-                    onBackClick = { activeMetricScreen = null }
+                    onBackClick = { activeMetricScreen = null },
+                    onMetricClick = { activeMetricId = it }
                 )
             }
             return

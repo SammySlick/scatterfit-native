@@ -3,6 +3,7 @@ package com.scatterbrain.scatterfit.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scatterbrain.scatterfit.core.ConsistencySection
 import com.scatterbrain.scatterfit.core.ConsistencySummary
+import com.scatterbrain.scatterfit.core.GoalId
+import com.scatterbrain.scatterfit.core.MetricId
 import com.scatterbrain.scatterfit.core.SquareBand
 import com.scatterbrain.scatterfit.core.dayBefore
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
@@ -52,6 +55,7 @@ fun ConsistencyBreakdownScreen(
     dayKey: String,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onMetricClick: (MetricId) -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
 
@@ -176,7 +180,7 @@ fun ConsistencyBreakdownScreen(
                             )
                         }
                         sectionSummaries.forEach { summary ->
-                            ConsistencyRow(summary = summary)
+                            ConsistencyRow(summary = summary, onMetricClick = onMetricClick)
                         }
                     }
                 }
@@ -184,7 +188,7 @@ fun ConsistencyBreakdownScreen(
                 // Metrics with section == null (unlogged) render after ALL sections, with NO header
                 val unloggedSummaries = summaries.filter { it.section == null || it.unlogged }
                 unloggedSummaries.forEach { summary ->
-                    ConsistencyRow(summary = summary)
+                    ConsistencyRow(summary = summary, onMetricClick = onMetricClick)
                 }
             }
         }
@@ -200,13 +204,31 @@ fun ConsistencyBreakdownScreen(
  * - Tier 3: sentence (14sp, TextForeground) on left, rightEdge (13sp Bold, TextForeground) right-aligned on same line.
  * - Vertical: 8dp between tiers inside each card.
  */
+private fun GoalId.toMetricId(): MetricId? = when (this) {
+    GoalId.STEPS -> MetricId.STEPS
+    GoalId.CALORIES -> MetricId.CALORIES_EATEN
+    GoalId.PROTEIN -> MetricId.PROTEIN
+    GoalId.SLEEP -> MetricId.SLEEP
+    GoalId.EXERCISE -> MetricId.TRAINING_MINUTES
+    GoalId.WEIGHT, GoalId.BODY_FAT -> MetricId.WEIGHT
+    GoalId.ALCOHOL, GoalId.UNITS -> MetricId.ALCOHOL_UNITS
+    GoalId.RHR_TREND -> MetricId.RESTING_HR
+    GoalId.Z4PLUS -> MetricId.TRAINING_MINUTES
+}
+
 @Composable
 private fun ConsistencyRow(
     summary: ConsistencySummary,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMetricClick: (MetricId) -> Unit = {},
 ) {
+    val metricId = summary.id?.toMetricId()
+    val isClickable = metricId != null
+
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (metricId != null) Modifier.clickable { onMetricClick(metricId) } else Modifier),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = AppCardSurface),
         border = null
@@ -237,8 +259,10 @@ private fun ConsistencyRow(
                         overflow = TextOverflow.Ellipsis
                     )
                     ChevronRightIcon(
-                        modifier = Modifier.size(12.dp),
-                        tint = TextMuted
+                        modifier = Modifier
+                            .size(12.dp)
+                            .then(if (metricId != null) Modifier.clickable { onMetricClick(metricId) } else Modifier),
+                        tint = if (isClickable) TextMuted else TextMuted.copy(alpha = 0.3f)
                     )
                 }
 
