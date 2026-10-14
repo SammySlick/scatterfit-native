@@ -72,6 +72,7 @@ fun DayNavigationBar(
     initialExpanded: Boolean = false,
     asCard: Boolean = false,
     streakInfo: StreakInfo = StreakInfo(0, isTodayLogged = false, isAtRisk = false),
+    isSyncing: Boolean = false,
     onSettingsClick: () -> Unit = {}
 ) {
     val today = remember { todayKey() }
@@ -124,6 +125,7 @@ fun DayNavigationBar(
                     todayKey = today,
                     momentumSource = momentumSource,
                     streakInfo = streakInfo,
+                    isSyncing = isSyncing,
                     onSettingsClick = onSettingsClick,
                     onPrevWeek = { weekAnchorDate = weekAnchorDate.minusWeeks(1) },
                     onNextWeek = { weekAnchorDate = weekAnchorDate.plusWeeks(1) },
@@ -218,6 +220,7 @@ private fun WeekStripContent(
     todayKey: String,
     momentumSource: MomentumSource? = null,
     streakInfo: StreakInfo,
+    isSyncing: Boolean = false,
     onSettingsClick: () -> Unit,
     onPrevWeek: () -> Unit,
     onNextWeek: () -> Unit,
@@ -326,7 +329,7 @@ private fun WeekStripContent(
                 }
 
                 Text(
-                    text = dateRangeText,
+                    text = if (isSyncing) "$dateRangeText · Syncing…" else dateRangeText,
                     fontSize = 10.sp,
                     color = TextMuted,
                     fontWeight = FontWeight.Normal,

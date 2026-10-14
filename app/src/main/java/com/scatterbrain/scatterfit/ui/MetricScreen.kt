@@ -36,7 +36,10 @@ import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.StateSlip
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -71,15 +74,48 @@ fun MetricScreen(
         } ?: EmptyMetricSource()
     }
 
+    // Check if today has a logged record
+    val todayValue = repoDaily?.let { ad ->
+        when (currentId) {
+            MetricId.CALORIES_EATEN, MetricId.PROTEIN -> {
+                val hasFood = (ad.caloriesEaten[todayKey] ?: 0.0) > 0.0 || (ad.protein[todayKey] ?: 0.0) > 0.0
+                if (hasFood) def.valueFrom(ad, todayKey) else null
+            }
+            else -> def.valueFrom(ad, todayKey)
+        }
+    }
+    val hasTodayRecord = todayValue != null
+
     // Hero: newest value in the last HISTORY_DAYS window.
     val latest = remember(source) { source.latest() }
-    val heroText = remember(def, latest) {
+    val heroText = remember(def, latest, todayValue, hasTodayRecord) {
+        val v = if (hasTodayRecord) todayValue else latest?.value
         if (currentId == MetricId.SLEEP) {
-            latest?.value?.let { v ->
-                val mins = (v * 60.0).roundToInt()
+            v?.let {
+                val mins = (it * 60.0).roundToInt()
                 "${mins / 60}h ${mins % 60}m"
             } ?: "—"
-        } else MetricRegistry.format(def, latest?.value)
+        } else MetricRegistry.format(def, v)
+    }
+
+    val lastLoggedText = remember(def, latest, hasTodayRecord) {
+        if (!hasTodayRecord && latest != null && latest.value != null) {
+            val date = runCatching { LocalDate.parse(latest.dayKey) }.getOrNull()
+            val formattedDate = date?.format(DateTimeFormatter.ofPattern("EEEE d MMM", Locale.US)) ?: latest.dayKey
+            val valStr = if (currentId == MetricId.SLEEP) {
+                val mins = (latest.value * 60.0).roundToInt()
+                "${mins / 60}h ${mins % 60}m"
+            } else {
+                MetricRegistry.format(def, latest.value)
+            }
+            "Last logged: $formattedDate — $valStr"
+        } else null
+    }
+
+    val heroUnitText = if (hasTodayRecord) {
+        if (def.unit.isNotEmpty()) "${def.unit} today" else "today"
+    } else {
+        def.unit.ifEmpty { when (currentId) { MetricId.SLEEP -> "last night"; MetricId.STEPS -> "yesterday"; else -> "" } }
     }
 
     // Verdict/comparison from the ported targets engine, on the same demo
@@ -95,8 +131,10 @@ fun MetricScreen(
     MetricPageScreen(
         title = def.label,
         heroValue = heroText,
-        heroUnit = def.unit.ifEmpty { when (currentId) { MetricId.SLEEP -> "last night"; MetricId.STEPS -> "yesterday"; else -> "" } },
+        heroUnit = heroUnitText,
         heroScore = latest?.score,
+        isUnloggedToday = !hasTodayRecord,
+        lastLoggedText = lastLoggedText,
         verdictLabel = context.verdict.takeIf { it != "Not enough data" },
         verdictTone = verdictTone(context.verdict),
         insightSentence = buildString {

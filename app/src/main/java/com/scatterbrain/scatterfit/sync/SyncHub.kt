@@ -61,15 +61,29 @@ object SyncHub {
         }
     }
 
+    /** Fast incremental sync: reads only today's window (00:00 local today to now) without backfilling 120 days. */
+    suspend fun syncToday(
+        methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
+        zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    ): SyncEngine.SyncResult? {
+        val startOfToday = java.time.LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+        return syncNow(methods = methods, windowFromOverride = startOfToday)
+    }
+
     /** Run one incremental sync against Health Connect. Safe to call from
      *  anywhere (service, activity) — concurrency-guarded, idempotent. */
-    suspend fun syncNow(methods: Set<RecordMethod> = RecordMethod.entries.toSet()): SyncEngine.SyncResult? {
+    suspend fun syncNow(
+        methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
+        windowFromOverride: Long? = null,
+    ): SyncEngine.SyncResult? {
         val e = engine ?: return null
         val c = client ?: return null
         if (!_syncing.compareAndSet(false, true)) { Log.d(TAG, "syncNow: already running, skip"); return null }
-        Log.d(TAG, "syncNow: STARTING engine sync")
+        Log.d(TAG, "syncNow: STARTING engine sync (windowFromOverride=$windowFromOverride)")
         return try {
             val result = e.sync(
+                methods = methods,
+                windowFromOverride = windowFromOverride,
                 reader = { ms, fromMs, toMs, onSlice ->
                     var sliceN = 0
                     val read = HcReaders.readAll(c, fromMs, toMs, ms) { m, sliceEnd, sliceRecords ->

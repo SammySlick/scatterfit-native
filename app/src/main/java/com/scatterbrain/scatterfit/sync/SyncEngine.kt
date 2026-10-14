@@ -46,6 +46,7 @@ class SyncEngine(
      *  throttled 36-row pages and burned the quota again. */
     suspend fun sync(
         methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
+        windowFromOverride: Long? = null,
         /** Fired after each slice commit (and once at sync end) with the
          *  live whole-cache snapshot — cache + everything committed so far —
          *  so the UI can stream while the sync is still running.
@@ -60,7 +61,7 @@ class SyncEngine(
         ) -> Map<RecordMethod, List<HealthRecord>>,
     ): SyncResult {
         val now = nowMs()
-        val from = windowStart(methods, now)
+        val from = windowFromOverride ?: windowStart(methods, now)
 
         val merged = HashMap<RecordMethod, List<HealthRecord>>()
         val fetchedBy = HashMap<RecordMethod, Int>()
@@ -117,7 +118,9 @@ class SyncEngine(
             // already counted (their return map is the same records).
             if ((sliceCount[m] ?: 0) == 0) fetchedBy[m] = newRecords.size
             merged[m] = out
-            store.save(m, now, out) // final cursor: window was fully read
+            val currentCursor = store.load(m).cursorMs
+            val finalCursor = if (windowFromOverride != null) (currentCursor ?: now) else now
+            store.save(m, finalCursor, out) // final cursor: window was fully read
             for (r in out) {
                 val s = parseMillis(r.start) ?: continue
                 if (s < earliest) earliest = s

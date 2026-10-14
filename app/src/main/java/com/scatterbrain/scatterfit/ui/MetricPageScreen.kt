@@ -87,6 +87,8 @@ fun MetricPageScreen(
     topSlot: (@Composable () -> Unit)? = null,
     onBackClick: () -> Unit,
     formatValue: (Double?) -> String = { it?.toString() ?: "—" },
+    isUnloggedToday: Boolean = false,
+    lastLoggedText: String? = null,
     showList: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -168,46 +170,90 @@ fun MetricPageScreen(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = heroValue,
-                            fontSize = 34.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = valueColor
-                        )
-                        Text(
-                            text = heroUnit,
-                            fontSize = 11.sp,
-                            color = TextMuted,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
-
-                    // Verdict pill
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(if (pillText == "No data") MutedFill else pillColor.copy(alpha = 0.16f))
-                            .border(
-                                BorderStroke(1.dp, if (pillText == "No data") BorderDefault else pillColor.copy(alpha = 0.40f)),
-                                CircleShape
+                if (isUnloggedToday) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Nothing logged today",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextMuted
                             )
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+
+                            // Verdict pill
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(if (pillText == "No data") MutedFill else pillColor.copy(alpha = 0.16f))
+                                    .border(
+                                        BorderStroke(1.dp, if (pillText == "No data") BorderDefault else pillColor.copy(alpha = 0.40f)),
+                                        CircleShape
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = pillText,
+                                    color = pillColor,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        if (!lastLoggedText.isNullOrBlank()) {
+                            Text(
+                                text = lastLoggedText,
+                                fontSize = 12.sp,
+                                color = TextMuted
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = pillText,
-                            color = pillColor,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = heroValue,
+                                fontSize = 34.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = valueColor
+                            )
+                            Text(
+                                text = heroUnit,
+                                fontSize = 11.sp,
+                                color = TextMuted,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
+
+                        // Verdict pill
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(if (pillText == "No data") MutedFill else pillColor.copy(alpha = 0.16f))
+                                .border(
+                                    BorderStroke(1.dp, if (pillText == "No data") BorderDefault else pillColor.copy(alpha = 0.40f)),
+                                    CircleShape
+                                )
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = pillText,
+                                color = pillColor,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
 

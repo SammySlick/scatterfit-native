@@ -59,7 +59,6 @@ import androidx.compose.ui.text.style.TextAlign
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -110,17 +109,18 @@ fun formatSdkStatus(status: Int): String = when (status) {
 private data class MetricValueRow(
     val label: String,
     val todayValueText: String,
-    val lastRecordText: String,
+    val lastRecordLabel: String,
+    val lastRecordDetail: String,
 )
 
-private fun formatLastRecordLine(
+private fun formatLastRecordDetail(
     key: String?,
     formattedValue: String?,
     today: LocalDate = LocalDate.now(),
-): String {
-    if (key == null || formattedValue == null) return "no records"
+): Pair<String, String> {
+    if (key == null || formattedValue == null) return "Last daily record:" to "no records"
     val date = runCatching { LocalDate.parse(key) }.getOrNull()
-    val dayName = date?.dayOfWeek?.getDisplayName(TextStyle.FULL, Locale.US) ?: key
+    val dateStr = date?.format(DateTimeFormatter.ofPattern("EEEE d MMM", Locale.US)) ?: key
     val daysAgo = if (date != null) ChronoUnit.DAYS.between(date, today).toInt() else 0
     val ageStr = when {
         daysAgo == 0 -> "today"
@@ -128,7 +128,7 @@ private fun formatLastRecordLine(
         daysAgo > 1 -> "${daysAgo}d ago"
         else -> "${-daysAgo}d future"
     }
-    return "Last daily record: $dayName — $formattedValue ($ageStr)"
+    return "Last daily record:" to "$dateStr — $formattedValue ($ageStr)"
 }
 
 private fun extractLatestMetric(
@@ -144,7 +144,7 @@ private fun extractLatestMetric(
     val nonNullEntries = map ?: emptyMap()
     val maxKey = nonNullEntries.keys.maxOrNull()
     val lastVal = if (maxKey != null) nonNullEntries[maxKey] else null
-    val lastRecordText = formatLastRecordLine(
+    val (recordLabel, recordDetail) = formatLastRecordDetail(
         key = maxKey,
         formattedValue = lastVal?.let { formatValue(it) },
         today = today
@@ -153,7 +153,8 @@ private fun extractLatestMetric(
     return MetricValueRow(
         label = label,
         todayValueText = todayValueText,
-        lastRecordText = lastRecordText
+        lastRecordLabel = recordLabel,
+        lastRecordDetail = recordDetail
     )
 }
 
@@ -177,7 +178,7 @@ private fun extractLatestSleep(
         val mins = it.totalMin.roundToInt()
         "${mins / 60}h ${mins % 60}m"
     }
-    val lastRecordText = formatLastRecordLine(
+    val (recordLabel, recordDetail) = formatLastRecordDetail(
         key = maxKey,
         formattedValue = lastValStr,
         today = today
@@ -186,7 +187,8 @@ private fun extractLatestSleep(
     return MetricValueRow(
         label = "Sleep",
         todayValueText = todayValueText,
-        lastRecordText = lastRecordText
+        lastRecordLabel = recordLabel,
+        lastRecordDetail = recordDetail
     )
 }
 
@@ -203,7 +205,7 @@ private fun extractLatestHr(
         "Nothing logged today"
     }
 
-    val lastRecordText = formatLastRecordLine(
+    val (recordLabel, recordDetail) = formatLastRecordDetail(
         key = dayKey,
         formattedValue = pair?.let { "${it.first.roundToInt()} bpm" },
         today = today
@@ -212,7 +214,8 @@ private fun extractLatestHr(
     return MetricValueRow(
         label = "Latest Heart Rate",
         todayValueText = todayValueText,
-        lastRecordText = lastRecordText
+        lastRecordLabel = recordLabel,
+        lastRecordDetail = recordDetail
     )
 }
 
@@ -445,13 +448,23 @@ fun DebugScreen(
                                         textAlign = TextAlign.End
                                     )
                                 }
-                                Text(
-                                    text = num.lastRecordText,
-                                    fontSize = 11.sp,
-                                    color = TextMuted,
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.End
-                                )
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = num.lastRecordLabel,
+                                        fontSize = 11.sp,
+                                        color = TextMuted
+                                    )
+                                    Text(
+                                        text = num.lastRecordDetail,
+                                        fontSize = 11.sp,
+                                        color = TextMuted,
+                                        textAlign = TextAlign.End
+                                    )
+                                }
                             }
                         }
                     }
@@ -486,7 +499,7 @@ fun DebugScreen(
                                 color = TextMuted
                             )
                             Text(
-                                text = info.progressText,
+                                text = if (info.method == RecordMethod.HEART_RATE) "Live window: 2 days" else info.progressText,
                                 fontSize = 12.sp,
                                 color = TextMuted
                             )

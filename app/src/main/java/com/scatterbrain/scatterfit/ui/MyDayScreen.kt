@@ -250,6 +250,12 @@ fun MyDayScreen(
         return
     }
 
+    val isSyncing by SyncHub.syncing.collectAsState()
+
+    LaunchedEffect(Unit) {
+        SyncHub.syncToday()
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -277,6 +283,7 @@ fun MyDayScreen(
             },
             momentumSource = momentumSource,
             streakInfo = streakInfo,
+            isSyncing = isSyncing,
             asCard = true,
             onSettingsClick = onSettingsClick,
             modifier = Modifier.fillMaxWidth()
