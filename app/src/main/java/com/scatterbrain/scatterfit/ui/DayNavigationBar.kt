@@ -201,7 +201,7 @@ private fun CardSurfaceBox(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(BorderDefault)
+                .background(AccentTeal)
         )
     }
 }

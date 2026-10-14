@@ -679,7 +679,7 @@ fun TodayPulseCard(
                         text = "TODAY",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Normal,
-                        color = TextMuted,
+                        color = AccentTeal,
                         letterSpacing = 0.5.sp,
                         textAlign = TextAlign.Start,
                         maxLines = 1,
@@ -701,7 +701,7 @@ fun TodayPulseCard(
                             fontSize = 8.sp,
                             lineHeight = 10.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = TextMuted,
+                            color = AccentTeal,
                             letterSpacing = 1.5.sp
                         )
                         Spacer(modifier = Modifier.height(1.dp))
@@ -730,7 +730,7 @@ fun TodayPulseCard(
                         text = "TARGET",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Normal,
-                        color = TextMuted,
+                        color = AccentTeal,
                         letterSpacing = 0.5.sp,
                         textAlign = TextAlign.End,
                         maxLines = 1,
@@ -946,6 +946,7 @@ fun TodayPulseCard(
             // Heart glyph + "7hr:35m sleep last night · 56 RHR" — TextMuted, 11sp, centred.
             Row(
                 modifier = Modifier
+                    .background(AccentTeal.copy(alpha = 0.10f))
                     .fillMaxWidth()
                     .clickable { onSleepClick() }
                     .padding(vertical = 10.dp, horizontal = 14.dp),
@@ -954,7 +955,7 @@ fun TodayPulseCard(
             ) {
                 HeartPulseIcon(
                     modifier = Modifier.size(13.dp),
-                    tint = TextMuted
+                    tint = AccentTeal
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 val sleepText = "${sleepHours}hr:${"%02d".format(sleepMinutes)}m sleep last night"
@@ -965,7 +966,7 @@ fun TodayPulseCard(
                 Text(
                     text = "$sleepText · $rhrFormatted",
                     fontSize = 11.sp,
-                    color = TextMuted,
+                    color = AccentTeal,
                     textAlign = TextAlign.Center
                 )
             }
@@ -997,8 +998,8 @@ fun TodayTasksCard(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardSurface),
-        border = BorderStroke(1.dp, BorderDefault)
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(0.dp, Color.Transparent)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
