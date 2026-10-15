@@ -47,6 +47,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -68,6 +74,7 @@ import com.scatterbrain.scatterfit.ui.theme.MutedFill
 import com.scatterbrain.scatterfit.ui.theme.OnPrimaryText
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
+import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import java.text.SimpleDateFormat
@@ -125,6 +132,16 @@ fun DrinkLoggerContent(
         formatDayTitle(dailyState.dayKey, today)
     }
     val isFutureDay = dailyState.dayKey > today
+
+    var showSaveConfirmation by remember { mutableStateOf(false) }
+    var saveConfirmationKey by remember { mutableStateOf(0) }
+
+    LaunchedEffect(saveConfirmationKey) {
+        if (showSaveConfirmation) {
+            kotlinx.coroutines.delay(2000L)
+            showSaveConfirmation = false
+        }
+    }
 
     // Time editor dialog
     if (drinkToEditTime != null) {
@@ -267,6 +284,26 @@ fun DrinkLoggerContent(
                 }
             }
 
+            // Post-save confirmation row
+            if (showSaveConfirmation) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "✓ Logged",
+                            color = StateLocked,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
             // 5. Search and Filter Bar
             item {
                 Column(
@@ -344,7 +381,11 @@ fun DrinkLoggerContent(
                 DrinkLibraryItemRow(
                     drink = drink,
                     isFutureDay = isFutureDay,
-                    onLogClick = { onLogDrink(drink) }
+                    onLogClick = {
+                        onLogDrink(drink)
+                        showSaveConfirmation = true
+                        saveConfirmationKey++
+                    }
                 )
             }
         }
@@ -550,12 +591,25 @@ fun DrinkLibraryItemRow(
                     )
                 }
             } else {
+                val interactionSource = remember { MutableInteractionSource() }
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "logScale")
+                val haptic = LocalHapticFeedback.current
+
                 Box(
                     modifier = Modifier
                         .size(width = 60.dp, height = 36.dp)
+                        .scale(scale)
                         .clip(RoundedCornerShape(8.dp))
                         .background(AccentTeal)
-                        .clickable { onLogClick() },
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onLogClick()
+                            }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -978,8 +1032,14 @@ fun LoggedDrinkTimePickerDialog(
             }
         },
         confirmButton = {
+            val dialogInteraction = remember { MutableInteractionSource() }
+            val isDialogPressed by dialogInteraction.collectIsPressedAsState()
+            val dialogScale by animateFloatAsState(if (isDialogPressed) 0.96f else 1f, label = "dialogScale")
+            val dialogHaptic = LocalHapticFeedback.current
+
             Button(
                 onClick = {
+                    dialogHaptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     val zone = ZoneId.systemDefault()
                     val targetDay = if (selectedDayIsYesterday) {
                         LocalDate.now(zone).minusDays(1)
@@ -995,6 +1055,8 @@ fun LoggedDrinkTimePickerDialog(
 
                     onConfirmTime(finalTimestamp)
                 },
+                interactionSource = dialogInteraction,
+                modifier = Modifier.scale(dialogScale),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AccentTeal,
                     contentColor = OnPrimaryText

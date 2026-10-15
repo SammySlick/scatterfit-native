@@ -9,9 +9,13 @@ import com.scatterbrain.scatterfit.data.RecordMethod
 import com.scatterbrain.scatterfit.ui.DrinkStorage
 import com.scatterbrain.scatterfit.ui.toHealthRecord
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /** Application-scoped sync state. Holds the merged record map (the exact
  *  shape Daily.buildDailyDataFromMaps consumes — demo and HC data share it)
@@ -25,6 +29,11 @@ object SyncHub {
         private set
     private var engine: SyncEngine? = null
     private var client: HealthConnectClient? = null
+    private var initJob: Job? = null
+
+    suspend fun awaitInit() {
+        initJob?.join()
+    }
 
     private val _records = MutableStateFlow<Map<RecordMethod, List<HealthRecord>>?>(null)
     val records: StateFlow<Map<RecordMethod, List<HealthRecord>>?> = _records.asStateFlow()
@@ -67,8 +76,8 @@ object SyncHub {
         return out
     }
 
-    fun init(context: Context) {
-        if (store != null) return
+    fun init(context: Context, scope: CoroutineScope) {
+        if (initJob != null) return
         val appContext = context.applicationContext
         store = SyncStore(File(appContext.filesDir, "hc-sync"))
         engine = SyncEngine(store!!, nowMs = { System.currentTimeMillis() })
@@ -77,21 +86,23 @@ object SyncHub {
         } catch (_: Exception) {
             client = null // HC unavailable (no provider); UI falls back to demo
         }
-        // Cold start: load the cache so UI has data before the first sync.
-        if (_records.value == null) {
-            val loaded = HashMap<RecordMethod, List<HealthRecord>>()
-            for (m in RecordMethod.entries) {
-                val s = store!!.load(m)
-                if (s.records.isNotEmpty()) loaded[m] = s.records
-            }
-            val foodStorage = com.scatterbrain.scatterfit.ui.FoodStorage(appContext)
-            localFood = foodStorage.getAllMeals().map { it.toHealthRecord() }
-            val weightStorage = com.scatterbrain.scatterfit.ui.WeightStorage(appContext)
-            localWeights = weightStorage.loadAll().flatMap { it.toHealthRecords() }
-            val drinkStorage = com.scatterbrain.scatterfit.ui.DrinkStorage(appContext)
-            localDrinks = drinkStorage.loadAll().values.flatten().map { it.toHealthRecord() }
-            if (loaded.isNotEmpty() || localFood.isNotEmpty() || localWeights.isNotEmpty() || localDrinks.isNotEmpty()) {
-                _records.value = publishFood(loaded)
+        initJob = scope.launch(Dispatchers.IO) {
+            // Cold start: load the cache so UI has data before the first sync.
+            if (_records.value == null) {
+                val loaded = HashMap<RecordMethod, List<HealthRecord>>()
+                for (m in RecordMethod.entries) {
+                    val s = store!!.load(m)
+                    if (s.records.isNotEmpty()) loaded[m] = s.records
+                }
+                val foodStorage = com.scatterbrain.scatterfit.ui.FoodStorage(appContext)
+                localFood = foodStorage.getAllMeals().map { it.toHealthRecord() }
+                val weightStorage = com.scatterbrain.scatterfit.ui.WeightStorage(appContext)
+                localWeights = weightStorage.loadAll().flatMap { it.toHealthRecords() }
+                val drinkStorage = com.scatterbrain.scatterfit.ui.DrinkStorage(appContext)
+                localDrinks = drinkStorage.loadAll().values.flatten().map { it.toHealthRecord() }
+                if (loaded.isNotEmpty() || localFood.isNotEmpty() || localWeights.isNotEmpty() || localDrinks.isNotEmpty()) {
+                    _records.value = publishFood(loaded)
+                }
             }
         }
     }
@@ -144,6 +155,7 @@ object SyncHub {
         methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
         windowFromOverride: Long? = null,
     ): SyncEngine.SyncResult? {
+        awaitInit()
         val e = engine ?: return null
         val c = client ?: return null
         if (!_syncing.compareAndSet(false, true)) { Log.d(TAG, "syncNow: already running, skip"); return null }

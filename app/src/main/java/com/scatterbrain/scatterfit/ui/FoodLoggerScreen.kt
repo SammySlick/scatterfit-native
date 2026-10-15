@@ -19,6 +19,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -33,12 +36,19 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +62,7 @@ import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.JudgementBad
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
+import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
@@ -71,6 +82,21 @@ fun FoodLoggerScreen(
     val mealsForDay by viewModel.mealsForDay.collectAsState()
     val presets by viewModel.presets.collectAsState()
     val scrollState = rememberScrollState()
+
+    val saveInteractionSource = remember { MutableInteractionSource() }
+    val isSavePressed by saveInteractionSource.collectIsPressedAsState()
+    val saveScale by animateFloatAsState(if (isSavePressed) 0.96f else 1f, label = "foodSaveScale")
+    val haptic = LocalHapticFeedback.current
+
+    var showSaveConfirmation by remember { mutableStateOf(false) }
+    var saveConfirmationKey by remember { mutableStateOf(0) }
+
+    LaunchedEffect(saveConfirmationKey) {
+        if (showSaveConfirmation) {
+            kotlinx.coroutines.delay(2000L)
+            showSaveConfirmation = false
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -283,17 +309,41 @@ fun FoodLoggerScreen(
 
                             Button(
                                 onClick = {
-                                    viewModel.saveCurrentMeal()
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    if (viewModel.saveCurrentMeal()) {
+                                        showSaveConfirmation = true
+                                        saveConfirmationKey++
+                                    }
                                 },
                                 enabled = viewModel.kcalInput.isNotBlank(),
+                                interactionSource = saveInteractionSource,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .scale(saveScale),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = TealHighlight,
                                     contentColor = Color.Black
                                 ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
+                                shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("Save", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        if (showSaveConfirmation) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "✓ Logged",
+                                    color = StateLocked,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }

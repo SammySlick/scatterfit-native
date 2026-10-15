@@ -2,9 +2,12 @@ package com.scatterbrain.scatterfit.ui
 
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +27,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -37,7 +42,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -65,6 +73,7 @@ fun MyDayScreen(
 
     val today = remember { todayKey() }
     var currentDayKey by remember { mutableStateOf(today) }
+    val isFutureDay = currentDayKey > today
 
     val repoDaily by DailyRepository.daily.collectAsState()
     val momentumSource: MomentumSource? = remember(repoDaily) {
@@ -219,6 +228,31 @@ fun MyDayScreen(
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Slim header row: "ScatterFit" 16sp Bold on left, SettingsIcon on right
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "ScatterFit",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextForeground
+            )
+            IconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier.size(28.dp)
+            ) {
+                SettingsIcon(
+                    modifier = Modifier.size(20.dp),
+                    tint = AccentTeal
+                )
+            }
+        }
+
         // Day Card (header + rows + value-state colouring)
         DayCard(
             daily = repoDaily,
@@ -227,6 +261,7 @@ fun MyDayScreen(
                 activeMetricId = metricId
             },
             onWeighInClick = { showWeighInDialog = true },
+            onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
@@ -263,6 +298,13 @@ fun WeighInDialog(
 ) {
     var weightInput by remember { mutableStateOf("") }
     var bodyFatInput by remember { mutableStateOf("") }
+    var weightError by remember { mutableStateOf<String?>(null) }
+    var bodyFatError by remember { mutableStateOf<String?>(null) }
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "weighInSaveScale")
+    val haptic = LocalHapticFeedback.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -272,38 +314,76 @@ fun WeighInDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = weightInput,
-                    onValueChange = { weightInput = it },
-                    label = { Text("Weight (kg)", color = TextMuted) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextForeground,
-                        unfocusedTextColor = TextForeground,
-                        focusedBorderColor = AccentTeal,
-                        unfocusedBorderColor = BorderDefault
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    OutlinedTextField(
+                        value = weightInput,
+                        onValueChange = {
+                            weightInput = it
+                            if (weightError != null) weightError = null
+                        },
+                        label = { Text("Weight (kg)", color = TextMuted) },
+                        singleLine = true,
+                        isError = weightError != null,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextForeground,
+                            unfocusedTextColor = TextForeground,
+                            focusedBorderColor = AccentTeal,
+                            unfocusedBorderColor = BorderDefault
+                        )
                     )
-                )
-                OutlinedTextField(
-                    value = bodyFatInput,
-                    onValueChange = { bodyFatInput = it },
-                    label = { Text("Body Fat % (optional)", color = TextMuted) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextForeground,
-                        unfocusedTextColor = TextForeground,
-                        focusedBorderColor = AccentTeal,
-                        unfocusedBorderColor = BorderDefault
+                    if (weightError != null) {
+                        Text(
+                            text = weightError!!,
+                            color = Color(0xFFE57373),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        )
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    OutlinedTextField(
+                        value = bodyFatInput,
+                        onValueChange = {
+                            bodyFatInput = it
+                            if (bodyFatError != null) bodyFatError = null
+                        },
+                        label = { Text("Body Fat % (optional)", color = TextMuted) },
+                        singleLine = true,
+                        isError = bodyFatError != null,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextForeground,
+                            unfocusedTextColor = TextForeground,
+                            focusedBorderColor = AccentTeal,
+                            unfocusedBorderColor = BorderDefault
+                        )
                     )
-                )
+                    if (bodyFatError != null) {
+                        Text(
+                            text = bodyFatError!!,
+                            color = Color(0xFFE57373),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    val validation = validateWeighIn(weightInput, bodyFatInput)
+                    if (!validation.isValid) {
+                        weightError = validation.weightError
+                        bodyFatError = validation.bodyFatError
+                        return@Button
+                    }
                     onSubmitWeight(weightInput, bodyFatInput)
                     onDismiss()
                 },
+                interactionSource = interactionSource,
+                modifier = Modifier.scale(scale),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = Color.Black)
             ) {
                 Text("Save", fontWeight = FontWeight.Bold)
@@ -406,10 +486,23 @@ private fun QuickActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "buttonScale")
+    val haptic = LocalHapticFeedback.current
+
     Card(
         modifier = modifier
             .heightIn(min = 48.dp)
-            .clickable(onClick = onClick),
+            .scale(scale)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                }
+            ),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
         border = BorderStroke(1.dp, BorderDefault)

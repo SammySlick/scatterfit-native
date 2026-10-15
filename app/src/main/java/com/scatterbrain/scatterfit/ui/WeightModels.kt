@@ -69,3 +69,34 @@ class WeightStorage(private val context: Context) {
         }
     }
 }
+
+data class WeighInValidationResult(
+    val weightError: String? = null,
+    val bodyFatError: String? = null,
+) {
+    val isValid: Boolean = weightError == null && bodyFatError == null
+}
+
+fun validateWeighIn(weightInput: String, bodyFatInput: String): WeighInValidationResult {
+    val weightTrimmed = weightInput.trim()
+    val weightError = when {
+        weightTrimmed.isEmpty() -> "Enter a weight in kg"
+        weightTrimmed.toDoubleOrNull() == null -> "Enter a weight in kg"
+        else -> {
+            val w = weightTrimmed.toDouble()
+            if (w < 40.0 || w > 200.0) "Must be 40-200 kg" else null
+        }
+    }
+
+    val bodyFatTrimmed = bodyFatInput.trim()
+    val bodyFatError = when {
+        bodyFatTrimmed.isEmpty() -> null
+        bodyFatTrimmed.toDoubleOrNull() == null -> "Must be 0-60 %"
+        else -> {
+            val bf = bodyFatTrimmed.toDouble()
+            if (bf < 0.0 || bf > 60.0) "Must be 0-60 %" else null
+        }
+    }
+
+    return WeighInValidationResult(weightError = weightError, bodyFatError = bodyFatError)
+}

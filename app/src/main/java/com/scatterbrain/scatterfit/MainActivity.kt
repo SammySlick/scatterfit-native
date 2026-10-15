@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        SyncHub.init(this)
+        SyncHub.init(this, lifecycleScope)
         com.scatterbrain.scatterfit.data.DailyRepository.start(lifecycleScope)
 
         when (HealthConnectClient.getSdkStatus(this)) {

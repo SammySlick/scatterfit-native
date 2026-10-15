@@ -61,11 +61,10 @@ data class DayCardStatus(
         caloriesPassed,
         stepsPassed,
         proteinPassed,
-        sleepPassed,
         trainingPassed
     ).count { it }
 
-    val headerText: String = if (completedCount == 5) "All done ✓" else "$completedCount/5 done"
+    val headerText: String = if (completedCount == 4) "All done ✓" else "$completedCount/4 done"
 }
 
 fun computeDayCardStatus(
@@ -106,6 +105,7 @@ fun DayCard(
     settings: ScoringSettings = remember { ScoringSettings() },
     onMetricClick: (MetricId) -> Unit = {},
     onWeighInClick: (() -> Unit)? = null,
+    onLogDrinkClick: (() -> Unit)? = null,
 ) {
     val status = remember(daily, settings, dayKey) {
         computeDayCardStatus(daily, settings, dayKey)
@@ -239,7 +239,7 @@ fun DayCard(
                 label = "Training",
                 valueText = trainText,
                 valueColor = if (status.trainingPassed) StateLocked else TextForeground,
-                onMetricClick = null // NO chevron yet
+                onMetricClick = { onMetricClick(MetricId.TRAINING_MINUTES) }
             )
 
             // 6. Alcohol row (Conditional: absent if null or 0)
@@ -255,7 +255,9 @@ fun DayCard(
                 val alcText = "%.1fu today · %.1fu this week".format(todayUnits, weekUnits)
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (onLogDrinkClick != null) Modifier.clickable(onClick = onLogDrinkClick) else Modifier),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -306,7 +308,10 @@ fun DayCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (onWeighInClick != null) Modifier.clickable(onClick = onWeighInClick) else Modifier),
+                    .then(if (onWeighInClick != null) Modifier.clickable {
+                        android.util.Log.d("ScatterFitSync", "weigh-in row tapped")
+                        onWeighInClick()
+                    } else Modifier),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
