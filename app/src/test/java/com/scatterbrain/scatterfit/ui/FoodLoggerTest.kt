@@ -174,4 +174,33 @@ class FoodLoggerTest {
         val second = com.scatterbrain.scatterfit.sync.SyncHub.records.value?.get(RecordMethod.FOOD_LOG) ?: emptyList()
         assertEquals(listOf(mealB), second)
     }
+    @Test
+    fun `updateLocalWeights twice replaces previous local weights without duplicating`() {
+        val wA = LoggedWeight(kg = 91.0, dayKey = today).toHealthRecord()
+        val wB = LoggedWeight(kg = 92.0, dayKey = today).toHealthRecord()
+
+        com.scatterbrain.scatterfit.sync.SyncHub.updateLocalWeights(listOf(wA))
+        val first = com.scatterbrain.scatterfit.sync.SyncHub.records.value
+            ?.get(com.scatterbrain.scatterfit.data.RecordMethod.WEIGHT) ?: emptyList()
+        assertEquals(listOf(wA), first)
+
+        com.scatterbrain.scatterfit.sync.SyncHub.updateLocalWeights(listOf(wB))
+        val second = com.scatterbrain.scatterfit.sync.SyncHub.records.value
+            ?.get(com.scatterbrain.scatterfit.data.RecordMethod.WEIGHT) ?: emptyList()
+        assertEquals(listOf(wB), second)
+    }
+
+    @Test
+    fun `weigh-in record lands in daily weight and body fat maps`() {
+        val rec = LoggedWeight(kg = 91.8, bodyFatPct = 22.5, dayKey = today).toHealthRecord()
+        val records = mapOf(com.scatterbrain.scatterfit.data.RecordMethod.WEIGHT to listOf(rec))
+        val daily = Daily.buildDailyDataFromMaps(
+            records = records,
+            zones = Zones.DEFAULT_ZONES,
+            zone = defaultZone,
+            nowMs = nowMs
+        )
+        assertEquals(91.8, daily.weight[today] ?: 0.0, 0.001)
+        assertEquals(22.5, daily.bodyFat[today] ?: 0.0, 0.001)
+    }
 }

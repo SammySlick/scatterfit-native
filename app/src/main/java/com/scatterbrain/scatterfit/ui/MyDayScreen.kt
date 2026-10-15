@@ -116,8 +116,19 @@ fun MyDayScreen(
             onDismiss = { showWeighInDialog = false },
             onSubmitWeight = { weight, bodyFat ->
                 showWeighInDialog = false
-                // TODO(weigh-in dialog): write WEIGHT (and BODY_FAT) record via
-                // HC write + sync store; the checklist then derives itself.
+                // Real write: local LoggedWeight -> WEIGHT record -> pipeline.
+                // Same merge rules as scale data (per app per day, last wins,
+                // Hume preferred). Sanity gates mirror Records.clean:
+                // 40-200 kg, 0-60% body fat.
+                val kg = weight.trim().toDoubleOrNull() ?: return@WeighInDialog
+                if (kg < 40.0 || kg > 200.0) return@WeighInDialog
+                val bf = bodyFat.trim().toDoubleOrNull()
+                    ?.takeIf { it > 0.0 && it <= 60.0 }
+                val storage = WeightStorage(context)
+                storage.saveWeight(
+                    LoggedWeight(kg = kg, bodyFatPct = bf, dayKey = currentDayKey)
+                )
+                SyncHub.updateLocalWeights(storage.loadAll().map { it.toHealthRecord() })
             }
         )
     }
