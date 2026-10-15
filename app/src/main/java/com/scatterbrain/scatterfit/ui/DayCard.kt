@@ -1,11 +1,8 @@
 package com.scatterbrain.scatterfit.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -41,9 +37,7 @@ import com.scatterbrain.scatterfit.data.ZoneBounds
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
-import com.scatterbrain.scatterfit.ui.theme.StateBad
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
-import com.scatterbrain.scatterfit.ui.theme.StateSlip
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
@@ -111,6 +105,7 @@ fun DayCard(
     dayKey: String = remember { todayKey() },
     settings: ScoringSettings = remember { ScoringSettings() },
     onMetricClick: (MetricId) -> Unit = {},
+    onWeighInClick: (() -> Unit)? = null,
 ) {
     val status = remember(daily, settings, dayKey) {
         computeDayCardStatus(daily, settings, dayKey)
@@ -167,11 +162,10 @@ fun DayCard(
             } else {
                 "— / %,d kcal".format(calTarget)
             }
-            val calBand = squareBand(GoalId.CALORIES, daily?.caloriesEaten?.get(dayKey), settings)
             DayCardRow(
                 label = "Calories",
                 valueText = calText,
-                band = calBand,
+                valueColor = if (status.caloriesPassed) StateLocked else TextForeground,
                 onMetricClick = { onMetricClick(MetricId.CALORIES_EATEN) }
             )
 
@@ -188,11 +182,10 @@ fun DayCard(
             } else {
                 "— / %,d".format(stepTarget)
             }
-            val stepBand = squareBand(GoalId.STEPS, daily?.steps?.get(dayKey), settings)
             DayCardRow(
                 label = "Steps",
                 valueText = stepText,
-                band = stepBand,
+                valueColor = if (status.stepsPassed) StateLocked else TextForeground,
                 onMetricClick = { onMetricClick(MetricId.STEPS) }
             )
 
@@ -204,11 +197,10 @@ fun DayCard(
             } else {
                 "— / %,d g".format(protTarget)
             }
-            val protBand = squareBand(GoalId.PROTEIN, daily?.protein?.get(dayKey), settings)
             DayCardRow(
                 label = "Protein",
                 valueText = protText,
-                band = protBand,
+                valueColor = if (status.proteinPassed) StateLocked else TextForeground,
                 onMetricClick = { onMetricClick(MetricId.PROTEIN) }
             )
 
@@ -226,11 +218,10 @@ fun DayCard(
             } else {
                 "— / ${sleepTargetH}h"
             }
-            val sleepBand = squareBand(GoalId.SLEEP, sleepNight?.totalMin, settings)
             DayCardRow(
                 label = sleepLabel,
                 valueText = sleepText,
-                band = sleepBand,
+                valueColor = if (status.sleepPassed) StateLocked else TextForeground,
                 onMetricClick = { onMetricClick(MetricId.SLEEP) }
             )
 
@@ -244,11 +235,10 @@ fun DayCard(
                 if (zoneDay.z5 >= 1.0) zoneParts.add("Z5 ${zoneDay.z5.roundToInt()}m")
             }
             val trainText = if (zoneParts.isNotEmpty()) zoneParts.joinToString(" · ") else "—"
-            val trainBand = squareBand(GoalId.EXERCISE, daily?.trainingMinutes?.get(dayKey), settings)
             DayCardRow(
                 label = "Training",
                 valueText = trainText,
-                band = trainBand,
+                valueColor = if (status.trainingPassed) StateLocked else TextForeground,
                 onMetricClick = null // NO chevron yet
             )
 
@@ -314,7 +304,9 @@ fun DayCard(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (onWeighInClick != null) Modifier.clickable(onClick = onWeighInClick) else Modifier),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -338,9 +330,9 @@ fun DayCard(
 private fun DayCardRow(
     label: String,
     valueText: String,
-    band: SquareBand,
-    onMetricClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    valueColor: Color = TextForeground,
+    onMetricClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -363,55 +355,13 @@ private fun DayCardRow(
                 text = valueText,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextForeground,
+                color = valueColor,
                 textAlign = TextAlign.End
             )
-            ToleranceSquares(band = band)
             if (onMetricClick != null) {
                 ChevronRightIcon(
                     modifier = Modifier.size(12.dp),
                     tint = TextMuted
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ToleranceSquares(
-    band: SquareBand,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val filledCount = when (band) {
-            SquareBand.GREEN -> 3
-            SquareBand.ORANGE -> 2
-            SquareBand.RED -> 1
-            SquareBand.GREY -> 0
-        }
-        val fillColor = when (band) {
-            SquareBand.GREEN -> StateLocked
-            SquareBand.ORANGE -> StateSlip
-            SquareBand.RED -> StateBad
-            SquareBand.GREY -> Color.Transparent
-        }
-        for (i in 0 until 3) {
-            if (i < filledCount) {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(fillColor)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
                 )
             }
         }

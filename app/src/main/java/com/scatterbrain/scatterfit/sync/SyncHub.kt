@@ -27,6 +27,9 @@ object SyncHub {
     private val _records = MutableStateFlow<Map<RecordMethod, List<HealthRecord>>?>(null)
     val records: StateFlow<Map<RecordMethod, List<HealthRecord>>?> = _records.asStateFlow()
 
+    private var localFood: List<HealthRecord> = emptyList()
+    private var lastHcFood: List<HealthRecord> = emptyList()
+
     private val _syncing = MutableStateFlow(false)
     val syncing: StateFlow<Boolean> = _syncing.asStateFlow()
 
@@ -39,6 +42,14 @@ object SyncHub {
     val status: StateFlow<String> = _status.asStateFlow()
 
     fun setStatus(msg: String) { _status.value = msg }
+
+    private fun publishFood(snapshot: Map<RecordMethod, List<HealthRecord>>): Map<RecordMethod, List<HealthRecord>> {
+        if (RecordMethod.FOOD_LOG in snapshot) lastHcFood = snapshot[RecordMethod.FOOD_LOG]!!
+        if (localFood.isEmpty() && lastHcFood.isEmpty()) return snapshot
+        val out = snapshot.toMutableMap()
+        out[RecordMethod.FOOD_LOG] = localFood + (snapshot[RecordMethod.FOOD_LOG] ?: emptyList())
+        return out
+    }
 
     fun init(context: Context) {
         if (store != null) return
@@ -57,8 +68,23 @@ object SyncHub {
                 val s = store!!.load(m)
                 if (s.records.isNotEmpty()) loaded[m] = s.records
             }
-            if (loaded.isNotEmpty()) _records.value = loaded
+            val foodStorage = com.scatterbrain.scatterfit.ui.FoodStorage(appContext)
+            localFood = foodStorage.getAllMeals().map { it.toHealthRecord() }
+            if (loaded.isNotEmpty() || localFood.isNotEmpty()) {
+                _records.value = publishFood(loaded)
+            }
         }
+    }
+
+    fun updateLocalFoodLog(foodRecords: List<HealthRecord>) {
+        localFood = foodRecords
+        val snapshot = _records.value ?: emptyMap()
+        val out = snapshot.toMutableMap()
+        // lastHcFood = the HC-only view maintained by publishFood — rebuild
+        // the bucket from it, never from the current bucket (which contains
+        // the OLD local list and would duplicate).
+        out[RecordMethod.FOOD_LOG] = foodRecords + lastHcFood
+        _records.value = out
     }
 
     /** Fast incremental sync: reads only today's window (00:00 local today to now) without backfilling 120 days. */
@@ -99,10 +125,11 @@ object SyncHub {
                 },
                 // Stream each slice into the UI the moment it commits — the
                 // Today screen updates WHILE the sync runs, not after.
-                onProgress = { snapshot -> _records.value = snapshot },
+                onProgress = { snapshot -> _records.value = publishFood(snapshot) },
             )
             Log.d(TAG, "sync done: mergedMethods=${result.merged.size} mergedRows=${result.merged.values.sumOf { it.size }}")
-            _records.value = result.merged
+            _records.value = publishFood(result.merged)
+            _lastError.value = null
             _lastError.value = null
             _status.value = if (result.merged.isEmpty()) {
                 // Sync ran, read everything it was allowed to — and got nothing.
