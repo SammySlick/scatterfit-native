@@ -182,12 +182,12 @@ class FoodLoggerTest {
         com.scatterbrain.scatterfit.sync.SyncHub.updateLocalWeights(wA)
         val first = com.scatterbrain.scatterfit.sync.SyncHub.records.value
             ?.get(com.scatterbrain.scatterfit.data.RecordMethod.WEIGHT) ?: emptyList()
-        assertEquals(listOf(wA), first)
+        assertEquals(wA, first)
 
         com.scatterbrain.scatterfit.sync.SyncHub.updateLocalWeights(wB)
         val second = com.scatterbrain.scatterfit.sync.SyncHub.records.value
             ?.get(com.scatterbrain.scatterfit.data.RecordMethod.WEIGHT) ?: emptyList()
-        assertEquals(listOf(wB), second)
+        assertEquals(wB, second)
     }
 
     @Test
