@@ -103,9 +103,10 @@ fun DayCard(
     modifier: Modifier = Modifier,
     dayKey: String = remember { todayKey() },
     settings: ScoringSettings = remember { ScoringSettings() },
+    planName: String? = null,
     onMetricClick: (MetricId) -> Unit = {},
+    onPlanEditorClick: (() -> Unit)? = null,
     onWeighInClick: (() -> Unit)? = null,
-    onLogDrinkClick: (() -> Unit)? = null,
 ) {
     val status = remember(daily, settings, dayKey) {
         computeDayCardStatus(daily, settings, dayKey)
@@ -225,24 +226,54 @@ fun DayCard(
                 onMetricClick = { onMetricClick(MetricId.SLEEP) }
             )
 
-            // 5. Training row
-            val zoneDay = daily?.hrZones?.get(dayKey)
-            val zoneParts = mutableListOf<String>()
-            if (zoneDay != null) {
-                if (zoneDay.z2 >= 1.0) zoneParts.add("Z2 ${zoneDay.z2.roundToInt()}m")
-                if (zoneDay.z3 >= 1.0) zoneParts.add("Z3 ${zoneDay.z3.roundToInt()}m")
-                if (zoneDay.z4 >= 1.0) zoneParts.add("Z4 ${zoneDay.z4.roundToInt()}m")
-                if (zoneDay.z5 >= 1.0) zoneParts.add("Z5 ${zoneDay.z5.roundToInt()}m")
+            // 5. Training row (plan name + secondary minutes line)
+            val trainMins = daily?.trainingMinutes?.get(dayKey)?.roundToInt() ?: 0
+            val trainSubtitle = if (trainMins > 0) "$trainMins min today" else null
+            val planTitle = planName ?: "Rest day"
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (onPlanEditorClick != null) Modifier.clickable(onClick = onPlanEditorClick) else Modifier),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Training",
+                    fontSize = 12.sp,
+                    color = TextForeground,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = planTitle,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (status.trainingPassed) StateLocked else TextForeground,
+                            textAlign = TextAlign.End
+                        )
+                        if (trainSubtitle != null) {
+                            Text(
+                                text = trainSubtitle,
+                                fontSize = 11.sp,
+                                color = TextMuted,
+                                textAlign = TextAlign.End
+                            )
+                        }
+                    }
+                    if (onPlanEditorClick != null) {
+                        ChevronRightIcon(
+                            modifier = Modifier.size(12.dp),
+                            tint = TextMuted
+                        )
+                    }
+                }
             }
-            val trainText = if (zoneParts.isNotEmpty()) zoneParts.joinToString(" · ") else "—"
-            DayCardRow(
-                label = "Training",
-                valueText = trainText,
-                valueColor = if (status.trainingPassed) StateLocked else TextForeground,
-                onMetricClick = { onMetricClick(MetricId.TRAINING_MINUTES) }
-            )
 
-            // 6. Alcohol row (Conditional: absent if null or 0)
+            // 6. Alcohol row (Conditional: absent if null or 0; tap opens MetricId.ALCOHOL_UNITS)
             val todayUnits = daily?.alcoholUnits?.get(dayKey) ?: 0.0
             if (todayUnits > 0.0) {
                 val monday = runCatching {
@@ -257,7 +288,7 @@ fun DayCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(if (onLogDrinkClick != null) Modifier.clickable(onClick = onLogDrinkClick) else Modifier),
+                        .clickable { onMetricClick(MetricId.ALCOHOL_UNITS) },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -267,33 +298,55 @@ fun DayCard(
                         color = TextForeground,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    Text(
-                        text = alcText,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextForeground,
-                        textAlign = TextAlign.End
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = alcText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextForeground,
+                            textAlign = TextAlign.End
+                        )
+                        ChevronRightIcon(
+                            modifier = Modifier.size(12.dp),
+                            tint = TextMuted
+                        )
+                    }
                 }
             }
 
-            // 7. Weight row (shows last weight value + day, appends "· weigh in?" if nothing today)
+            // 7. Weight row (shows weight + body fat if present)
             val todayWeight = daily?.weight?.get(dayKey)
+            val todayBf = daily?.bodyFat?.get(dayKey)
             val latestWeightEntry = daily?.weight?.filterValues { it > 0.0 }?.entries?.maxByOrNull { it.key }
+            val latestBf = if (latestWeightEntry != null) daily?.bodyFat?.get(latestWeightEntry.key) else null
+
             val weightAnnotated = buildAnnotatedString {
                 if (todayWeight != null && todayWeight > 0.0) {
                     val dayShort = runCatching {
                         LocalDate.parse(dayKey).format(DateTimeFormatter.ofPattern("EEE", Locale.US))
                     }.getOrDefault("")
+                    val valText = if (todayBf != null && todayBf > 0.0) {
+                        "%.1f kg · %.1f%% · %s".format(todayWeight, todayBf, dayShort)
+                    } else {
+                        "%.1f kg · %s".format(todayWeight, dayShort)
+                    }
                     withStyle(SpanStyle(color = TextForeground, fontWeight = FontWeight.Bold)) {
-                        append("%.1f kg · %s".format(todayWeight, dayShort))
+                        append(valText)
                     }
                 } else if (latestWeightEntry != null && latestWeightEntry.value > 0.0) {
                     val dayShort = runCatching {
                         LocalDate.parse(latestWeightEntry.key).format(DateTimeFormatter.ofPattern("EEE", Locale.US))
                     }.getOrDefault("")
+                    val valText = if (latestBf != null && latestBf > 0.0) {
+                        "%.1f kg · %.1f%% · last: %s".format(latestWeightEntry.value, latestBf, dayShort)
+                    } else {
+                        "%.1f kg · last: %s".format(latestWeightEntry.value, dayShort)
+                    }
                     withStyle(SpanStyle(color = TextForeground, fontWeight = FontWeight.Bold)) {
-                        append("%.1f kg · last: %s".format(latestWeightEntry.value, dayShort))
+                        append(valText)
                     }
                     withStyle(SpanStyle(color = TealHighlight, fontWeight = FontWeight.SemiBold)) {
                         append(" · weigh in?")

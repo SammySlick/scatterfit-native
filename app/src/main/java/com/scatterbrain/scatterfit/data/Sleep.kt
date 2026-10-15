@@ -1,16 +1,20 @@
 package com.scatterbrain.scatterfit.data
 
 import com.scatterbrain.scatterfit.core.dayKeyFromIso
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.ZoneId
 
 /** Sleep night merging — dedupe identical sessions, union overlaps, never sum.
  *  Port of web src/lib/sleep.ts. */
+@Serializable
 enum class SleepStage { AWAKE, REM, LIGHT, DEEP }
 
+@Serializable
 data class SleepStageInterval(val start: String, val end: String, val stage: SleepStage)
 
+@Serializable
 data class SleepSlice(
     val start: String,
     val end: String,
@@ -23,6 +27,7 @@ data class SleepSlice(
     val stages: List<SleepStageInterval>,
 )
 
+@Serializable
 data class MergedNight(
     val start: String,
     val end: String,

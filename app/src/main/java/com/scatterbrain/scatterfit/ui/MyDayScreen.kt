@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,6 +52,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.sync.SyncHub
@@ -58,6 +63,7 @@ import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
+import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.StateSlip
@@ -114,8 +120,18 @@ fun MyDayScreen(
         foodViewModel.setDayKey(currentDayKey)
     }
 
+    val planStorage = remember { TrainingPlanStorage(context) }
+    var planVersion by remember { mutableIntStateOf(0) }
+    val todayDate = remember(currentDayKey) {
+        runCatching { LocalDate.parse(currentDayKey) }.getOrDefault(LocalDate.now())
+    }
+    val todayPlan = remember(todayDate, planVersion) {
+        planStorage.getPlanForDate(todayDate)
+    }
+
     var showFoodLoggerScreen by remember { mutableStateOf(false) }
     var showDrinkLoggerScreen by remember { mutableStateOf(false) }
+    var showPlanEditor by remember { mutableStateOf(false) }
     var showWeighInDialog by remember { mutableStateOf(false) }
     var activeMetricScreen by remember { mutableStateOf<String?>(null) }
     var activeMetricId by remember { mutableStateOf<com.scatterbrain.scatterfit.core.MetricId?>(null) }
@@ -125,10 +141,6 @@ fun MyDayScreen(
             onDismiss = { showWeighInDialog = false },
             onSubmitWeight = { weight, bodyFat ->
                 showWeighInDialog = false
-                // Real write: local LoggedWeight -> WEIGHT record -> pipeline.
-                // Same merge rules as scale data (per app per day, last wins,
-                // Hume preferred). Sanity gates mirror Records.clean:
-                // 40-200 kg, 0-60% body fat.
                 val kg = weight.trim().toDoubleOrNull() ?: return@WeighInDialog
                 if (kg < 40.0 || kg > 200.0) return@WeighInDialog
                 val bf = bodyFat.trim().toDoubleOrNull()
@@ -150,12 +162,13 @@ fun MyDayScreen(
         }
     }
 
-    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen || showFoodLoggerScreen) {
+    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen || showFoodLoggerScreen || showPlanEditor) {
         when {
             activeMetricId != null -> activeMetricId = null
             activeMetricScreen != null -> activeMetricScreen = null
             showDrinkLoggerScreen -> showDrinkLoggerScreen = false
             showFoodLoggerScreen -> showFoodLoggerScreen = false
+            showPlanEditor -> showPlanEditor = false
         }
     }
 
@@ -214,6 +227,18 @@ fun MyDayScreen(
         return
     }
 
+    if (showPlanEditor) {
+        PlanEditorScreen(
+            storage = planStorage,
+            onPlanSaved = {
+                planVersion++
+                showPlanEditor = false
+            },
+            onBackClick = { showPlanEditor = false }
+        )
+        return
+    }
+
     val isSyncing by SyncHub.syncing.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -257,22 +282,98 @@ fun MyDayScreen(
         DayCard(
             daily = repoDaily,
             dayKey = currentDayKey,
+            planName = todayPlan,
             onMetricClick = { metricId ->
                 activeMetricId = metricId
             },
-            onWeighInClick = { showWeighInDialog = true },
-            onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
+            onPlanEditorClick = { showPlanEditor = true },
+            onWeighInClick = {
+                val hasTodayWeight = repoDaily?.weight?.get(currentDayKey)?.let { it > 0.0 } == true
+                if (hasTodayWeight) {
+                    android.util.Log.d("ScatterFitSync", "weigh-in row tapped -> open WeightScreen")
+                    activeMetricScreen = "weight"
+                } else {
+                    android.util.Log.d("ScatterFitSync", "weigh-in row tapped -> open WeighInDialog")
+                    showWeighInDialog = true
+                }
+            },
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
         // Quick Actions strip (Log meal / Log drink / Log workout)
         QuickActionsStrip(
-            onLogMealClick = { showFoodLoggerScreen = true },
-            onLogDrinkClick = { showDrinkLoggerScreen = true },
+            onLogMealClick = { if (!isFutureDay) showFoodLoggerScreen = true },
+            onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
             onLogWorkoutClick = { showWorkoutHint = true },
             workoutHintVisible = showWorkoutHint,
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
+
+        // Tomorrow Card (shown only 19:00–07:59)
+        val currentHour = remember(currentDayKey) { LocalTime.now().hour }
+        val tomorrowVisible = remember(currentDayKey, currentHour) { isTomorrowCardVisible(currentHour) }
+
+        if (tomorrowVisible) {
+            val tomorrowDate = remember(currentDayKey) {
+                runCatching { LocalDate.parse(currentDayKey).plusDays(1) }.getOrDefault(LocalDate.now().plusDays(1))
+            }
+            val tomorrowDateText = remember(tomorrowDate) {
+                tomorrowDate.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US))
+            }
+            val tomorrowPlan = remember(tomorrowDate, planVersion) {
+                planStorage.getPlanForDate(tomorrowDate)
+            }
+
+            Card(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                border = BorderStroke(1.dp, BorderDefault)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Tomorrow",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextForeground
+                        )
+                        Text(
+                            text = tomorrowDateText,
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
+                    }
+
+                    if (tomorrowPlan != null) {
+                        Text(
+                            text = tomorrowPlan,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TealHighlight
+                        )
+                    } else {
+                        Text(
+                            text = "Rest day",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = TextMuted
+                        )
+                    }
+                }
+            }
+        }
 
         // Syncing indicator from batch 3
         if (isSyncing) {

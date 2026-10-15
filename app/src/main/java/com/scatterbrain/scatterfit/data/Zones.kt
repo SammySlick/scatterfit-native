@@ -1,13 +1,16 @@
 package com.scatterbrain.scatterfit.data
 
 import com.scatterbrain.scatterfit.core.dayKeyFromIso
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.ZoneId
 
 /** HR series + HR zone minutes. Port of web src/lib/zones.ts. */
+@Serializable
 data class ZoneBounds(val z2: Int, val z3: Int, val z4: Int, val z5: Int)
 
+@Serializable
 data class ZoneDay(
     val exerciseMinutes: Double,
     val z2: Double,

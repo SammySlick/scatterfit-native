@@ -1,12 +1,26 @@
 package com.scatterbrain.scatterfit.data
 
 import com.scatterbrain.scatterfit.core.dayKeyFromIso
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.ZoneId
 
+object ZoneIdSerializer : KSerializer<ZoneId> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ZoneId", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ZoneId) = encoder.encodeString(value.id)
+    override fun deserialize(decoder: Decoder): ZoneId = ZoneId.of(decoder.decodeString())
+}
+
 /** Full assembled DailyData (web types.ts DailyData). The scoring engine's
  *  core DailyData is the trimmed view of this. */
+@Serializable
 data class AssembledDaily(
     val steps: Map<String, Double> = emptyMap(),
     val caloriesEaten: Map<String, Double> = emptyMap(),
@@ -35,9 +49,10 @@ data class AssembledDaily(
     val alcoholUnits: Map<String, Double> = emptyMap(),
     val meals: Map<String, List<MealEntry>> = emptyMap(),
     /** Local zone used for all day keys (device TZ at the call site). */
-    val zone: ZoneId,
+    @Serializable(with = ZoneIdSerializer::class) val zone: ZoneId,
 )
 
+@Serializable
 data class SleepNight(
     val day: String,
     val totalMin: Double,
@@ -48,8 +63,10 @@ data class SleepNight(
     val end: String,
 )
 
+@Serializable
 data class ExerciseSession(val day: String, val minutes: Double, val title: String, val start: String)
 
+@Serializable
 data class MealEntry(
     val name: String,
     val kcal: Double,
