@@ -192,7 +192,7 @@ class FoodLoggerTest {
 
     @Test
     fun `weigh-in record lands in daily weight and body fat maps`() {
-        val rec = LoggedWeight(kg = 91.8, bodyFatPct = 22.5, dayKey = today).toHealthRecord()
+        val rec = LoggedWeight(kg = 91.8, bodyFatPct = 22.5, timestamp = nowMs, dayKey = today).toHealthRecord()
         val records = mapOf(com.scatterbrain.scatterfit.data.RecordMethod.WEIGHT to listOf(rec))
         val daily = Daily.buildDailyDataFromMaps(
             records = records,
