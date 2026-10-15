@@ -14,7 +14,11 @@ data class HealthRecord(
 /** Record fetch types (web types.ts RECORD_METHODS). */
 enum class RecordMethod {
     STEPS, DISTANCE, NUTRITION, FOOD_LOG, TOTAL_CALORIES_BURNED, WEIGHT,
-    RESTING_HEART_RATE, SLEEP_SESSION, EXERCISE_SESSION, BODY_FAT, HEART_RATE, BASAL_METABOLIC_RATE
+    RESTING_HEART_RATE, SLEEP_SESSION, EXERCISE_SESSION, BODY_FAT, HEART_RATE, BASAL_METABOLIC_RATE,
+    /** Local-only: logged drinks from the drink tracker. Health Connect has
+     *  no alcohol type, so HcReaders never reads this bucket — it is fed
+     *  exclusively by local injection (SyncHub.localDrinks). */
+    ALCOHOL
 }
 
 /** Single data-hygiene gate every metric reads through: drops blocked apps

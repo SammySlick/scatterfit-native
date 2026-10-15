@@ -206,4 +206,39 @@ class FoodLoggerTest {
         assertEquals(91.8, daily.weight[today] ?: 0.0, 0.001)
         assertEquals(22.5, daily.bodyFat[today] ?: 0.0, 0.001)
     }
+
+    @Test
+    fun `logged drinks land in alcoholUnits, alcoholKcal and caloriesEaten`() {
+        val drink = LoggedDrink(
+            id = "d1",
+            drink = DrinkReference(name = "Pint of IPA", units = 2.1, kcals = 239),
+            timestamp = nowMs,
+            dayKey = today
+        )
+        val daily = Daily.buildDailyDataFromMaps(
+            records = mapOf(RecordMethod.ALCOHOL to listOf(drink.toHealthRecord())),
+            zones = Zones.DEFAULT_ZONES,
+            zone = defaultZone,
+            nowMs = nowMs
+        )
+        assertEquals(2.1, daily.alcoholUnits[today] ?: 0.0, 0.001)
+        assertEquals(239.0, daily.alcoholKcal[today] ?: 0.0, 0.001)
+        // A pint is energy in: drink kcal joins calories eaten (MFP parity).
+        assertEquals(239.0, daily.caloriesEaten[today] ?: 0.0, 0.001)
+        assertTrue(daily.drinks[today] == true)
+    }
+
+    @Test
+    fun `two drinks accumulate units and kcal without doubling`() {
+        val a = LoggedDrink(DrinkReference(name = "Pint", units = 2.0, kcals = 200), nowMs, today).toHealthRecord()
+        val b = LoggedDrink(DrinkReference(name = "Pint", units = 2.0, kcals = 200), nowMs, today).toHealthRecord()
+        val daily = Daily.buildDailyDataFromMaps(
+            records = mapOf(RecordMethod.ALCOHOL to listOf(a, b)),
+            zones = Zones.DEFAULT_ZONES,
+            zone = defaultZone,
+            nowMs = nowMs
+        )
+        assertEquals(4.0, daily.alcoholUnits[today] ?: 0.0, 0.001)
+        assertEquals(400.0, daily.caloriesEaten[today] ?: 0.0, 0.001)
+    }
 }

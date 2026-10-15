@@ -31,6 +31,8 @@ object SyncHub {
     private var lastHcFood: List<HealthRecord> = emptyList()
     private var localWeights: List<HealthRecord> = emptyList()
     private var lastHcWeights: List<HealthRecord> = emptyList()
+    private var localDrinks: List<HealthRecord> = emptyList()
+    private var lastHcAlcohol: List<HealthRecord> = emptyList()
 
     private val _syncing = MutableStateFlow(false)
     val syncing: StateFlow<Boolean> = _syncing.asStateFlow()
@@ -48,13 +50,17 @@ object SyncHub {
     private fun publishFood(snapshot: Map<RecordMethod, List<HealthRecord>>): Map<RecordMethod, List<HealthRecord>> {
         if (RecordMethod.FOOD_LOG in snapshot) lastHcFood = snapshot[RecordMethod.FOOD_LOG]!!
         if (RecordMethod.WEIGHT in snapshot) lastHcWeights = snapshot[RecordMethod.WEIGHT]!!
-        if (localFood.isEmpty() && lastHcFood.isEmpty() && localWeights.isEmpty() && lastHcWeights.isEmpty()) return snapshot
+        if (RecordMethod.ALCOHOL in snapshot) lastHcAlcohol = snapshot[RecordMethod.ALCOHOL]!!
+        if (localFood.isEmpty() && lastHcFood.isEmpty() && localWeights.isEmpty() && lastHcWeights.isEmpty() && localDrinks.isEmpty() && lastHcAlcohol.isEmpty()) return snapshot
         val out = snapshot.toMutableMap()
         if (localFood.isNotEmpty() || lastHcFood.isNotEmpty()) {
             out[RecordMethod.FOOD_LOG] = localFood + (snapshot[RecordMethod.FOOD_LOG] ?: emptyList())
         }
         if (localWeights.isNotEmpty() || lastHcWeights.isNotEmpty()) {
             out[RecordMethod.WEIGHT] = localWeights + (snapshot[RecordMethod.WEIGHT] ?: emptyList())
+        }
+        if (localDrinks.isNotEmpty() || lastHcAlcohol.isNotEmpty()) {
+            out[RecordMethod.ALCOHOL] = localDrinks + (snapshot[RecordMethod.ALCOHOL] ?: emptyList())
         }
         return out
     }
@@ -80,7 +86,9 @@ object SyncHub {
             localFood = foodStorage.getAllMeals().map { it.toHealthRecord() }
             val weightStorage = com.scatterbrain.scatterfit.ui.WeightStorage(appContext)
             localWeights = weightStorage.loadAll().flatMap { it.toHealthRecords() }
-            if (loaded.isNotEmpty() || localFood.isNotEmpty() || localWeights.isNotEmpty()) {
+            val drinkStorage = com.scatterbrain.scatterfit.ui.DrinkStorage(appContext)
+            localDrinks = drinkStorage.loadAll().values.flatten().map { it.toHealthRecord() }
+            if (loaded.isNotEmpty() || localFood.isNotEmpty() || localWeights.isNotEmpty() || localDrinks.isNotEmpty()) {
                 _records.value = publishFood(loaded)
             }
         }
@@ -94,6 +102,17 @@ object SyncHub {
         // the bucket from it, never from the current bucket (which contains
         // the OLD local list and would duplicate).
         out[RecordMethod.FOOD_LOG] = foodRecords + lastHcFood
+        _records.value = out
+    }
+
+    fun updateLocalDrinks(drinkRecords: List<HealthRecord>) {
+        localDrinks = drinkRecords
+        val snapshot = _records.value ?: emptyMap()
+        val out = snapshot.toMutableMap()
+        // Same discipline as food/weights: rebuild the ALCOHOL bucket from the
+        // HC-only view, never from the current bucket (which contains the OLD
+        // local list and would duplicate).
+        out[RecordMethod.ALCOHOL] = drinkRecords + lastHcAlcohol
         _records.value = out
     }
 

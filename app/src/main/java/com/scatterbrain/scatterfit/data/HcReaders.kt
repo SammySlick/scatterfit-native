@@ -92,7 +92,8 @@ object HcReaders {
         // Dedupe makes boundary-crossing records (sleep over midnight) safe:
         // both windows yield the same start-keyed record, second copy collapses.
         for (m in methods) {
-            if (m in HcAggregators.AGGREGATED || m == RecordMethod.FOOD_LOG || m == RecordMethod.HEART_RATE) continue
+            // ALCOHOL has no HC record type — local-injection only, nothing to read.
+            if (m in HcAggregators.AGGREGATED || m == RecordMethod.FOOD_LOG || m == RecordMethod.HEART_RATE || m == RecordMethod.ALCOHOL) continue
             var dayStart = fromMs
             while (dayStart < toMs) {
                 val dayEnd = minOf(dayStart + SLICE_MS, toMs)

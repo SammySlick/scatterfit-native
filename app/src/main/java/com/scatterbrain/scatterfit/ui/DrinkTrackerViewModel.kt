@@ -260,6 +260,14 @@ class DrinkTrackerViewModel(
     }
 
     private fun recalculateTotals(loggedList: List<LoggedDrink>, dayKey: String) {
+        // Pipeline push: every storage mutation funnels through here, so this
+        // is the one point that keeps SyncHub's local ALCOHOL records current.
+        // loadAll() (every day) keeps past days correct after edits/moves.
+        storage?.let { st ->
+            com.scatterbrain.scatterfit.sync.SyncHub.updateLocalDrinks(
+                st.loadAll().values.flatten().map { it.toHealthRecord() }
+            )
+        }
         // Sort newest-first by timestamp
         val sortedList = loggedList.sortedByDescending { it.timestamp }
         // UNITS PARITY FIX: Use JSON units field directly (drink.units)

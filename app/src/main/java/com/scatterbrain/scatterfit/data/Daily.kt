@@ -89,6 +89,7 @@ object Daily {
         bodyFat: List<HealthRecord>,
         distance: List<HealthRecord> = emptyList(),
         foodLog: List<HealthRecord> = emptyList(),
+        alcohol: List<HealthRecord> = emptyList(),
         heartRate: List<HealthRecord> = emptyList(),
         zones: ZoneBounds,
         zone: ZoneId,
@@ -183,6 +184,27 @@ object Daily {
             list.sortWith(compareBy({ it.time == null }, { it.time ?: "" }))
         }
 
+        // ---- Alcohol: local-only records (drink tracker). Units and empty
+        // kcal per day; kcal ALSO joins calories eaten — a pint is energy in,
+        // MFP parity. Drinks flag marks the day for scoring/insights.
+        val alcoholUnitsMap = LinkedHashMap<String, Double>()
+        val alcoholKcalMap = LinkedHashMap<String, Double>()
+        val drinksDay = LinkedHashMap<String, Boolean>()
+        for (r in alcohol) {
+            val d = r.data ?: JsonObject(emptyMap())
+            val day = dayKeyFromIso(r.start, zone)
+            val units = Normalise.num(d["units"]) ?: 0.0
+            val kcal = Normalise.num(d["kcal"]) ?: 0.0
+            if (units > 0) {
+                alcoholUnitsMap[day] = (alcoholUnitsMap[day] ?: 0.0) + units
+                drinksDay[day] = true
+            }
+            if (kcal > 0) {
+                alcoholKcalMap[day] = (alcoholKcalMap[day] ?: 0.0) + kcal
+                add(caloriesEaten, day, kcal)
+            }
+        }
+
         // ---- Weight: per app per day keep the LAST reading, then prefer the
         // trusted Hume scale, else the latest remaining app. Myzone ignored.
         val perAppDay = LinkedHashMap<String, Quad<String, String, Long, Double>>()
@@ -267,7 +289,7 @@ object Daily {
             sleep = sleepOut, sleepNights = sleepNights, sessions = sessions,
             bodyFat = bodyFatOut, stepsSource = stepSrc, distance = distMap,
             distanceSource = distSrc, burnedSource = burnSrc,
-            drinks = emptyMap(), foodKcal = emptyMap(), alcoholKcal = emptyMap(), alcoholUnits = emptyMap(),
+            drinks = drinksDay, foodKcal = emptyMap(), alcoholKcal = alcoholKcalMap, alcoholUnits = alcoholUnitsMap,
             meals = meals, zone = zone,
         )
     }
@@ -302,6 +324,7 @@ object Daily {
             bodyFat = inWindow(RecordMethod.BODY_FAT),
             distance = inWindow(RecordMethod.DISTANCE),
             foodLog = inWindow(RecordMethod.FOOD_LOG),
+            alcohol = inWindow(RecordMethod.ALCOHOL),
             heartRate = inWindow(RecordMethod.HEART_RATE),
             zones = zones, zone = zone,
         )

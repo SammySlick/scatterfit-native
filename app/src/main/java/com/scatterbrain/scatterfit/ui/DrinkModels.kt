@@ -30,6 +30,22 @@ data class LoggedDrink(
     val dayKey: String = ""
 )
 
+/** One logged drink -> one ALCOHOL record for the pipeline. Same local-record
+ *  convention as meals and weigh-ins: app="app", real timestamps, flat data.
+ *  kcal rides in the record so Daily can count it into calories eaten. */
+fun LoggedDrink.toHealthRecord(): com.scatterbrain.scatterfit.data.HealthRecord {
+    val startIso = java.time.Instant.ofEpochMilli(timestamp).toString()
+    return com.scatterbrain.scatterfit.data.HealthRecord(
+        app = "app", start = startIso, end = startIso,
+        data = kotlinx.serialization.json.buildJsonObject {
+            put("name", kotlinx.serialization.json.JsonPrimitive(drink.name.ifEmpty { "Drink" }))
+            put("units", kotlinx.serialization.json.JsonPrimitive(drink.units))
+            put("kcal", kotlinx.serialization.json.JsonPrimitive(drink.kcals))
+            put("kind", kotlinx.serialization.json.JsonPrimitive("alcohol"))
+        },
+    )
+}
+
 class DrinkStorage(private val context: Context) {
     private val prefs = context.getSharedPreferences("scatterfit_drinks_prefs", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
