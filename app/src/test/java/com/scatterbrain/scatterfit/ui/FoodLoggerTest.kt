@@ -230,8 +230,8 @@ class FoodLoggerTest {
 
     @Test
     fun `two drinks accumulate units and kcal without doubling`() {
-        val a = LoggedDrink(DrinkReference(name = "Pint", units = 2.0, kcals = 200), nowMs, today).toHealthRecord()
-        val b = LoggedDrink(DrinkReference(name = "Pint", units = 2.0, kcals = 200), nowMs, today).toHealthRecord()
+        val a = LoggedDrink(id = "a", drink = DrinkReference(name = "Pint", units = 2.0, kcals = 200), timestamp = nowMs, dayKey = today).toHealthRecord()
+        val b = LoggedDrink(id = "b", drink = DrinkReference(name = "Pint", units = 2.0, kcals = 200), timestamp = nowMs, dayKey = today).toHealthRecord()
         val daily = Daily.buildDailyDataFromMaps(
             records = mapOf(RecordMethod.ALCOHOL to listOf(a, b)),
             zones = Zones.DEFAULT_ZONES,
