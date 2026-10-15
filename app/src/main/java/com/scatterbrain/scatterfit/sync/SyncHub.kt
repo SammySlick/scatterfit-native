@@ -6,6 +6,8 @@ import androidx.health.connect.client.HealthConnectClient
 import com.scatterbrain.scatterfit.data.HealthRecord
 import com.scatterbrain.scatterfit.data.HcReaders
 import com.scatterbrain.scatterfit.data.RecordMethod
+import com.scatterbrain.scatterfit.ui.DrinkStorage
+import com.scatterbrain.scatterfit.ui.toHealthRecord
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
