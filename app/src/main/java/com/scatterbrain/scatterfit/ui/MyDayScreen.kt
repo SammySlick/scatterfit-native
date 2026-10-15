@@ -291,6 +291,23 @@ fun MyDayScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // THE DAY CARD
+        DayCard(
+            daily = repoDaily,
+            dayKey = currentDayKey,
+            settings = remember(dailyCalorieTarget) {
+                com.scatterbrain.scatterfit.core.ScoringSettings(
+                    kcalTarget = dailyCalorieTarget
+                )
+            },
+            onMetricClick = { metricId ->
+                activeMetricId = metricId
+            },
+            modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         // 2. Today Pulse Card (Consolidates Momentum + Readiness with integrated Goal Header strip)
         TodayPulseCard(
             goalName = goalProjection.goalName,
