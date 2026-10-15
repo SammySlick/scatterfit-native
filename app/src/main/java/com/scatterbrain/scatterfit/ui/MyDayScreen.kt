@@ -128,7 +128,7 @@ fun MyDayScreen(
                 storage.saveWeight(
                     LoggedWeight(kg = kg, bodyFatPct = bf, dayKey = currentDayKey)
                 )
-                SyncHub.updateLocalWeights(storage.loadAll().map { it.toHealthRecord() })
+                SyncHub.updateLocalWeights(storage.loadAll().flatMap { it.toHealthRecords() })
             }
         )
     }

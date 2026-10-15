@@ -79,7 +79,7 @@ object SyncHub {
             val foodStorage = com.scatterbrain.scatterfit.ui.FoodStorage(appContext)
             localFood = foodStorage.getAllMeals().map { it.toHealthRecord() }
             val weightStorage = com.scatterbrain.scatterfit.ui.WeightStorage(appContext)
-            localWeights = weightStorage.loadAll().map { it.toHealthRecord() }
+            localWeights = weightStorage.loadAll().flatMap { it.toHealthRecords() }
             if (loaded.isNotEmpty() || localFood.isNotEmpty() || localWeights.isNotEmpty()) {
                 _records.value = publishFood(loaded)
             }

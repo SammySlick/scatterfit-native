@@ -22,14 +22,25 @@ data class LoggedWeight(
     val timestamp: Long = System.currentTimeMillis(),
     val dayKey: String = "",
 ) {
-    fun toHealthRecord(): HealthRecord {
+    /** Health Connect stores weight and body fat as SEPARATE record types,
+     *  and Daily parses body fat only from the BODY_FAT bucket — so one
+     *  weigh-in with body fat becomes two records. */
+    fun toHealthRecords(): List<HealthRecord> {
         val startIso = Instant.ofEpochMilli(timestamp).toString()
-        val data = buildJsonObject {
-            put("weight", JsonPrimitive(kg))
-            bodyFatPct?.let { put("percentage", JsonPrimitive(it)) }
-            put("name", JsonPrimitive("Weigh-in"))
+        val weightRec = HealthRecord(
+            app = "app", start = startIso, end = startIso,
+            data = buildJsonObject {
+                put("weight", JsonPrimitive(kg))
+                put("name", JsonPrimitive("Weigh-in"))
+            }
+        )
+        val bfRec = bodyFatPct?.let {
+            HealthRecord(
+                app = "app", start = startIso, end = startIso,
+                data = buildJsonObject { put("percentage", JsonPrimitive(it)) }
+            )
         }
-        return HealthRecord(app = "app", start = startIso, end = startIso, data = data)
+        return listOfNotNull(weightRec, bfRec)
     }
 }
 
