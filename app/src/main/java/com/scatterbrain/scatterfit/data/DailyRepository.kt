@@ -1,6 +1,7 @@
 package com.scatterbrain.scatterfit.data
 
 import android.content.Context
+import android.util.Log
 import com.scatterbrain.scatterfit.sync.SyncHub
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
@@ -28,15 +29,20 @@ object DailyRepository {
 
     fun start(scope: CoroutineScope, snapshotStorage: DailySnapshotStorage? = storage) {
         this.storage = snapshotStorage
+        val startMs = System.currentTimeMillis()
 
         // BEFORE the collect, load the snapshot on IO and if present, decode and publish it as _daily immediately
         scope.launch(Dispatchers.IO) {
+            val t0 = System.currentTimeMillis()
             val cached = snapshotStorage?.load()
+            val loadMs = System.currentTimeMillis() - t0
+            Log.d("ScatterFitSync", "snapshot loaded in ${loadMs}ms (${if (cached != null) "present" else "absent"})")
             if (cached != null && _daily.value == null) {
                 _daily.value = cached
             }
         }
 
+        var firstDailyPublished = false
         scope.launch {
             SyncHub.records.collect { records ->
                 val newDaily = withContext(Dispatchers.Default) {
@@ -49,7 +55,14 @@ object DailyRepository {
                         )
                     }
                 }
-                _daily.value = newDaily
+                if (newDaily != null) {
+                    _daily.value = newDaily
+                    if (!firstDailyPublished) {
+                        firstDailyPublished = true
+                        val elapsed = System.currentTimeMillis() - startMs
+                        Log.d("ScatterFitSync", "first daily from records in ${elapsed}ms")
+                    }
+                }
 
                 // Debounced write: only write when no new emission has arrived for 3s.
                 // Skip the write while SyncHub.syncing is true; write final settled state when non-syncing emission lands.

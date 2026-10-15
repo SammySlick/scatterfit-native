@@ -48,9 +48,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
@@ -335,24 +338,11 @@ fun DrinkLoggerContent(
                     ) {
                         items(categories) { category ->
                             val isSelected = category.equals(dailyState.selectedCategory, ignoreCase = true)
-                            val pillBg = if (isSelected) AccentTeal else SecondaryFill
-                            val pillTextColor = if (isSelected) OnPrimaryText else TextMuted
-
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(pillBg)
-                                    .border(BorderStroke(1.dp, if (isSelected) AccentTeal else BorderDefault), RoundedCornerShape(16.dp))
-                                    .clickable { onCategorySelect(category) }
-                                    .padding(horizontal = 14.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = category,
-                                    color = pillTextColor,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                )
-                            }
+                            DrinkCategoryChip(
+                                category = category,
+                                isSelected = isSelected,
+                                onCategorySelect = onCategorySelect
+                            )
                         }
                     }
                 }
@@ -486,6 +476,66 @@ fun DrinkDayPickerStrip(
  * - Hairline divider (white @ 10% opacity) between rows.
  */
 @Composable
+private fun DrinkCategoryChip(
+    category: String,
+    isSelected: Boolean,
+    onCategorySelect: (String) -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.70f else 1f,
+        animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        label = "chipAlpha"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        label = "chipScale"
+    )
+    val haptic = LocalHapticFeedback.current
+
+    val pillBg = if (isSelected) AccentTeal else SecondaryFill
+    val pillTextColor = if (isSelected) OnPrimaryText else TextMuted
+
+    Box(
+        modifier = Modifier
+            .graphicsLayer {
+                this.alpha = alpha
+                this.scaleX = scale
+                this.scaleY = scale
+            }
+            .clip(RoundedCornerShape(16.dp))
+            .background(pillBg)
+            .border(BorderStroke(1.dp, if (isSelected) AccentTeal else BorderDefault), RoundedCornerShape(16.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onCategorySelect(category)
+                }
+            )
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = category,
+            color = pillTextColor,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+        )
+    }
+}
+
+/**
+ * Condensed single-column list row for library drinks (~56-64dp height).
+ * Matches design tokens:
+ * - Left: drink name (14sp semibold), serving (11sp muted), optional brand (10sp muted) above name.
+ * - Right: compact stat cluster ("5.3% · 2.8u · 285kcal", with units in TextForeground semibold) and price ("£2.02").
+ * - Far right: "+ Log" button (lime, min 36dp touch target) or disabled "Upcoming" state.
+ * - Hairline divider (white @ 10% opacity) between rows.
+ */
+@Composable
 fun DrinkLibraryItemRow(
     drink: DrinkReference,
     isFutureDay: Boolean = false,
@@ -593,13 +643,26 @@ fun DrinkLibraryItemRow(
             } else {
                 val interactionSource = remember { MutableInteractionSource() }
                 val isPressed by interactionSource.collectIsPressedAsState()
-                val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "logScale")
+                val alpha by animateFloatAsState(
+                    targetValue = if (isPressed) 0.70f else 1f,
+                    animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+                    label = "logAlpha"
+                )
+                val scale by animateFloatAsState(
+                    targetValue = if (isPressed) 0.96f else 1f,
+                    animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+                    label = "logScale"
+                )
                 val haptic = LocalHapticFeedback.current
 
                 Box(
                     modifier = Modifier
                         .size(width = 60.dp, height = 36.dp)
-                        .scale(scale)
+                        .graphicsLayer {
+                            this.alpha = alpha
+                            this.scaleX = scale
+                            this.scaleY = scale
+                        }
                         .clip(RoundedCornerShape(8.dp))
                         .background(AccentTeal)
                         .clickable(
@@ -1034,7 +1097,16 @@ fun LoggedDrinkTimePickerDialog(
         confirmButton = {
             val dialogInteraction = remember { MutableInteractionSource() }
             val isDialogPressed by dialogInteraction.collectIsPressedAsState()
-            val dialogScale by animateFloatAsState(if (isDialogPressed) 0.96f else 1f, label = "dialogScale")
+            val dialogAlpha by animateFloatAsState(
+                targetValue = if (isDialogPressed) 0.70f else 1f,
+                animationSpec = if (isDialogPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+                label = "dialogAlpha"
+            )
+            val dialogScale by animateFloatAsState(
+                targetValue = if (isDialogPressed) 0.96f else 1f,
+                animationSpec = if (isDialogPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+                label = "dialogScale"
+            )
             val dialogHaptic = LocalHapticFeedback.current
 
             Button(
@@ -1056,7 +1128,11 @@ fun LoggedDrinkTimePickerDialog(
                     onConfirmTime(finalTimestamp)
                 },
                 interactionSource = dialogInteraction,
-                modifier = Modifier.scale(dialogScale),
+                modifier = Modifier.graphicsLayer {
+                    this.alpha = dialogAlpha
+                    this.scaleX = dialogScale
+                    this.scaleY = dialogScale
+                },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AccentTeal,
                     contentColor = OnPrimaryText

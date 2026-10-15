@@ -2,7 +2,14 @@ package com.scatterbrain.scatterfit.ui
 
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,7 +50,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -404,7 +410,16 @@ fun WeighInDialog(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "weighInSaveScale")
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.70f else 1f,
+        animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        label = "weighInSaveAlpha"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        label = "weighInSaveScale"
+    )
     val haptic = LocalHapticFeedback.current
 
     AlertDialog(
@@ -484,7 +499,11 @@ fun WeighInDialog(
                     onDismiss()
                 },
                 interactionSource = interactionSource,
-                modifier = Modifier.scale(scale),
+                modifier = Modifier.graphicsLayer {
+                    this.alpha = alpha
+                    this.scaleX = scale
+                    this.scaleY = scale
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = Color.Black)
             ) {
                 Text("Save", fontWeight = FontWeight.Bold)
@@ -589,18 +608,39 @@ private fun QuickActionButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "buttonScale")
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.70f else 1f,
+        animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        label = "qaAlpha"
+    )
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        label = "qaScale"
+    )
+    val bounceScale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
     Card(
         modifier = modifier
             .heightIn(min = 48.dp)
-            .scale(scale)
+            .graphicsLayer {
+                val totalScale = pressScale * bounceScale.value
+                this.alpha = alpha
+                this.scaleX = totalScale
+                this.scaleY = totalScale
+            }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    scope.launch {
+                        bounceScale.snapTo(1f)
+                        bounceScale.animateTo(1.06f, tween(100))
+                        bounceScale.animateTo(1f, spring(stiffness = Spring.StiffnessHigh))
+                    }
                     onClick()
                 }
             ),

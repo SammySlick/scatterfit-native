@@ -20,6 +20,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material.icons.Icons
@@ -45,8 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -85,7 +88,16 @@ fun FoodLoggerScreen(
 
     val saveInteractionSource = remember { MutableInteractionSource() }
     val isSavePressed by saveInteractionSource.collectIsPressedAsState()
-    val saveScale by animateFloatAsState(if (isSavePressed) 0.96f else 1f, label = "foodSaveScale")
+    val saveAlpha by animateFloatAsState(
+        targetValue = if (isSavePressed) 0.70f else 1f,
+        animationSpec = if (isSavePressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        label = "foodSaveAlpha"
+    )
+    val saveScale by animateFloatAsState(
+        targetValue = if (isSavePressed) 0.96f else 1f,
+        animationSpec = if (isSavePressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        label = "foodSaveScale"
+    )
     val haptic = LocalHapticFeedback.current
 
     var showSaveConfirmation by remember { mutableStateOf(false) }
@@ -319,7 +331,11 @@ fun FoodLoggerScreen(
                                 interactionSource = saveInteractionSource,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .scale(saveScale),
+                                    .graphicsLayer {
+                                        this.alpha = saveAlpha
+                                        this.scaleX = saveScale
+                                        this.scaleY = saveScale
+                                    },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = TealHighlight,
                                     contentColor = Color.Black

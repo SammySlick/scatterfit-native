@@ -524,6 +524,13 @@ fun DebugScreen(
                                 fontSize = 12.sp,
                                 color = TextMuted
                             )
+                            if (info.method == RecordMethod.RESTING_HEART_RATE && info.recordCount == 0) {
+                                Text(
+                                    text = "Samsung Health doesn't share resting HR with Health Connect — no source writes it",
+                                    fontSize = 11.sp,
+                                    color = TextMuted
+                                )
+                            }
                             Text(
                                 text = "Cursor: ${info.cursorText}",
                                 fontSize = 12.sp,
