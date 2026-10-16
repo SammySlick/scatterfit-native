@@ -161,9 +161,11 @@ fun MyDayScreen(
     var showFoodLoggerScreen by remember { mutableStateOf(false) }
     var showDrinkLoggerScreen by remember { mutableStateOf(false) }
     var showPlanEditor by remember { mutableStateOf(false) }
+    var showTrainingScreen by remember { mutableStateOf(false) }
     var showWeighInDialog by remember { mutableStateOf(false) }
     var activeMetricScreen by remember { mutableStateOf<String?>(null) }
     var activeMetricId by remember { mutableStateOf<com.scatterbrain.scatterfit.core.MetricId?>(null) }
+    val routineStorage = remember { RoutineStorage(context) }
 
     if (showWeighInDialog) {
         WeighInDialog(
@@ -197,13 +199,14 @@ fun MyDayScreen(
         }
     }
 
-    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen || showFoodLoggerScreen || showPlanEditor) {
+    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen || showFoodLoggerScreen || showPlanEditor || showTrainingScreen) {
         when {
             activeMetricId != null -> activeMetricId = null
             activeMetricScreen != null -> activeMetricScreen = null
             showDrinkLoggerScreen -> showDrinkLoggerScreen = false
             showFoodLoggerScreen -> showFoodLoggerScreen = false
             showPlanEditor -> showPlanEditor = false
+            showTrainingScreen -> showTrainingScreen = false
         }
     }
 
@@ -270,6 +273,14 @@ fun MyDayScreen(
                 showPlanEditor = false
             },
             onBackClick = { showPlanEditor = false }
+        )
+        return
+    }
+
+    if (showTrainingScreen) {
+        TrainingScreen(
+            storage = routineStorage,
+            onBackClick = { showTrainingScreen = false }
         )
         return
     }
@@ -405,7 +416,7 @@ fun MyDayScreen(
         QuickActionsStrip(
             onLogMealClick = { if (!isFutureDay) showFoodLoggerScreen = true },
             onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
-            onLogWorkoutClick = { showWorkoutHint = true },
+            onLogWorkoutClick = { showTrainingScreen = true },
             workoutHintVisible = showWorkoutHint,
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
