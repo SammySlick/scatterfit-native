@@ -138,6 +138,7 @@ class RoutineStorageTest {
         assertNull(ex.customName)
         assertNull(ex.tempo)
         assertFalse(ex.isTimed)
+        assertEquals("sec", ex.timeUnit)
         assertEquals("Lat Pulldown", ex.displayName)
 
         val set = ex.sets.first()
@@ -163,6 +164,24 @@ class RoutineStorageTest {
         assertEquals("30-45s", timeLabel(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)))
         assertEquals("45s", timeLabel(PlannedSet(timeSecondsMax = 45)))
         assertEquals("", timeLabel(PlannedSet()))
+    }
+
+    @Test
+    fun `timeLabelScaled formats sec min hour correctly with rounding`() {
+        // sec unit
+        assertEquals("30s", timeLabelScaled(PlannedSet(timeSecondsMin = 30), "sec"))
+        assertEquals("30-45s", timeLabelScaled(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45), "sec"))
+
+        // min unit
+        assertEquals("90 min", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "min"))
+        assertEquals("1-1.5 min", timeLabelScaled(PlannedSet(timeSecondsMin = 60, timeSecondsMax = 90), "min"))
+
+        // hour unit
+        assertEquals("1.5 h", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "hour"))
+        assertEquals("1-1.5 h", timeLabelScaled(PlannedSet(timeSecondsMin = 3600, timeSecondsMax = 5400), "hour"))
+
+        // empty
+        assertEquals("", timeLabelScaled(PlannedSet(), "hour"))
     }
 
     @Test
@@ -282,5 +301,52 @@ class RoutineStorageTest {
         )
         val est = calculateRoutineEstimateMinutes(exercises)
         assertEquals(10, est)
+    }
+
+    @Test
+    fun `formatExerciseSetsSummary collapses identical sets and expands differing sets`() {
+        // Identical rep-based sets collapse to compact form
+        val exIdentical = RoutineExercise(
+            exerciseId = "bench",
+            exerciseName = "Bench Press",
+            sets = listOf(
+                PlannedSet(weightKg = 60.0, repsMin = 8, repsMax = 12),
+                PlannedSet(weightKg = 60.0, repsMin = 8, repsMax = 12),
+                PlannedSet(weightKg = 60.0, repsMin = 8, repsMax = 12),
+                PlannedSet(weightKg = 60.0, repsMin = 8, repsMax = 12)
+            )
+        )
+        val identicalSummary = formatExerciseSetsSummary(exIdentical)
+        assertEquals(1, identicalSummary.size)
+        assertEquals("4 × 8-12 @ 60", identicalSummary.first())
+
+        // Identical timed sets collapse
+        val exTimedIdentical = RoutineExercise(
+            exerciseId = "plank",
+            exerciseName = "Plank",
+            isTimed = true,
+            sets = listOf(
+                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45),
+                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45),
+                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)
+            )
+        )
+        val timedSummary = formatExerciseSetsSummary(exTimedIdentical)
+        assertEquals(1, timedSummary.size)
+        assertEquals("3 × 30-45s", timedSummary.first())
+
+        // Differing sets expand to per-set lines
+        val exDiffering = RoutineExercise(
+            exerciseId = "squat",
+            exerciseName = "Squat",
+            sets = listOf(
+                PlannedSet(type = "warmup", weightKg = 40.0, repsMin = 12),
+                PlannedSet(type = "normal", weightKg = 60.0, repsMin = 8, repsMax = 12, note = "slow")
+            )
+        )
+        val differingSummary = formatExerciseSetsSummary(exDiffering)
+        assertEquals(2, differingSummary.size)
+        assertEquals("Set 1 (warmup): 40kg × 12", differingSummary[0])
+        assertEquals("Set 2: 60kg × 8-12 · slow", differingSummary[1])
     }
 }

@@ -82,9 +82,11 @@ import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.StateBad
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
+import com.scatterbrain.scatterfit.ui.theme.TextFaint
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import java.util.UUID
+import kotlin.math.roundToInt
 
 fun calculateRoutineEstimateMinutes(exercises: List<RoutineExercise>): Int {
     if (exercises.isEmpty()) return 0
@@ -575,6 +577,33 @@ private fun HevyExerciseCard(
                         color = if (isTimed) TealHighlight else TextMuted
                     )
                 }
+
+                // Time unit toggle chip (shown when isTimed is true)
+                if (isTimed) {
+                    val unitLabel = exercise.timeUnit.ifBlank { "sec" }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SecondaryFill)
+                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
+                            .clickable {
+                                val nextUnit = when (exercise.timeUnit.lowercase()) {
+                                    "sec" -> "min"
+                                    "min" -> "hour"
+                                    else -> "sec"
+                                }
+                                onUpdateExercise(exercise.copy(timeUnit = nextUnit))
+                            }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = unitLabel,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TealHighlight
+                        )
+                    }
+                }
             }
 
             // Inline multi-line note editor (if toggled open)
@@ -698,7 +727,7 @@ private fun HevyExerciseCard(
                 Text("SET", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
                 Text("KG", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Text(
-                    if (exercise.isTimed) "TIME (s)" else "REPS",
+                    if (exercise.isTimed) "TIME (${exercise.timeUnit})" else "REPS",
                     fontSize = 10.sp,
                     color = TextMuted,
                     fontWeight = FontWeight.Bold,
@@ -802,6 +831,19 @@ private fun HevyExerciseCard(
                             ),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             cursorBrush = SolidColor(TealHighlight),
+                            decorationBox = { innerTextField ->
+                                if (kgText.isEmpty()) {
+                                    Text(
+                                        text = "No Weight",
+                                        color = TextFaint,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                                innerTextField()
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -840,6 +882,12 @@ private fun HevyExerciseCard(
                                     ),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     cursorBrush = SolidColor(TealHighlight),
+                                    decorationBox = { innerTextField ->
+                                        if (repsMinText.isEmpty()) {
+                                            Text("Min", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                                        }
+                                        innerTextField()
+                                    },
                                     modifier = Modifier.width(36.dp)
                                 )
                                 Text("–", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 2.dp))
@@ -861,6 +909,12 @@ private fun HevyExerciseCard(
                                     ),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     cursorBrush = SolidColor(TealHighlight),
+                                    decorationBox = { innerTextField ->
+                                        if (repsMaxText.isEmpty()) {
+                                            Text("Max", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                                        }
+                                        innerTextField()
+                                    },
                                     modifier = Modifier.width(36.dp)
                                 )
                             }
@@ -872,10 +926,16 @@ private fun HevyExerciseCard(
                                 BasicTextField(
                                     value = timeMinText,
                                     onValueChange = { input ->
-                                        val clean = input.filter { it.isDigit() }
+                                        val clean = input.filter { it.isDigit() || it == '.' }
                                         timeMinText = clean
+                                        val num = clean.toDoubleOrNull()
+                                        val seconds = when (exercise.timeUnit.lowercase()) {
+                                            "min" -> num?.let { (it * 60.0).roundToInt() }
+                                            "hour" -> num?.let { (it * 3600.0).roundToInt() }
+                                            else -> num?.toInt()
+                                        }
                                         val updated = exercise.sets.toMutableList()
-                                        updated[setIndex] = set.copy(timeSecondsMin = clean.toIntOrNull())
+                                        updated[setIndex] = set.copy(timeSecondsMin = seconds)
                                         onUpdateExercise(exercise.copy(sets = updated))
                                     },
                                     singleLine = true,
@@ -885,18 +945,30 @@ private fun HevyExerciseCard(
                                         fontWeight = FontWeight.SemiBold,
                                         textAlign = TextAlign.Center
                                     ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     cursorBrush = SolidColor(TealHighlight),
+                                    decorationBox = { innerTextField ->
+                                        if (timeMinText.isEmpty()) {
+                                            Text("Min", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                                        }
+                                        innerTextField()
+                                    },
                                     modifier = Modifier.width(36.dp)
                                 )
                                 Text("–", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 2.dp))
                                 BasicTextField(
                                     value = timeMaxText,
                                     onValueChange = { input ->
-                                        val clean = input.filter { it.isDigit() }
+                                        val clean = input.filter { it.isDigit() || it == '.' }
                                         timeMaxText = clean
+                                        val num = clean.toDoubleOrNull()
+                                        val seconds = when (exercise.timeUnit.lowercase()) {
+                                            "min" -> num?.let { (it * 60.0).roundToInt() }
+                                            "hour" -> num?.let { (it * 3600.0).roundToInt() }
+                                            else -> num?.toInt()
+                                        }
                                         val updated = exercise.sets.toMutableList()
-                                        updated[setIndex] = set.copy(timeSecondsMax = clean.toIntOrNull())
+                                        updated[setIndex] = set.copy(timeSecondsMax = seconds)
                                         onUpdateExercise(exercise.copy(sets = updated))
                                     },
                                     singleLine = true,
@@ -906,11 +978,17 @@ private fun HevyExerciseCard(
                                         fontWeight = FontWeight.SemiBold,
                                         textAlign = TextAlign.Center
                                     ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     cursorBrush = SolidColor(TealHighlight),
+                                    decorationBox = { innerTextField ->
+                                        if (timeMaxText.isEmpty()) {
+                                            Text("Max", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                                        }
+                                        innerTextField()
+                                    },
                                     modifier = Modifier.width(36.dp)
                                 )
-                                Text("s", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 2.dp))
+                                Text(timeUnitSuffix(exercise.timeUnit), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 2.dp))
                             }
                         }
                     }
@@ -948,7 +1026,7 @@ private fun HevyExerciseCard(
  * Routine Summary Card showing Exercises count, Total Sets, Estimated Duration, and Muscle Bars.
  */
 @Composable
-private fun RoutineSummaryCard(
+fun RoutineSummaryCard(
     exercises: List<RoutineExercise>,
     lookupMuscle: (String) -> String,
     modifier: Modifier = Modifier,
