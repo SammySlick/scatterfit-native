@@ -146,6 +146,7 @@ class RoutineStorageTest {
         assertNull(set.repsMax)
         assertNull(set.timeSecondsMin)
         assertNull(set.timeSecondsMax)
+        assertEquals("sec", set.timeUnit)
         assertNull(set.note)
         assertNull(set.difficulty)
     }
@@ -231,6 +232,60 @@ class RoutineStorageTest {
         assertEquals(60, ex.sets[0].timeSecondsMax)
         assertEquals(60, ex.sets[1].timeSecondsMin)
         assertNull(ex.sets[1].timeSecondsMax)
+    }
+
+    @Test
+    fun `displayTimeEntry formats sub-minute hour as 0 point 008 and scales correctly`() {
+        assertEquals("0.008", displayTimeEntry(30, "hour"))
+        assertEquals("30", displayTimeEntry(30, "sec"))
+        assertEquals("0.5", displayTimeEntry(30, "min"))
+        assertEquals("1.5", displayTimeEntry(90, "min"))
+        assertEquals("1.5", displayTimeEntry(5400, "hour"))
+        assertEquals("2", displayTimeEntry(7200, "hour"))
+        assertEquals("", displayTimeEntry(null, "hour"))
+    }
+
+    @Test
+    fun `round-trip store and display matches exact values`() {
+        // sec round-trip for 1..7200
+        val testSecs = listOf(1, 15, 30, 45, 60, 90, 120, 300, 1800, 3600, 5400, 7200)
+        for (sec in testSecs) {
+            val displayed = timeEntryText(sec, "sec")
+            val restored = timeEntryToSeconds(displayed, "sec")
+            assertEquals(sec, restored)
+        }
+
+        // min round-trip for representative values
+        val testMins = listOf(30, 60, 90, 120, 180, 600, 3600, 5400)
+        for (sec in testMins) {
+            val displayed = timeEntryText(sec, "min")
+            val restored = timeEntryToSeconds(displayed, "min")
+            assertEquals(sec, restored)
+        }
+
+        // hour round-trip for hour values
+        val testHours = listOf(1800, 3600, 5400, 7200)
+        for (sec in testHours) {
+            val displayed = timeEntryText(sec, "hour")
+            val restored = timeEntryToSeconds(displayed, "hour")
+            assertEquals(sec, restored)
+        }
+    }
+
+    @Test
+    fun `re-scale on unit change converts 30 secs to 0 point 5 min`() {
+        val rawSec = 30
+        assertEquals("30", timeEntryText(rawSec, "sec"))
+        assertEquals("0.5", timeEntryText(rawSec, "min"))
+        assertEquals("0.008", timeEntryText(rawSec, "hour"))
+    }
+
+    @Test
+    fun `blank and invalid inputs to timeEntryToSeconds return null`() {
+        assertNull(timeEntryToSeconds("", "sec"))
+        assertNull(timeEntryToSeconds("   ", "min"))
+        assertNull(timeEntryToSeconds("abc", "hour"))
+        assertNull(timeEntryToSeconds("-5", "sec"))
     }
 
     @Test

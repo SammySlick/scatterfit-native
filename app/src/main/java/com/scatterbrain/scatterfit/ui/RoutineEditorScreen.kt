@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -341,7 +342,7 @@ fun RoutineEditorScreen(
                 val newEx = RoutineExercise(
                     exerciseId = selectedRef.id,
                     exerciseName = selectedRef.name,
-                    sets = listOf(PlannedSet(type = "normal", weightKg = null, repsMin = null, repsMax = null))
+                    sets = listOf(PlannedSet(type = "normal", weightKg = null, repsMin = null, repsMax = null, timeUnit = "sec"))
                 )
                 if (exerciseTargetIndex in exercises.indices) {
                     exercises[exerciseTargetIndex] = newEx
@@ -589,37 +590,6 @@ private fun HevyExerciseCard(
                         softWrap = false
                     )
                 }
-
-                // Time unit toggle chip (shown when isTimed is true)
-                if (isTimed) {
-                    val unitLabel = exercise.timeUnit.ifBlank { "sec" }
-                    Box(
-                        modifier = Modifier
-                            .defaultMinSize(minWidth = 48.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SecondaryFill)
-                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
-                            .clickable {
-                                val nextUnit = when (exercise.timeUnit.lowercase()) {
-                                    "sec" -> "min"
-                                    "min" -> "hour"
-                                    else -> "sec"
-                                }
-                                onUpdateExercise(exercise.copy(timeUnit = nextUnit))
-                            }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = unitLabel,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TealHighlight,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
             }
 
             // Inline multi-line note editor (if toggled open)
@@ -743,7 +713,7 @@ private fun HevyExerciseCard(
                 Text("SET", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
                 Text("KG", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Text(
-                    if (exercise.isTimed) "TIME (${exercise.timeUnit})" else "REPS",
+                    if (exercise.isTimed) "TIME" else "REPS",
                     fontSize = 10.sp,
                     color = TextMuted,
                     fontWeight = FontWeight.Bold,
@@ -762,12 +732,6 @@ private fun HevyExerciseCard(
                 }
                 var repsMaxText by remember(set.repsMax) {
                     mutableStateOf(set.repsMax?.toString() ?: "")
-                }
-                var timeMinText by remember(set.timeSecondsMin) {
-                    mutableStateOf(set.timeSecondsMin?.toString() ?: "")
-                }
-                var timeMaxText by remember(set.timeSecondsMax) {
-                    mutableStateOf(set.timeSecondsMax?.toString() ?: "")
                 }
 
                 Row(
@@ -935,6 +899,14 @@ private fun HevyExerciseCard(
                                 )
                             }
                         } else {
+                            val setUnit = set.timeUnit.ifBlank { "sec" }
+                            var timeMinText by remember(set.timeSecondsMin, setUnit) {
+                                mutableStateOf(set.timeSecondsMin?.let { timeEntryText(it, setUnit) } ?: "")
+                            }
+                            var timeMaxText by remember(set.timeSecondsMax, setUnit) {
+                                mutableStateOf(set.timeSecondsMax?.let { timeEntryText(it, setUnit) } ?: "")
+                            }
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
@@ -944,12 +916,7 @@ private fun HevyExerciseCard(
                                     onValueChange = { input ->
                                         val clean = input.filter { it.isDigit() || it == '.' }
                                         timeMinText = clean
-                                        val num = clean.toDoubleOrNull()
-                                        val seconds = when (exercise.timeUnit.lowercase()) {
-                                            "min" -> num?.let { (it * 60.0).roundToInt() }
-                                            "hour" -> num?.let { (it * 3600.0).roundToInt() }
-                                            else -> num?.toInt()
-                                        }
+                                        val seconds = timeEntryToSeconds(clean, setUnit)
                                         val updated = exercise.sets.toMutableList()
                                         updated[setIndex] = set.copy(timeSecondsMin = seconds)
                                         onUpdateExercise(exercise.copy(sets = updated))
@@ -969,7 +936,7 @@ private fun HevyExerciseCard(
                                         }
                                         innerTextField()
                                     },
-                                    modifier = Modifier.width(36.dp)
+                                    modifier = Modifier.width(34.dp)
                                 )
                                 Text("–", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 2.dp))
                                 BasicTextField(
@@ -977,12 +944,7 @@ private fun HevyExerciseCard(
                                     onValueChange = { input ->
                                         val clean = input.filter { it.isDigit() || it == '.' }
                                         timeMaxText = clean
-                                        val num = clean.toDoubleOrNull()
-                                        val seconds = when (exercise.timeUnit.lowercase()) {
-                                            "min" -> num?.let { (it * 60.0).roundToInt() }
-                                            "hour" -> num?.let { (it * 3600.0).roundToInt() }
-                                            else -> num?.toInt()
-                                        }
+                                        val seconds = timeEntryToSeconds(clean, setUnit)
                                         val updated = exercise.sets.toMutableList()
                                         updated[setIndex] = set.copy(timeSecondsMax = seconds)
                                         onUpdateExercise(exercise.copy(sets = updated))
@@ -1002,9 +964,34 @@ private fun HevyExerciseCard(
                                         }
                                         innerTextField()
                                     },
-                                    modifier = Modifier.width(36.dp)
+                                    modifier = Modifier.width(34.dp)
                                 )
-                                Text(timeUnitSuffix(exercise.timeUnit), color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 2.dp))
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                // Inline unit selector chip inside the time field: "sec" | "min" | "hrs"
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color.Transparent)
+                                        .clickable {
+                                            val nextUnit = cycleTimeUnit(setUnit)
+                                            val updated = exercise.sets.toMutableList()
+                                            updated[setIndex] = set.copy(timeUnit = nextUnit)
+                                            onUpdateExercise(exercise.copy(sets = updated))
+                                        }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = timeUnitPickerLabel(setUnit),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TealHighlight,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
                             }
                         }
                     }
@@ -1025,7 +1012,8 @@ private fun HevyExerciseCard(
                             repsMin = lastSet?.repsMin,
                             repsMax = lastSet?.repsMax,
                             timeSecondsMin = lastSet?.timeSecondsMin,
-                            timeSecondsMax = lastSet?.timeSecondsMax
+                            timeSecondsMax = lastSet?.timeSecondsMax,
+                            timeUnit = lastSet?.timeUnit ?: "sec"
                         )
                         onUpdateExercise(exercise.copy(sets = exercise.sets + newSet))
                     }

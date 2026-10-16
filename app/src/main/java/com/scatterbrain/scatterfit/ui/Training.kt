@@ -22,6 +22,7 @@ data class PlannedSet(
     val repsMax: Int? = null,
     val timeSecondsMin: Int? = null,
     val timeSecondsMax: Int? = null,
+    val timeUnit: String = "sec", // sec | min | hour
     val note: String? = null,
     val difficulty: String? = null, // easy | medium | hard
 )
@@ -138,6 +139,54 @@ fun timeLabelScaled(s: PlannedSet, timeUnit: String = "sec"): String {
         maxSec != null -> "${formatTimeUnitValue(maxSec, timeUnit)}$suffix"
         else -> ""
     }
+}
+
+fun timeEntryText(seconds: Int?, unit: String): String {
+    if (seconds == null) return ""
+    return when (unit.lowercase()) {
+        "min" -> {
+            val v = seconds / 60.0
+            val rounded = kotlin.math.round(v * 10.0) / 10.0
+            if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
+        }
+        "hour", "hrs" -> {
+            val v = seconds / 3600.0
+            if (v < 0.1) {
+                val rounded = kotlin.math.round(v * 1000.0) / 1000.0
+                if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
+            } else {
+                val rounded = kotlin.math.round(v * 10.0) / 10.0
+                if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
+            }
+        }
+        else -> "$seconds"
+    }
+}
+
+fun displayTimeEntry(seconds: Int?, unit: String): String = timeEntryText(seconds, unit)
+
+fun timeEntryToSeconds(text: String, unit: String): Int? {
+    if (text.isBlank()) return null
+    val d = text.trim().toDoubleOrNull() ?: return null
+    if (d < 0.0) return null
+    val factor = when (unit.lowercase()) {
+        "min" -> 60.0
+        "hour", "hrs" -> 3600.0
+        else -> 1.0
+    }
+    return kotlin.math.round(d * factor).toInt()
+}
+
+fun timeUnitPickerLabel(unit: String): String = when (unit.lowercase()) {
+    "min" -> "min"
+    "hour", "hrs" -> "hrs"
+    else -> "sec"
+}
+
+fun cycleTimeUnit(current: String): String = when (current.lowercase()) {
+    "sec" -> "min"
+    "min" -> "hour"
+    else -> "sec"
 }
 
 fun setTargetLabel(s: PlannedSet, isTimed: Boolean = false): String {
@@ -284,6 +333,7 @@ private data class LegacyPlannedSet(
     val repsMax: Int? = null,
     val timeSecondsMin: Int? = null,
     val timeSecondsMax: Int? = null,
+    val timeUnit: String = "sec",
     val note: String? = null,
     val difficulty: String? = null,
 ) {
@@ -294,6 +344,7 @@ private data class LegacyPlannedSet(
         repsMax = repsMax,
         timeSecondsMin = timeSecondsMin,
         timeSecondsMax = timeSecondsMax,
+        timeUnit = timeUnit,
         note = note,
         difficulty = difficulty,
     )
