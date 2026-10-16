@@ -78,23 +78,13 @@ import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BorderInput
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
-import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.StateBad
-import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import java.util.UUID
-
-fun cycleDifficulty(current: String?): String? = when (current?.lowercase()) {
-    null -> "easy"
-    "easy" -> "medium"
-    "medium" -> "hard"
-    "hard" -> null
-    else -> null
-}
 
 fun calculateRoutineEstimateMinutes(exercises: List<RoutineExercise>): Int {
     if (exercises.isEmpty()) return 0
@@ -103,7 +93,12 @@ fun calculateRoutineEstimateMinutes(exercises: List<RoutineExercise>): Int {
         val sets = ex.sets.size
         if (sets == 0) continue
         val rest = if (ex.restSeconds > 0) ex.restSeconds else 60
-        totalSeconds += sets * 40 + (sets - 1).coerceAtLeast(0) * rest
+        val setDuration = if (ex.isTimed) {
+            ex.sets.mapNotNull { it.timeSecondsMin }.average().takeIf { !it.isNaN() }?.toInt() ?: 40
+        } else {
+            40
+        }
+        totalSeconds += sets * setDuration + (sets - 1).coerceAtLeast(0) * rest
     }
     val totalMin = totalSeconds / 60.0
     return (kotlin.math.round(totalMin / 5.0) * 5).toInt().coerceAtLeast(5)
@@ -342,7 +337,7 @@ fun RoutineEditorScreen(
                 val newEx = RoutineExercise(
                     exerciseId = selectedRef.id,
                     exerciseName = selectedRef.name,
-                    sets = listOf(PlannedSet(type = "normal", weightKg = null, reps = null))
+                    sets = listOf(PlannedSet(type = "normal", weightKg = null, repsMin = null, repsMax = null))
                 )
                 if (exerciseTargetIndex in exercises.indices) {
                     exercises[exerciseTargetIndex] = newEx
@@ -383,7 +378,8 @@ fun RoutineEditorScreen(
 }
 
 /**
- * Hevy-style Exercise Card with in-place text editing, sets table, inline rest & note chips.
+ * Hevy-style Exercise Card with in-place text editing, sets table (SET | KG | REPS/TIME),
+ * inline rest, note, tempo, and time mode toggle chips.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -402,6 +398,13 @@ private fun HevyExerciseCard(
 
     var isEditingNote by remember { mutableStateOf(false) }
     var noteInput by remember(exercise.note) { mutableStateOf(exercise.note ?: "") }
+
+    var isEditingTempo by remember { mutableStateOf(false) }
+    val initialTempoParts = remember(exercise.tempo) { parseTempo(exercise.tempo) }
+    var tempoE by remember(exercise.tempo) { mutableStateOf(initialTempoParts[0]) }
+    var tempoP1 by remember(exercise.tempo) { mutableStateOf(initialTempoParts[1]) }
+    var tempoC by remember(exercise.tempo) { mutableStateOf(initialTempoParts[2]) }
+    var tempoP2 by remember(exercise.tempo) { mutableStateOf(initialTempoParts[3]) }
 
     val haptic = LocalHapticFeedback.current
 
@@ -488,7 +491,7 @@ private fun HevyExerciseCard(
                 }
             }
 
-            // 2. SUB-ROW: [Rest: <X>s | OFF] chip + [Note] chip
+            // 2. SUB-ROW: [Rest] + [Note] + [Tempo] + [Time] chips
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -533,6 +536,45 @@ private fun HevyExerciseCard(
                         color = if (hasNote) TealHighlight else TextMuted
                     )
                 }
+
+                // Tempo chip
+                val hasTempo = !exercise.tempo.isNullOrBlank()
+                val tempoChipLabel = if (hasTempo) "Tempo: ${exercise.tempo}" else "+ Tempo"
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SecondaryFill)
+                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
+                        .clickable { isEditingTempo = !isEditingTempo }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = tempoChipLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (hasTempo) TealHighlight else TextMuted
+                    )
+                }
+
+                // Time mode toggle chip
+                val isTimed = exercise.isTimed
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isTimed) AccentTeal.copy(alpha = 0.2f) else SecondaryFill)
+                        .border(BorderStroke(1.dp, if (isTimed) AccentTeal else BorderDefault), RoundedCornerShape(8.dp))
+                        .clickable {
+                            onUpdateExercise(exercise.copy(isTimed = !exercise.isTimed))
+                        }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = if (isTimed) "Time: ON" else "Time",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isTimed) TealHighlight else TextMuted
+                    )
+                }
             }
 
             // Inline multi-line note editor (if toggled open)
@@ -566,20 +608,87 @@ private fun HevyExerciseCard(
                 }
             }
 
-            // 3. NOTES DISPLAY: Muted clipboard block lines if note exists
-            if (!exercise.note.isNullOrBlank() && !isEditingNote) {
+            // Inline Tempo editor (if toggled open): 4 small numeric fields labelled E - P - C - P
+            if (isEditingTempo) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SecondaryFill)
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Tempo:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextMuted)
+
+                    listOf(
+                        Triple("E", tempoE) { v: String -> tempoE = v },
+                        Triple("P", tempoP1) { v: String -> tempoP1 = v },
+                        Triple("C", tempoC) { v: String -> tempoC = v },
+                        Triple("P", tempoP2) { v: String -> tempoP2 = v }
+                    ).forEach { (lbl, currVal, updateVal) ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(lbl, fontSize = 9.sp, color = TextMuted, fontWeight = FontWeight.Bold)
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 34.dp, height = 30.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(DarkCardSurface)
+                                    .border(BorderStroke(1.dp, BorderInput), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                BasicTextField(
+                                    value = currVal,
+                                    onValueChange = { input ->
+                                        updateVal(input.filter { it.isDigit() }.take(2))
+                                    },
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        color = TextForeground,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    cursorBrush = SolidColor(TealHighlight),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+
+                    IconButton(
+                        onClick = {
+                            isEditingTempo = false
+                            val formatted = formatTempo(tempoE, tempoP1, tempoC, tempoP2)
+                            onUpdateExercise(exercise.copy(tempo = formatted))
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Text("✓", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                }
+            }
+
+            // 3. NOTES & TEMPO DISPLAY: Muted clipboard lines if set
+            val displayLines = buildList {
+                if (!exercise.note.isNullOrBlank()) add(exercise.note)
+                if (!exercise.tempo.isNullOrBlank() && !isEditingTempo) add("Tempo: ${exercise.tempo}")
+            }
+            if (displayLines.isNotEmpty() && !isEditingNote) {
                 Text(
-                    text = exercise.note,
+                    text = displayLines.joinToString(" · "),
                     fontSize = 11.sp,
                     color = TextMuted,
                     modifier = Modifier.clickable {
-                        noteInput = exercise.note
+                        noteInput = exercise.note ?: ""
                         isEditingNote = true
                     }
                 )
             }
 
-            // 4. SETS TABLE: Header row
+            // 4. SETS TABLE: Header row (SET | KG | REPS/TIME) - NO DIFFICULTY, NO DONE
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -588,18 +697,32 @@ private fun HevyExerciseCard(
             ) {
                 Text("SET", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
                 Text("KG", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Text("REPS", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Text("DIFF", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp), textAlign = TextAlign.Center)
-                Text("DONE", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(34.dp), textAlign = TextAlign.Center)
+                Text(
+                    if (exercise.isTimed) "TIME (s)" else "REPS",
+                    fontSize = 10.sp,
+                    color = TextMuted,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1.5f),
+                    textAlign = TextAlign.Center
+                )
             }
 
-            // Sets rows (in-place text inputs for KG & REPS, difficulty cycling on tap)
+            // Sets rows (SET | KG | REPS (min/max) or TIME (min/max))
             exercise.sets.forEachIndexed { setIndex, set ->
                 var kgText by remember(set.weightKg) {
                     mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "")
                 }
-                var repsText by remember(set.reps) {
-                    mutableStateOf(set.reps?.toString() ?: "")
+                var repsMinText by remember(set.repsMin) {
+                    mutableStateOf(set.repsMin?.toString() ?: "")
+                }
+                var repsMaxText by remember(set.repsMax) {
+                    mutableStateOf(set.repsMax?.toString() ?: "")
+                }
+                var timeMinText by remember(set.timeSecondsMin) {
+                    mutableStateOf(set.timeSecondsMin?.toString() ?: "")
+                }
+                var timeMaxText by remember(set.timeSecondsMax) {
+                    mutableStateOf(set.timeSecondsMax?.toString() ?: "")
                 }
 
                 Row(
@@ -617,7 +740,7 @@ private fun HevyExerciseCard(
                         .padding(vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Set # column (or tap cycles type)
+                    // Set # column (tap cycles normal / warmup / failure)
                     val setBadge = when (set.type) {
                         "warmup" -> "W"
                         "failure" -> "F"
@@ -683,92 +806,112 @@ private fun HevyExerciseCard(
                         )
                     }
 
-                    // REPS Input
+                    // REPS or TIME Range Inputs (min required, max optional)
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(1.5f)
                             .padding(horizontal = 4.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(SecondaryFill)
                             .border(BorderStroke(1.dp, BorderInput), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 6.dp),
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        BasicTextField(
-                            value = repsText,
-                            onValueChange = { input ->
-                                val clean = input.filter { ch -> ch.isDigit() }
-                                repsText = clean
-                                val updated = exercise.sets.toMutableList()
-                                updated[setIndex] = set.copy(reps = clean.toIntOrNull())
-                                onUpdateExercise(exercise.copy(sets = updated))
-                            },
-                            singleLine = true,
-                            textStyle = LocalTextStyle.current.copy(
-                                color = TextForeground,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            ),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            cursorBrush = SolidColor(TealHighlight),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // DIFFICULTY chip (Cycles none -> easy -> medium -> hard -> none on tap)
-                    val diffColor = when (set.difficulty?.lowercase()) {
-                        "easy" -> StateLocked
-                        "medium" -> JudgementWarn
-                        "hard" -> StateBad
-                        else -> TextMuted
-                    }
-                    val diffLabel = when (set.difficulty?.lowercase()) {
-                        "easy" -> "EASY"
-                        "medium" -> "MED"
-                        "hard" -> "HARD"
-                        else -> "—"
-                    }
-                    Box(
-                        modifier = Modifier
-                            .width(56.dp)
-                            .padding(horizontal = 2.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (set.difficulty != null) diffColor.copy(alpha = 0.15f) else SecondaryFill)
-                            .border(BorderStroke(1.dp, if (set.difficulty != null) diffColor else BorderDefault), RoundedCornerShape(6.dp))
-                            .clickable {
-                                val nextDiff = cycleDifficulty(set.difficulty)
-                                val updated = exercise.sets.toMutableList()
-                                updated[setIndex] = set.copy(difficulty = nextDiff)
-                                onUpdateExercise(exercise.copy(sets = updated))
+                        if (!exercise.isTimed) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                BasicTextField(
+                                    value = repsMinText,
+                                    onValueChange = { input ->
+                                        val clean = input.filter { it.isDigit() }
+                                        repsMinText = clean
+                                        val updated = exercise.sets.toMutableList()
+                                        updated[setIndex] = set.copy(repsMin = clean.toIntOrNull())
+                                        onUpdateExercise(exercise.copy(sets = updated))
+                                    },
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        color = TextForeground,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    cursorBrush = SolidColor(TealHighlight),
+                                    modifier = Modifier.width(36.dp)
+                                )
+                                Text("–", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 2.dp))
+                                BasicTextField(
+                                    value = repsMaxText,
+                                    onValueChange = { input ->
+                                        val clean = input.filter { it.isDigit() }
+                                        repsMaxText = clean
+                                        val updated = exercise.sets.toMutableList()
+                                        updated[setIndex] = set.copy(repsMax = clean.toIntOrNull())
+                                        onUpdateExercise(exercise.copy(sets = updated))
+                                    },
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        color = if (repsMaxText.isNotBlank()) TextForeground else TextMuted,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    cursorBrush = SolidColor(TealHighlight),
+                                    modifier = Modifier.width(36.dp)
+                                )
                             }
-                            .padding(vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = diffLabel,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = diffColor,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    // DONE box (visual only in editor)
-                    Box(
-                        modifier = Modifier
-                            .width(34.dp)
-                            .padding(horizontal = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(4.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("✓", fontSize = 11.sp, color = TextMuted.copy(alpha = 0.35f))
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                BasicTextField(
+                                    value = timeMinText,
+                                    onValueChange = { input ->
+                                        val clean = input.filter { it.isDigit() }
+                                        timeMinText = clean
+                                        val updated = exercise.sets.toMutableList()
+                                        updated[setIndex] = set.copy(timeSecondsMin = clean.toIntOrNull())
+                                        onUpdateExercise(exercise.copy(sets = updated))
+                                    },
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        color = TextForeground,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    cursorBrush = SolidColor(TealHighlight),
+                                    modifier = Modifier.width(36.dp)
+                                )
+                                Text("–", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 2.dp))
+                                BasicTextField(
+                                    value = timeMaxText,
+                                    onValueChange = { input ->
+                                        val clean = input.filter { it.isDigit() }
+                                        timeMaxText = clean
+                                        val updated = exercise.sets.toMutableList()
+                                        updated[setIndex] = set.copy(timeSecondsMax = clean.toIntOrNull())
+                                        onUpdateExercise(exercise.copy(sets = updated))
+                                    },
+                                    singleLine = true,
+                                    textStyle = LocalTextStyle.current.copy(
+                                        color = if (timeMaxText.isNotBlank()) TextForeground else TextMuted,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    cursorBrush = SolidColor(TealHighlight),
+                                    modifier = Modifier.width(36.dp)
+                                )
+                                Text("s", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(start = 2.dp))
+                            }
                         }
                     }
                 }
@@ -785,8 +928,10 @@ private fun HevyExerciseCard(
                         val newSet = PlannedSet(
                             type = "normal",
                             weightKg = lastSet?.weightKg,
-                            reps = lastSet?.reps,
-                            difficulty = lastSet?.difficulty
+                            repsMin = lastSet?.repsMin,
+                            repsMax = lastSet?.repsMax,
+                            timeSecondsMin = lastSet?.timeSecondsMin,
+                            timeSecondsMax = lastSet?.timeSecondsMax
                         )
                         onUpdateExercise(exercise.copy(sets = exercise.sets + newSet))
                     }

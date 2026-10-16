@@ -3,6 +3,7 @@ package com.scatterbrain.scatterfit.ui
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,14 +13,16 @@ class RoutineStorageTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun `round-trip encode and decode preserves Routine structure`() {
+    fun `round-trip encode and decode preserves Routine structure with repsMin and repsMax`() {
         val exercise1 = RoutineExercise(
             exerciseId = "barbell-bench-press",
             exerciseName = "Barbell Bench Press",
+            tempo = "2-0-2-1",
+            isTimed = false,
             sets = listOf(
-                PlannedSet(type = "warmup", weightKg = 40.0, reps = 10),
-                PlannedSet(type = "normal", weightKg = 80.0, reps = 8),
-                PlannedSet(type = "failure", weightKg = 85.0, reps = 6)
+                PlannedSet(type = "warmup", weightKg = 40.0, repsMin = 10, repsMax = 12),
+                PlannedSet(type = "normal", weightKg = 80.0, repsMin = 8, repsMax = null),
+                PlannedSet(type = "failure", weightKg = 85.0, repsMin = 6, repsMax = 6)
             )
         )
         val routine = Routine(
@@ -38,10 +41,16 @@ class RoutineStorageTest {
         assertEquals("routine-1", loaded.id)
         assertEquals("Push Day", loaded.name)
         assertEquals(1, loaded.exercises.size)
-        assertEquals(3, loaded.exercises.first().sets.size)
-        assertEquals("warmup", loaded.exercises.first().sets[0].type)
-        assertEquals(80.0, loaded.exercises.first().sets[1].weightKg!!, 0.001)
-        assertEquals(6, loaded.exercises.first().sets[2].reps)
+        val ex = loaded.exercises.first()
+        assertEquals("2-0-2-1", ex.tempo)
+        assertFalse(ex.isTimed)
+        assertEquals(3, ex.sets.size)
+        assertEquals("warmup", ex.sets[0].type)
+        assertEquals(40.0, ex.sets[0].weightKg!!, 0.001)
+        assertEquals(10, ex.sets[0].repsMin)
+        assertEquals(12, ex.sets[0].repsMax)
+        assertEquals(8, ex.sets[1].repsMin)
+        assertNull(ex.sets[1].repsMax)
     }
 
     @Test
@@ -95,7 +104,7 @@ class RoutineStorageTest {
     }
 
     @Test
-    fun `migration test - decode old JSON shape applies new defaults`() {
+    fun `migration test - decode old JSON shape with reps maps to repsMin`() {
         val oldJson = """
             [
               {
@@ -120,18 +129,79 @@ class RoutineStorageTest {
             ]
         """.trimIndent()
 
-        val decoded = json.decodeFromString<List<Routine>>(oldJson)
+        val decoded = decodeRoutinesJson(oldJson)
         assertEquals(1, decoded.size)
         val r = decoded.first()
         val ex = r.exercises.first()
         assertEquals(0, ex.restSeconds)
         assertNull(ex.note)
         assertNull(ex.customName)
+        assertNull(ex.tempo)
+        assertFalse(ex.isTimed)
         assertEquals("Lat Pulldown", ex.displayName)
 
         val set = ex.sets.first()
+        assertEquals(10, set.repsMin)
+        assertNull(set.repsMax)
+        assertNull(set.timeSecondsMin)
+        assertNull(set.timeSecondsMax)
         assertNull(set.note)
         assertNull(set.difficulty)
+    }
+
+    @Test
+    fun `repsLabel formats min only, min-max range, and empty`() {
+        assertEquals("8", repsLabel(PlannedSet(repsMin = 8)))
+        assertEquals("8-12", repsLabel(PlannedSet(repsMin = 8, repsMax = 12)))
+        assertEquals("12", repsLabel(PlannedSet(repsMax = 12)))
+        assertEquals("", repsLabel(PlannedSet()))
+    }
+
+    @Test
+    fun `timeLabel formats seconds min only, min-max range, and empty`() {
+        assertEquals("30s", timeLabel(PlannedSet(timeSecondsMin = 30)))
+        assertEquals("30-45s", timeLabel(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)))
+        assertEquals("45s", timeLabel(PlannedSet(timeSecondsMax = 45)))
+        assertEquals("", timeLabel(PlannedSet()))
+    }
+
+    @Test
+    fun `tempo formatting converts parts with blanks to 0 or null if all blank`() {
+        assertEquals("2-0-2-1", formatTempo("2", "0", "2", "1"))
+        assertEquals("3-0-0-0", formatTempo("3", "", "", ""))
+        assertEquals("0-1-0-2", formatTempo("", "1", "", "2"))
+        assertNull(formatTempo("", "", "", ""))
+        assertNull(formatTempo("   ", "", "", ""))
+
+        val parsed = parseTempo("2-0-2-1")
+        assertEquals(listOf("2", "0", "2", "1"), parsed)
+        assertEquals(listOf("", "", "", ""), parseTempo(null))
+    }
+
+    @Test
+    fun `timed exercise round-trip serialises timeSeconds fields and isTimed flag`() {
+        val timedEx = RoutineExercise(
+            exerciseId = "plank",
+            exerciseName = "Plank",
+            isTimed = true,
+            tempo = null,
+            sets = listOf(
+                PlannedSet(type = "normal", timeSecondsMin = 45, timeSecondsMax = 60),
+                PlannedSet(type = "normal", timeSecondsMin = 60, timeSecondsMax = null)
+            )
+        )
+        val routine = Routine(name = "Core", exercises = listOf(timedEx))
+
+        val encoded = json.encodeToString(listOf(routine))
+        val decoded = decodeRoutinesJson(encoded)
+
+        assertEquals(1, decoded.size)
+        val ex = decoded.first().exercises.first()
+        assertTrue(ex.isTimed)
+        assertEquals(45, ex.sets[0].timeSecondsMin)
+        assertEquals(60, ex.sets[0].timeSecondsMax)
+        assertEquals(60, ex.sets[1].timeSecondsMin)
+        assertNull(ex.sets[1].timeSecondsMax)
     }
 
     @Test
@@ -156,14 +226,6 @@ class RoutineStorageTest {
             customName = null
         )
         assertEquals("Lat Pulldown", exNullCustom.displayName)
-    }
-
-    @Test
-    fun `cycleDifficulty transitions null to easy to medium to hard to null`() {
-        assertEquals("easy", cycleDifficulty(null))
-        assertEquals("medium", cycleDifficulty("easy"))
-        assertEquals("hard", cycleDifficulty("medium"))
-        assertNull(cycleDifficulty("hard"))
     }
 
     @Test
