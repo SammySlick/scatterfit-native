@@ -34,23 +34,17 @@ fun repsLabel(s: PlannedSet): String = when {
     else -> ""
 }
 
-fun formatScaledTime(seconds: Int): Pair<String, String> {
-    return when {
-        seconds < 60 -> {
-            "$seconds" to "secs"
-        }
-        seconds < 7200 -> {
-            val mins = seconds / 60.0
-            val rounded = kotlin.math.round(mins * 10.0) / 10.0
-            val numStr = if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
-            numStr to "mins"
-        }
-        else -> {
-            val hours = seconds / 3600.0
-            val rounded = kotlin.math.round(hours * 10.0) / 10.0
-            val numStr = if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
-            numStr to "hours"
-        }
+fun formatClockTime(seconds: Int): String {
+    val s = seconds.coerceAtLeast(0)
+    val hours = s / 3600
+    val remainder = s % 3600
+    val mins = remainder / 60
+    val secs = remainder % 60
+
+    return if (hours > 0) {
+        String.format(java.util.Locale.US, "%d:%02d:%02d", hours, mins, secs)
+    } else {
+        String.format(java.util.Locale.US, "%02d:%02d", mins, secs)
     }
 }
 
@@ -58,44 +52,10 @@ fun displayTimeLabel(secondsMin: Int?, secondsMax: Int?): String {
     if (secondsMin == null && secondsMax == null) return ""
     return when {
         secondsMin != null && secondsMax != null -> {
-            val baseSec = maxOf(secondsMin, secondsMax)
-            val (_, unit) = formatScaledTime(baseSec)
-            val minStr = when (unit) {
-                "secs" -> "$secondsMin"
-                "mins" -> {
-                    val m = secondsMin / 60.0
-                    val r = kotlin.math.round(m * 10.0) / 10.0
-                    if (r % 1.0 == 0.0) "${r.toInt()}" else "$r"
-                }
-                else -> {
-                    val h = secondsMin / 3600.0
-                    val r = kotlin.math.round(h * 10.0) / 10.0
-                    if (r % 1.0 == 0.0) "${r.toInt()}" else "$r"
-                }
-            }
-            val maxStr = when (unit) {
-                "secs" -> "$secondsMax"
-                "mins" -> {
-                    val m = secondsMax / 60.0
-                    val r = kotlin.math.round(m * 10.0) / 10.0
-                    if (r % 1.0 == 0.0) "${r.toInt()}" else "$r"
-                }
-                else -> {
-                    val h = secondsMax / 3600.0
-                    val r = kotlin.math.round(h * 10.0) / 10.0
-                    if (r % 1.0 == 0.0) "${r.toInt()}" else "$r"
-                }
-            }
-            "$minStr-$maxStr $unit"
+            "${formatClockTime(secondsMin)} - ${formatClockTime(secondsMax)}"
         }
-        secondsMin != null -> {
-            val (num, unit) = formatScaledTime(secondsMin)
-            "$num $unit"
-        }
-        secondsMax != null -> {
-            val (num, unit) = formatScaledTime(secondsMax)
-            "$num $unit"
-        }
+        secondsMin != null -> formatClockTime(secondsMin)
+        secondsMax != null -> formatClockTime(secondsMax)
         else -> ""
     }
 }

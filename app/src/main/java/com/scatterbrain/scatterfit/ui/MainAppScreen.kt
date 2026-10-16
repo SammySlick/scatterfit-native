@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scatterbrain.scatterfit.sync.SyncHub
@@ -37,6 +38,7 @@ import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 enum class AppTab {
     MY_DAY,
     ODYSSEY,
+    TRAINING,
     ASK
 }
 
@@ -81,11 +83,20 @@ fun MainAppScreen(
             ) {
             when (selectedTab) {
                 AppTab.MY_DAY -> MyDayScreen(
-                    onSettingsClick = onSettingsClick
+                    onSettingsClick = onSettingsClick,
+                    onOpenTraining = { selectedTab = AppTab.TRAINING }
                 )
                 AppTab.ODYSSEY -> OdysseyScreen(
                     onSettingsClick = onSettingsClick
                 )
+                AppTab.TRAINING -> {
+                    val context = LocalContext.current
+                    val routineStorage = remember { RoutineStorage(context) }
+                    TrainingScreen(
+                        storage = routineStorage,
+                        onBackClick = { selectedTab = AppTab.MY_DAY }
+                    )
+                }
                 AppTab.ASK -> AskScreen()
             }
             }
@@ -142,6 +153,19 @@ fun BottomNavBar(
                         modifier = Modifier.size(24.dp),
                         tint = tint,
                         strokeWidthDp = 1.8.dp
+                    )
+                }
+            )
+
+            BottomNavItem(
+                label = "Training",
+                isSelected = selectedTab == AppTab.TRAINING,
+                onClick = { onTabSelected(AppTab.TRAINING) },
+                icon = { tint ->
+                    DumbbellIcon(
+                        modifier = Modifier.size(24.dp),
+                        tint = tint,
+                        strokeWidthDp = 2.dp
                     )
                 }
             )

@@ -160,20 +160,30 @@ class RoutineStorageTest {
     }
 
     @Test
-    fun `timeLabel formats seconds min only, min-max range, and empty`() {
-        assertEquals("30 secs", timeLabel(PlannedSet(timeSecondsMin = 30)))
-        assertEquals("30-45 secs", timeLabel(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)))
-        assertEquals("45 secs", timeLabel(PlannedSet(timeSecondsMax = 45)))
+    fun `timeLabel formats seconds in clock format`() {
+        assertEquals("00:30", timeLabel(PlannedSet(timeSecondsMin = 30)))
+        assertEquals("00:30 - 00:45", timeLabel(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)))
+        assertEquals("00:45", timeLabel(PlannedSet(timeSecondsMax = 45)))
         assertEquals("", timeLabel(PlannedSet()))
     }
 
     @Test
-    fun `displayTimeLabel auto-scales for readability across thresholds`() {
-        assertEquals("30 secs", displayTimeLabel(30, null))
-        assertEquals("30-45 secs", displayTimeLabel(30, 45))
-        assertEquals("1.5 mins", displayTimeLabel(90, null))
-        assertEquals("90 mins", displayTimeLabel(5400, null))
-        assertEquals("2 hours", displayTimeLabel(7200, null))
+    fun `formatClockTime and displayTimeLabel format clock style MM SS and H MM SS`() {
+        assertEquals("00:30", formatClockTime(30))
+        assertEquals("00:59", formatClockTime(59))
+        assertEquals("01:30", formatClockTime(90))
+        assertEquals("09:59", formatClockTime(599))
+        assertEquals("1:00:00", formatClockTime(3600))
+        assertEquals("1:30:00", formatClockTime(5400))
+        assertEquals("2:00:00", formatClockTime(7200))
+
+        assertEquals("00:30", displayTimeLabel(30, null))
+        assertEquals("00:30 - 00:45", displayTimeLabel(30, 45))
+        assertEquals("01:30", displayTimeLabel(90, null))
+        assertEquals("09:59", displayTimeLabel(599, null))
+        assertEquals("1:00:00", displayTimeLabel(3600, null))
+        assertEquals("1:30:00", displayTimeLabel(5400, null))
+        assertEquals("2:00:00", displayTimeLabel(7200, null))
         assertEquals("", displayTimeLabel(null, null))
     }
 
@@ -385,7 +395,7 @@ class RoutineStorageTest {
         assertEquals(1, identicalSummary.size)
         assertEquals("4 × 8-12 @ 60 kg", identicalSummary.first())
 
-        // Identical timed sets collapse to auto-scaled long-form time
+        // Identical timed sets collapse to auto-scaled clock format
         val exTimedIdentical = RoutineExercise(
             exerciseId = "plank",
             exerciseName = "Plank",
@@ -398,7 +408,7 @@ class RoutineStorageTest {
         )
         val timedSummary = formatExerciseSetsSummary(exTimedIdentical)
         assertEquals(1, timedSummary.size)
-        assertEquals("3 × 30-45 secs", timedSummary.first())
+        assertEquals("3 × 00:30 - 00:45", timedSummary.first())
 
         // Differing sets expand to per-set lines with kg suffix
         val exDiffering = RoutineExercise(

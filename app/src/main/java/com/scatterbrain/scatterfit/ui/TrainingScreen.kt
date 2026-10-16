@@ -23,9 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -57,7 +55,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -306,8 +303,11 @@ fun TrainingScreen(
 }
 
 /**
- * PLAN Tab: 7-day week strip (Mon-first), selected day detail, inline routine/session assigner,
- * and recent session log.
+ * PLAN Tab: Seven-row week view (Mon..Sun).
+ * Week navigation chevrons above the rows.
+ * Tapping a row expands it IN PLACE (accordion, only one open at a time).
+ * Shows assign controls [+ Routine] / [+ Session], or existing assignment with [Remove] & "Log it".
+ * Recent log strip at bottom.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -325,20 +325,13 @@ private fun WeeklyPlannerSection(
 ) {
     val today = remember { todayKey() }
     var currentAnchorDay by remember { mutableStateOf(today) }
-    var selectedDayKey by remember { mutableStateOf(today) }
+    var expandedDayKey by remember { mutableStateOf<String?>(null) }
 
     val weekDays = remember(currentAnchorDay) { weekDaysFor(currentAnchorDay) }
 
-    val selectedPlanned = plannedSessions.find { it.dayKey == selectedDayKey }
-    val assignedRoutine = selectedPlanned?.routineId?.let { rid -> routines.find { it.id == rid } }
-    val assignedSessionName = selectedPlanned?.sessionName
-
-    val loggedForSelectedDay = loggedSessions.filter { it.dayKey == selectedDayKey }
-    val isDayLogged = loggedForSelectedDay.isNotEmpty()
-
     val haptic = LocalHapticFeedback.current
 
-    // Expandable states for assign UI
+    // Inline assign UI state per expanded row
     var showRoutinePicker by remember { mutableStateOf(false) }
     var showSessionInput by remember { mutableStateOf(false) }
 
@@ -346,448 +339,423 @@ private fun WeeklyPlannerSection(
     var customSessionDuration by remember { mutableStateOf("") }
 
     var isEditingSessionName by remember { mutableStateOf(false) }
-    var editingSessionNameText by remember(assignedSessionName) { mutableStateOf(assignedSessionName ?: "") }
+    var editingSessionNameText by remember { mutableStateOf("") }
+
+    // Week navigation header label: e.g. "13 – 19 Oct"
+    val weekLabel = remember(weekDays) {
+        runCatching {
+            val first = LocalDate.parse(weekDays.first())
+            val last = LocalDate.parse(weekDays.last())
+            val startStr = "${first.dayOfMonth}"
+            val endStr = last.format(DateTimeFormatter.ofPattern("d MMM", Locale.US))
+            "$startStr – $endStr"
+        }.getOrDefault("Week")
+    }
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // 1. WEEK STRIP with Chevron Navigation
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
-            border = BorderStroke(1.dp, BorderDefault)
+        // Week Navigation Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp, horizontal = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            IconButton(
+                onClick = {
+                    val curr = LocalDate.parse(currentAnchorDay)
+                    currentAnchorDay = curr.minusDays(7).format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    expandedDayKey = null
+                },
+                modifier = Modifier.size(32.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(
-                        onClick = {
-                            val curr = LocalDate.parse(currentAnchorDay)
-                            currentAnchorDay = curr.minusDays(7).format(DateTimeFormatter.ISO_LOCAL_DATE)
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Text("‹", fontSize = 20.sp, color = TextForeground, fontWeight = FontWeight.Bold)
-                    }
+                Text("‹", fontSize = 22.sp, color = TextForeground, fontWeight = FontWeight.Bold)
+            }
 
-                    // Week Strip 7 Cells
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val weekdayLetters = listOf("M", "T", "W", "T", "F", "S", "S")
-                        weekDays.forEachIndexed { idx, dayKey ->
-                            val date = LocalDate.parse(dayKey)
-                            val isSelected = dayKey == selectedDayKey
-                            val isCurrentToday = dayKey == today
-                            val hasAssignment = plannedSessions.any {
-                                it.dayKey == dayKey && (it.routineId != null || !it.sessionName.isNullOrBlank())
-                            }
+            Text(
+                text = weekLabel,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextForeground
+            )
 
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(3.dp),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) SecondaryFill else Color.Transparent)
-                                    .border(
-                                        BorderStroke(
-                                            1.dp,
-                                            if (isCurrentToday) TealHighlight else if (isSelected) BorderDefault else Color.Transparent
-                                        ),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable {
-                                        selectedDayKey = dayKey
-                                        showRoutinePicker = false
-                                        showSessionInput = false
-                                        isEditingSessionName = false
-                                    }
-                                    .padding(horizontal = 6.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = weekdayLetters[idx],
-                                    fontSize = 11.sp,
-                                    color = TextMuted,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = date.dayOfMonth.toString(),
-                                    fontSize = 13.sp,
-                                    color = if (isSelected || isCurrentToday) TextForeground else TextMuted,
-                                    fontWeight = if (isSelected || isCurrentToday) FontWeight.Bold else FontWeight.Normal
-                                )
-
-                                // Teal dot for assigned routine/session
-                                Box(
-                                    modifier = Modifier
-                                        .size(4.dp)
-                                        .clip(CircleShape)
-                                        .background(if (hasAssignment) TealHighlight else Color.Transparent)
-                                )
-                            }
-                        }
-                    }
-
-                    IconButton(
-                        onClick = {
-                            val curr = LocalDate.parse(currentAnchorDay)
-                            currentAnchorDay = curr.plusDays(7).format(DateTimeFormatter.ISO_LOCAL_DATE)
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Text("›", fontSize = 20.sp, color = TextForeground, fontWeight = FontWeight.Bold)
-                    }
-                }
+            IconButton(
+                onClick = {
+                    val curr = LocalDate.parse(currentAnchorDay)
+                    currentAnchorDay = curr.plusDays(7).format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    expandedDayKey = null
+                },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Text("›", fontSize = 22.sp, color = TextForeground, fontWeight = FontWeight.Bold)
             }
         }
 
-        // 2. DAY DETAIL (for selectedDayKey)
-        val selectedDateFormatted = remember(selectedDayKey) {
-            runCatching {
-                LocalDate.parse(selectedDayKey).format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US))
-            }.getOrDefault(selectedDayKey)
-        }
+        // 7-ROW WEEK VIEW (Mon..Sun)
+        weekDays.forEach { dayKey ->
+            val date = LocalDate.parse(dayKey)
+            val dayNumber = date.dayOfMonth.toString()
+            val weekdayAbbrev = date.format(DateTimeFormatter.ofPattern("EEE", Locale.US))
+            val isCurrentToday = dayKey == today
+            val isExpanded = expandedDayKey == dayKey
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
-            border = BorderStroke(1.dp, BorderDefault)
-        ) {
-            Column(
+            val planned = plannedSessions.find { it.dayKey == dayKey }
+            val routine = planned?.routineId?.let { rid -> routines.find { it.id == rid } }
+            val sessionName = planned?.sessionName
+            val isAssigned = routine != null || !sessionName.isNullOrBlank()
+            val assignedTitle = routine?.name ?: sessionName ?: "Rest day"
+
+            val isLogged = loggedSessions.any { it.dayKey == dayKey }
+
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Header row: Date + Status / Rest day
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = selectedDateFormatted,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextForeground
-                    )
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (isDayLogged) {
-                            Text(
-                                text = "✓ Done",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TealHighlight
-                            )
-                        } else if (assignedRoutine == null && assignedSessionName.isNullOrBlank()) {
-                            Text(
-                                text = "Rest day",
-                                fontSize = 12.sp,
-                                color = TextMuted
-                            )
-                        }
-                    }
-                }
-
-                // ASSIGNED BLOCK
-                if (assignedRoutine != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SecondaryFill)
-                            .clickable { onViewRoutine(assignedRoutine) }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = assignedRoutine.name,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextForeground
-                            )
-                            Text(
-                                text = "${assignedRoutine.exercises.size} exercises · Tap for details",
-                                fontSize = 11.sp,
-                                color = TextMuted
-                            )
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (!isDayLogged) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(TealHighlight.copy(alpha = 0.15f))
-                                        .border(BorderStroke(1.dp, TealHighlight.copy(alpha = 0.4f)), RoundedCornerShape(6.dp))
-                                        .clickable {
-                                            onAddLoggedSession(
-                                                LoggedSession(dayKey = selectedDayKey, name = assignedRoutine.name)
-                                            )
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("Log it", color = TealHighlight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            TextButton(onClick = { onRemovePlan(selectedDayKey) }) {
-                                Text("Remove", color = TextMuted, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                } else if (!assignedSessionName.isNullOrBlank()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SecondaryFill)
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        if (isEditingSessionName) {
-                            OutlinedTextField(
-                                value = editingSessionNameText,
-                                onValueChange = { editingSessionNameText = it },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TextForeground,
-                                    unfocusedTextColor = TextForeground,
-                                    focusedBorderColor = TealHighlight,
-                                    unfocusedBorderColor = BorderInput
-                                )
-                            )
-                            IconButton(onClick = {
-                                isEditingSessionName = false
-                                val trimmed = editingSessionNameText.trim()
-                                if (trimmed.isNotBlank()) {
-                                    onUpsertPlan(
-                                        selectedPlanned?.copy(sessionName = trimmed)
-                                            ?: PlannedSessionDay(dayKey = selectedDayKey, sessionName = trimmed)
-                                    )
-                                }
-                            }) {
-                                Text("✓", color = TealHighlight, fontWeight = FontWeight.Bold)
-                            }
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable {
+                        if (isExpanded) {
+                            expandedDayKey = null
+                            showRoutinePicker = false
+                            showSessionInput = false
+                            isEditingSessionName = false
                         } else {
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { isEditingSessionName = true }
-                            ) {
-                                Text(
-                                    text = assignedSessionName,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextForeground
-                                )
-                                Text(
-                                    text = "Standalone Session · Tap name to edit",
-                                    fontSize = 11.sp,
-                                    color = TextMuted
-                                )
-                            }
+                            expandedDayKey = dayKey
+                            showRoutinePicker = false
+                            showSessionInput = false
+                            isEditingSessionName = false
+                            editingSessionNameText = sessionName ?: ""
                         }
-
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (!isDayLogged) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(TealHighlight.copy(alpha = 0.15f))
-                                        .border(BorderStroke(1.dp, TealHighlight.copy(alpha = 0.4f)), RoundedCornerShape(6.dp))
-                                        .clickable {
-                                            onAddLoggedSession(
-                                                LoggedSession(dayKey = selectedDayKey, name = assignedSessionName)
-                                            )
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("Log it", color = TealHighlight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            TextButton(onClick = { onRemovePlan(selectedDayKey) }) {
-                                Text("Remove", color = TextMuted, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                } else {
-                    // Empty day -> Two inline assign buttons
+                    },
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                border = BorderStroke(
+                    1.dp,
+                    if (isCurrentToday) TealHighlight else BorderDefault
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Row Header (Day badge, title, logged tick, chevron)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(SecondaryFill)
-                                .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
-                                .clickable {
-                                    showRoutinePicker = !showRoutinePicker
-                                    showSessionInput = false
-                                }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text("+ Routine", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            // Day Badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isCurrentToday) TealHighlight.copy(alpha = 0.15f) else SecondaryFill)
+                                    .border(
+                                        BorderStroke(1.dp, if (isCurrentToday) TealHighlight else BorderDefault),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = weekdayAbbrev,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isCurrentToday) TealHighlight else TextMuted
+                                    )
+                                    Text(
+                                        text = dayNumber,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isCurrentToday) TealHighlight else TextForeground
+                                    )
+                                }
+                            }
+
+                            // Assignment Title
+                            Text(
+                                text = assignedTitle,
+                                fontSize = 13.sp,
+                                fontWeight = if (isAssigned) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isAssigned) TextForeground else TextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
 
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(SecondaryFill)
-                                .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
-                                .clickable {
-                                    showSessionInput = !showSessionInput
-                                    showRoutinePicker = false
-                                }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("+ Session", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            if (isLogged) {
+                                Text("✓", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                            Text(
+                                text = if (isExpanded) "▴" else "▾",
+                                color = TextMuted,
+                                fontSize = 12.sp
+                            )
                         }
                     }
-                }
 
-                // Expandable Section: Pick Routine
-                if (showRoutinePicker) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SecondaryFill)
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text("Select a routine for $selectedDateFormatted:", fontSize = 12.sp, color = TextMuted)
-
-                        routines.forEach { r ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(DarkCardSurface)
-                                    .clickable {
-                                        onUpsertPlan(PlannedSessionDay(dayKey = selectedDayKey, routineId = r.id))
-                                        showRoutinePicker = false
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(r.name, color = TextForeground, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text("${r.exercises.size} ex", color = TextMuted, fontSize = 11.sp)
-                            }
-                        }
-
-                        // [+ New routine] row at end
-                        Row(
+                    // Accordion Expanded Content
+                    if (isExpanded) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(DarkCardSurface)
-                                .clickable {
-                                    showRoutinePicker = false
-                                    onCreateNewRoutine()
-                                }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(top = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("+ New routine…", color = TealHighlight, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+                            if (routine != null) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    TextButton(onClick = { onViewRoutine(routine) }) {
+                                        Text("View Routine →", color = TealHighlight, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    }
 
-                // Expandable Section: New Standalone Session
-                if (showSessionInput) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SecondaryFill)
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("Plan a session (Running, Golf, Football…):", fontSize = 12.sp, color = TextMuted)
-
-                        OutlinedTextField(
-                            value = customSessionName,
-                            onValueChange = { customSessionName = it },
-                            placeholder = { Text("Session name (e.g. Running)", color = TextMuted) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TextForeground,
-                                unfocusedTextColor = TextForeground,
-                                focusedBorderColor = TealHighlight,
-                                unfocusedBorderColor = BorderInput
-                            )
-                        )
-
-                        OutlinedTextField(
-                            value = customSessionDuration,
-                            onValueChange = { customSessionDuration = it.filter { ch -> ch.isDigit() } },
-                            placeholder = { Text("Duration mins (optional)", color = TextMuted) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TextForeground,
-                                unfocusedTextColor = TextForeground,
-                                focusedBorderColor = TealHighlight,
-                                unfocusedBorderColor = BorderInput
-                            )
-                        )
-
-                        Button(
-                            onClick = {
-                                val trimmed = customSessionName.trim()
-                                if (trimmed.isNotBlank()) {
-                                    val dur = customSessionDuration.toIntOrNull()
-                                    val note = dur?.let { "$it mins" }
-                                    onUpsertPlan(
-                                        PlannedSessionDay(dayKey = selectedDayKey, sessionName = trimmed, note = note)
-                                    )
-                                    customSessionName = ""
-                                    customSessionDuration = ""
-                                    showSessionInput = false
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        if (!isLogged) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(TealHighlight.copy(alpha = 0.15f))
+                                                    .border(BorderStroke(1.dp, TealHighlight.copy(alpha = 0.4f)), RoundedCornerShape(6.dp))
+                                                    .clickable {
+                                                        onAddLoggedSession(LoggedSession(dayKey = dayKey, name = routine.name))
+                                                    }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("Log it", color = TealHighlight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                        TextButton(onClick = { onRemovePlan(dayKey) }) {
+                                            Text("Remove", color = TextMuted, fontSize = 11.sp)
+                                        }
+                                    }
                                 }
-                            },
-                            enabled = customSessionName.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Save Planned Session", fontWeight = FontWeight.Bold)
+                            } else if (!sessionName.isNullOrBlank()) {
+                                if (isEditingSessionName) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = editingSessionNameText,
+                                            onValueChange = { editingSessionNameText = it },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1f),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedTextColor = TextForeground,
+                                                unfocusedTextColor = TextForeground,
+                                                focusedBorderColor = TealHighlight,
+                                                unfocusedBorderColor = BorderInput
+                                            )
+                                        )
+                                        IconButton(onClick = {
+                                            isEditingSessionName = false
+                                            val trimmed = editingSessionNameText.trim()
+                                            if (trimmed.isNotBlank()) {
+                                                onUpsertPlan(
+                                                    planned?.copy(sessionName = trimmed)
+                                                        ?: PlannedSessionDay(dayKey = dayKey, sessionName = trimmed)
+                                                )
+                                            }
+                                        }) {
+                                            Text("✓", color = TealHighlight, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                } else {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        TextButton(onClick = { isEditingSessionName = true }) {
+                                            Text("Edit Name", color = TealHighlight, fontSize = 12.sp)
+                                        }
+
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            if (!isLogged) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(TealHighlight.copy(alpha = 0.15f))
+                                                        .border(BorderStroke(1.dp, TealHighlight.copy(alpha = 0.4f)), RoundedCornerShape(6.dp))
+                                                        .clickable {
+                                                            onAddLoggedSession(LoggedSession(dayKey = dayKey, name = sessionName))
+                                                        }
+                                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                ) {
+                                                    Text("Log it", color = TealHighlight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                            TextButton(onClick = { onRemovePlan(dayKey) }) {
+                                                Text("Remove", color = TextMuted, fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Rest day -> assign controls
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(SecondaryFill)
+                                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(6.dp))
+                                            .clickable {
+                                                showRoutinePicker = !showRoutinePicker
+                                                showSessionInput = false
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("+ Routine", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(SecondaryFill)
+                                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(6.dp))
+                                            .clickable {
+                                                showSessionInput = !showSessionInput
+                                                showRoutinePicker = false
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("+ Session", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+
+                                if (showRoutinePicker) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(SecondaryFill)
+                                            .padding(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        routines.forEach { r ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(DarkCardSurface)
+                                                    .clickable {
+                                                        onUpsertPlan(PlannedSessionDay(dayKey = dayKey, routineId = r.id))
+                                                        showRoutinePicker = false
+                                                    }
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(r.name, color = TextForeground, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                                Text("${r.exercises.size} ex", color = TextMuted, fontSize = 10.sp)
+                                            }
+                                        }
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(DarkCardSurface)
+                                                .clickable {
+                                                    showRoutinePicker = false
+                                                    onCreateNewRoutine()
+                                                }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Text("+ New routine…", color = TealHighlight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                if (showSessionInput) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(SecondaryFill)
+                                            .padding(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = customSessionName,
+                                            onValueChange = { customSessionName = it },
+                                            placeholder = { Text("Session (e.g. Running)", color = TextMuted) },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedTextColor = TextForeground,
+                                                unfocusedTextColor = TextForeground,
+                                                focusedBorderColor = TealHighlight,
+                                                unfocusedBorderColor = BorderInput
+                                            )
+                                        )
+
+                                        OutlinedTextField(
+                                            value = customSessionDuration,
+                                            onValueChange = { customSessionDuration = it.filter { ch -> ch.isDigit() } },
+                                            placeholder = { Text("Duration mins (optional)", color = TextMuted) },
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedTextColor = TextForeground,
+                                                unfocusedTextColor = TextForeground,
+                                                focusedBorderColor = TealHighlight,
+                                                unfocusedBorderColor = BorderInput
+                                            )
+                                        )
+
+                                        Button(
+                                            onClick = {
+                                                val trimmed = customSessionName.trim()
+                                                if (trimmed.isNotBlank()) {
+                                                    val dur = customSessionDuration.toIntOrNull()
+                                                    val note = dur?.let { "$it mins" }
+                                                    onUpsertPlan(PlannedSessionDay(dayKey = dayKey, sessionName = trimmed, note = note))
+                                                    customSessionName = ""
+                                                    customSessionDuration = ""
+                                                    showSessionInput = false
+                                                }
+                                            },
+                                            enabled = customSessionName.isNotBlank(),
+                                            colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black),
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text("Save Planned Session", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        // 3. RECENT LOG Strip at bottom of PLAN tab (last 5 LoggedSessions, newest first)
+        // Recent Logs Strip
         val recentLogs = remember(loggedSessions) { loggedSessions.take(5) }
         if (recentLogs.isNotEmpty()) {
             Column(
@@ -968,7 +936,7 @@ fun RoutineOverviewScreen(
 
                             // Subtitle: Rest / Tempo
                             val subtitleParts = buildList {
-                                if (ex.restSeconds > 0) add("Rest: ${ex.restSeconds} secs")
+                                if (ex.restSeconds > 0) add("Rest: ${formatClockTime(ex.restSeconds)}")
                                 if (!ex.tempo.isNullOrBlank()) add("Tempo: ${ex.tempo}")
                             }
                             if (subtitleParts.isNotEmpty()) {

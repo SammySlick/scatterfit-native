@@ -46,6 +46,25 @@ class TrainingPlanStorageTest {
     }
 
     @Test
+    fun `seven-row week view maths matches weekDaysFor anchor exactly`() {
+        val anchor = "2026-10-15"
+        val rows = weekDaysFor(anchor)
+        assertEquals(7, rows.size)
+        assertEquals(
+            listOf(
+                "2026-10-12",
+                "2026-10-13",
+                "2026-10-14",
+                "2026-10-15",
+                "2026-10-16",
+                "2026-10-17",
+                "2026-10-18"
+            ),
+            rows
+        )
+    }
+
+    @Test
     fun `PlannedSessionsStorage round-trip, upsert-overwrite, and remove`() {
         var rawJson: String? = null
         val storage = PlannedSessionsStorage(

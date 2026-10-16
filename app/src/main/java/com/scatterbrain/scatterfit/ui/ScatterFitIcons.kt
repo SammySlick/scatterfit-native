@@ -168,6 +168,62 @@ fun ChevronLeftIcon(
     )
 }
 
+@Composable
+fun DumbbellIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground,
+    strokeWidthDp: Dp = 2.dp
+) {
+    Canvas(modifier = modifier) {
+        val strokeWidth = strokeWidthDp.toPx()
+        val w = size.width
+        val h = size.height
+
+        // Center barbell line
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.15f, h * 0.5f),
+            end = Offset(w * 0.85f, h * 0.5f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+
+        // Left outer plate
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.22f, h * 0.30f),
+            end = Offset(w * 0.22f, h * 0.70f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+        // Left inner plate
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.32f, h * 0.20f),
+            end = Offset(w * 0.32f, h * 0.80f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+
+        // Right inner plate
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.68f, h * 0.20f),
+            end = Offset(w * 0.68f, h * 0.80f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+        // Right outer plate
+        drawLine(
+            color = tint,
+            start = Offset(w * 0.78f, h * 0.30f),
+            end = Offset(w * 0.78f, h * 0.70f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 @Composable
 fun ScatterFitIconsPreview() {

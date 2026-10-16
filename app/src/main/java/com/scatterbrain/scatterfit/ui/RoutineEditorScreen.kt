@@ -505,7 +505,7 @@ private fun HevyExerciseCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Rest chip (tap cycles 0 -> 30 -> 45 -> 60 -> 90 -> 120 -> 180 -> 0)
-                val restLabel = if (exercise.restSeconds == 0) "Rest: OFF" else "Rest: ${exercise.restSeconds} secs"
+                val restLabel = if (exercise.restSeconds == 0) "Rest: OFF" else "Rest: ${formatClockTime(exercise.restSeconds)}"
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
