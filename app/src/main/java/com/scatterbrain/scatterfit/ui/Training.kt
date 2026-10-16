@@ -323,6 +323,24 @@ data class Routine(
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
+@Serializable
+data class PlannedSessionDay(
+    val dayKey: String, // yyyy-MM-dd, LOCAL
+    val routineId: String? = null,
+    val sessionName: String? = null,
+    val note: String? = null,
+)
+
+@Serializable
+data class LoggedSession(
+    val id: String = UUID.randomUUID().toString(),
+    val dayKey: String,
+    val name: String,
+    val durationMinutes: Int? = null,
+    val note: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
 // Legacy DTOs for seamless backward-compatible decoding of old stored routines
 @Serializable
 private data class LegacyPlannedSet(
