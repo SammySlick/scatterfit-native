@@ -36,6 +36,19 @@ fun SettingsIcon(
 }
 
 @Composable
+fun CalendarIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_calendar),
+        contentDescription = "Calendar",
+        tint = tint,
+        modifier = modifier
+    )
+}
+
+@Composable
 fun StreakIcon(
     modifier: Modifier = Modifier,
     tint: Color = AccentTeal

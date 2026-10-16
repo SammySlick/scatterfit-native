@@ -1,17 +1,16 @@
 package com.scatterbrain.scatterfit.ui
 
 import android.annotation.SuppressLint
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.graphics.graphicsLayer
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -47,21 +47,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.sync.SyncHub
@@ -69,12 +69,20 @@ import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
-import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
+import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.StateSlip
+import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun MyDayScreen(
@@ -84,8 +92,15 @@ fun MyDayScreen(
     val scrollState = rememberScrollState()
 
     val today = remember { todayKey() }
-    var currentDayKey by remember { mutableStateOf(today) }
-    val isFutureDay = currentDayKey > today
+    var selectedDay by remember { mutableStateOf(today) }
+    val isFutureDay = selectedDay > today
+    val isToday = selectedDay == today
+
+    val context = LocalContext.current
+    val foodStorage = remember { FoodStorage(context) }
+    val drinkStorage = remember { DrinkStorage(context) }
+    val weightStorage = remember { WeightStorage(context) }
+    val planStorage = remember { TrainingPlanStorage(context) }
 
     val repoDaily by DailyRepository.daily.collectAsState()
     val momentumSource: MomentumSource? = remember(repoDaily) {
@@ -95,16 +110,15 @@ fun MyDayScreen(
     }
 
     // Day-keyed persistent drink tracking ViewModel
-    val context = androidx.compose.ui.platform.LocalContext.current
     val drinkViewModel = remember {
         DrinkTrackerViewModel(
-            storage = DrinkStorage(context),
-            initialDayKey = currentDayKey
+            storage = drinkStorage,
+            initialDayKey = selectedDay
         )
     }
 
-    LaunchedEffect(currentDayKey) {
-        drinkViewModel.setDayKey(currentDayKey)
+    LaunchedEffect(selectedDay) {
+        drinkViewModel.setDayKey(selectedDay)
     }
 
     val drinkState by drinkViewModel.dailyState.collectAsState()
@@ -117,24 +131,33 @@ fun MyDayScreen(
 
     val foodViewModel = remember {
         FoodTrackerViewModel(
-            storage = FoodStorage(context),
-            initialDayKey = currentDayKey
+            storage = foodStorage,
+            initialDayKey = selectedDay
         )
     }
 
-    LaunchedEffect(currentDayKey) {
-        foodViewModel.setDayKey(currentDayKey)
+    LaunchedEffect(selectedDay) {
+        foodViewModel.setDayKey(selectedDay)
     }
 
-    val planStorage = remember { TrainingPlanStorage(context) }
     var planVersion by remember { mutableIntStateOf(0) }
-    val todayDate = remember(currentDayKey) {
-        runCatching { LocalDate.parse(currentDayKey) }.getOrDefault(LocalDate.now())
+    val selectedDate = remember(selectedDay) {
+        runCatching { LocalDate.parse(selectedDay) }.getOrDefault(LocalDate.now())
     }
-    val todayPlan = remember(todayDate, planVersion) {
-        planStorage.getPlanForDate(todayDate)
+    val todayPlan = remember(selectedDate, planVersion) {
+        planStorage.getPlanForDate(selectedDate)
     }
 
+    val streak = remember(repoDaily, selectedDay) {
+        computeStreak(
+            foodByDay = foodStorage.getLoggedDays(),
+            drinksByDay = drinkStorage.getLoggedDays(),
+            weightsByDay = weightStorage.getLoggedDays(),
+            todayKey = today
+        )
+    }
+
+    var showCalendarSheet by remember { mutableStateOf(false) }
     var showFoodLoggerScreen by remember { mutableStateOf(false) }
     var showDrinkLoggerScreen by remember { mutableStateOf(false) }
     var showPlanEditor by remember { mutableStateOf(false) }
@@ -151,11 +174,17 @@ fun MyDayScreen(
                 if (kg < 40.0 || kg > 200.0) return@WeighInDialog
                 val bf = bodyFat.trim().toDoubleOrNull()
                     ?.takeIf { it > 0.0 && it <= 60.0 }
-                val storage = WeightStorage(context)
-                storage.saveWeight(
-                    LoggedWeight(kg = kg, bodyFatPct = bf, dayKey = currentDayKey)
+                val zone = ZoneId.systemDefault()
+                val timestamp = if (selectedDay == todayKey(zone)) {
+                    System.currentTimeMillis()
+                } else {
+                    val date = runCatching { LocalDate.parse(selectedDay) }.getOrDefault(LocalDate.now(zone))
+                    date.atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
+                }
+                weightStorage.saveWeight(
+                    LoggedWeight(kg = kg, bodyFatPct = bf, timestamp = timestamp, dayKey = selectedDay)
                 )
-                SyncHub.updateLocalWeights(storage.loadAll().flatMap { it.toHealthRecords() })
+                SyncHub.updateLocalWeights(weightStorage.loadAll().flatMap { it.toHealthRecords() })
             }
         )
     }
@@ -163,7 +192,7 @@ fun MyDayScreen(
     var showWorkoutHint by remember { mutableStateOf(false) }
     LaunchedEffect(showWorkoutHint) {
         if (showWorkoutHint) {
-            kotlinx.coroutines.delay(2000L)
+            delay(2000L)
             showWorkoutHint = false
         }
     }
@@ -208,7 +237,7 @@ fun MyDayScreen(
             if (momentumSource != null) {
                 ConsistencyBreakdownScreen(
                     momentumSource = momentumSource,
-                    dayKey = currentDayKey,
+                    dayKey = selectedDay,
                     onBackClick = { activeMetricScreen = null },
                     onMetricClick = { activeMetricId = it }
                 )
@@ -245,6 +274,19 @@ fun MyDayScreen(
         return
     }
 
+    if (showCalendarSheet) {
+        val allLoggedDays = remember(repoDaily, selectedDay) {
+            foodStorage.getLoggedDays().keys + drinkStorage.getLoggedDays().keys + weightStorage.getLoggedDays()
+        }
+        CalendarSheet(
+            selectedDayKey = selectedDay,
+            todayKey = today,
+            loggedDays = allLoggedDays,
+            onDaySelected = { selectedDay = it },
+            onDismissRequest = { showCalendarSheet = false }
+        )
+    }
+
     val isSyncing by SyncHub.syncing.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -255,54 +297,107 @@ fun MyDayScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(top = 8.dp, bottom = 16.dp)
+            .padding(bottom = 16.dp)
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Slim header row: "ScatterFit" 16sp Bold on left, SettingsIcon on right
+        // TOP BAR: statusBarsPadding (Streak chip, My Day title, Calendar + Settings icons)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            // LEFT: streak chip — flame icon + "N", SecondaryFill pill, 12sp Bold
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SecondaryFill)
+                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    StreakIcon(
+                        modifier = Modifier.size(14.dp),
+                        tint = TealHighlight
+                    )
+                    Text(
+                        text = "$streak",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground
+                    )
+                }
+            }
+
+            // CENTRE: "My Day" title (or formatted date when viewing a past day)
+            val centerTitle = if (isToday) {
+                "My Day"
+            } else {
+                runCatching {
+                    LocalDate.parse(selectedDay).format(DateTimeFormatter.ofPattern("EEEE d MMM", Locale.US))
+                }.getOrDefault(selectedDay)
+            }
             Text(
-                text = "ScatterFit",
+                text = centerTitle,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextForeground
+                color = TextForeground,
+                textAlign = TextAlign.Center
             )
-            IconButton(
-                onClick = onSettingsClick,
-                modifier = Modifier.size(28.dp)
+
+            // RIGHT: Calendar icon button + Settings gear button
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                SettingsIcon(
-                    modifier = Modifier.size(20.dp),
-                    tint = AccentTeal
-                )
+                IconButton(
+                    onClick = { showCalendarSheet = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    CalendarIcon(
+                        modifier = Modifier.size(20.dp),
+                        tint = TextForeground
+                    )
+                }
+                IconButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    SettingsIcon(
+                        modifier = Modifier.size(20.dp),
+                        tint = AccentTeal
+                    )
+                }
             }
         }
 
         // Day Card (header + rows + value-state colouring)
         DayCard(
             daily = repoDaily,
-            dayKey = currentDayKey,
+            dayKey = selectedDay,
             planName = todayPlan,
             onMetricClick = { metricId ->
                 activeMetricId = metricId
             },
             onPlanEditorClick = { showPlanEditor = true },
             onWeighInClick = {
-                val hasTodayWeight = repoDaily?.weight?.get(currentDayKey)?.let { it > 0.0 } == true
-                if (hasTodayWeight) {
-                    android.util.Log.d("ScatterFitSync", "weigh-in row tapped -> open WeightScreen")
+                val hasWeight = repoDaily?.weight?.get(selectedDay)?.let { it > 0.0 } == true
+                if (hasWeight) {
+                    Log.d("ScatterFitSync", "weigh-in row tapped -> open WeightScreen")
                     activeMetricScreen = "weight"
                 } else {
-                    android.util.Log.d("ScatterFitSync", "weigh-in row tapped -> open WeighInDialog")
+                    Log.d("ScatterFitSync", "weigh-in row tapped -> open WeighInDialog")
                     showWeighInDialog = true
                 }
             },
+            onResetToToday = { selectedDay = today },
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
@@ -315,13 +410,13 @@ fun MyDayScreen(
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
-        // Tomorrow Card (shown only 19:00–07:59)
-        val currentHour = remember(currentDayKey) { LocalTime.now().hour }
-        val tomorrowVisible = remember(currentDayKey, currentHour) { isTomorrowCardVisible(currentHour) }
+        // Tomorrow Card (shown only when viewing today and 19:00–07:59; hidden in past mode)
+        val currentHour = remember(selectedDay) { LocalTime.now().hour }
+        val tomorrowVisible = isToday && isTomorrowCardVisible(currentHour)
 
         if (tomorrowVisible) {
-            val tomorrowDate = remember(currentDayKey) {
-                runCatching { LocalDate.parse(currentDayKey).plusDays(1) }.getOrDefault(LocalDate.now().plusDays(1))
+            val tomorrowDate = remember(selectedDay) {
+                runCatching { LocalDate.parse(selectedDay).plusDays(1) }.getOrDefault(LocalDate.now().plusDays(1))
             }
             val tomorrowDateText = remember(tomorrowDate) {
                 tomorrowDate.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US))
@@ -381,7 +476,7 @@ fun MyDayScreen(
             }
         }
 
-        // Syncing indicator from batch 3
+        // Syncing indicator
         if (isSyncing) {
             Text(
                 text = "Syncing…",

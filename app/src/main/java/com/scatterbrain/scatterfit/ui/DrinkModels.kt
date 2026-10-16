@@ -108,6 +108,21 @@ class DrinkStorage(private val context: Context) {
         return keys.count { k -> loadLoggedDrinks(k).isNotEmpty() }
     }
 
+    fun getLoggedDays(): Map<String, Int> {
+        val result = mutableMapOf<String, Int>()
+        val allEntries = prefs.all ?: return emptyMap()
+        for (key in allEntries.keys) {
+            if (key.startsWith("logged_drinks_")) {
+                val dayKey = key.removePrefix("logged_drinks_")
+                val drinks = loadLoggedDrinks(dayKey)
+                if (drinks.isNotEmpty()) {
+                    result[dayKey] = drinks.size
+                }
+            }
+        }
+        return result
+    }
+
     fun getWeeklySpent(keys: List<String>): Double {
         return keys.sumOf { k -> loadLoggedDrinks(k).sumOf { it.drink.cost } }
     }

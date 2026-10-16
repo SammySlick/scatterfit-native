@@ -126,6 +126,21 @@ class FoodStorage(private val context: Context) {
     fun getAllMeals(): List<LoggedMeal> {
         return loadAll().values.flatten()
     }
+
+    fun getLoggedDays(): Map<String, Int> {
+        val result = mutableMapOf<String, Int>()
+        val allEntries = prefs.all ?: return emptyMap()
+        for (key in allEntries.keys) {
+            if (key.startsWith("logged_meals_")) {
+                val dayKey = key.removePrefix("logged_meals_")
+                val meals = loadLoggedMeals(dayKey)
+                if (meals.isNotEmpty()) {
+                    result[dayKey] = meals.size
+                }
+            }
+        }
+        return result
+    }
 }
 
 class FoodTrackerViewModel(
@@ -174,13 +189,20 @@ class FoodTrackerViewModel(
 
     fun saveCurrentMeal(): Boolean {
         val kcal = kcalInput.toDoubleOrNull() ?: return false
+        val zone = java.time.ZoneId.systemDefault()
+        val timestamp = if (activeDayKey == todayKey(zone)) {
+            System.currentTimeMillis()
+        } else {
+            val date = runCatching { java.time.LocalDate.parse(activeDayKey) }.getOrDefault(java.time.LocalDate.now(zone))
+            date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        }
         val meal = LoggedMeal(
             name = mealName.trim(),
             kcal = kcal,
             protein = proteinInput.toDoubleOrNull(),
             carbs = carbsInput.toDoubleOrNull(),
             fat = fatInput.toDoubleOrNull(),
-            timestamp = System.currentTimeMillis(),
+            timestamp = timestamp,
             dayKey = activeDayKey
         )
         if (storage != null) {

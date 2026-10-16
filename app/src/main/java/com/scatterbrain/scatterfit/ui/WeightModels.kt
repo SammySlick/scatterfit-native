@@ -68,6 +68,10 @@ class WeightStorage(private val context: Context) {
             emptyList()
         }
     }
+
+    fun getLoggedDays(): Set<String> {
+        return loadAll().map { it.dayKey }.filter { it.isNotBlank() }.toSet()
+    }
 }
 
 data class WeighInValidationResult(

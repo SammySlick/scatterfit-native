@@ -241,4 +241,31 @@ class FoodLoggerTest {
         assertEquals(4.0, daily.alcoholUnits[today] ?: 0.0, 0.001)
         assertEquals(400.0, daily.caloriesEaten[today] ?: 0.0, 0.001)
     }
+
+    @Test
+    fun `log to yesterday, pipeline shows it on yesterday day key`() {
+        val yesterday = "2026-10-13"
+        val vm = FoodTrackerViewModel(storage = null, initialDayKey = yesterday)
+        vm.mealName = "Steak & Veg"
+        vm.kcalInput = "650"
+        vm.proteinInput = "55"
+        val saved = vm.saveCurrentMeal()
+        assertTrue(saved)
+
+        val meal = vm.mealsForDay.value.first()
+        assertEquals(yesterday, meal.dayKey)
+
+        val record = meal.toHealthRecord()
+        val records = mapOf(RecordMethod.FOOD_LOG to listOf(record))
+        val daily = Daily.buildDailyDataFromMaps(
+            records = records,
+            zones = Zones.DEFAULT_ZONES,
+            zone = defaultZone,
+            nowMs = nowMs
+        )
+
+        assertEquals(650.0, daily.caloriesEaten[yesterday] ?: 0.0, 0.001)
+        assertEquals(55.0, daily.protein[yesterday] ?: 0.0, 0.001)
+        assertEquals("Steak & Veg", daily.meals[yesterday]?.first()?.name)
+    }
 }
