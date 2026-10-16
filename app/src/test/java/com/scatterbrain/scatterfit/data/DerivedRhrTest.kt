@@ -14,7 +14,7 @@ class DerivedRhrTest {
 
     private fun hrRecord(startIso: String, samples: String): HealthRecord =
         HealthRecord(app = "test", start = startIso, end = null,
-            data = kotlinx.serialization.json.Json.parseToJsonElement(samples).jsonObject)
+            data = kotlinx.serialization.json.Json.parseToJsonElement("""{"samples":$samples}""").jsonObject)
 
     private fun daySamples(day: String, count: Int): List<Long> {
         val startMs = parseMillis("${day}T00:00:00Z")!!
