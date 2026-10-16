@@ -1,6 +1,7 @@
 package com.scatterbrain.scatterfit.data
 
 import com.scatterbrain.scatterfit.core.dayKeyFromIso
+import com.scatterbrain.scatterfit.core.derivedRestingHr
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -263,6 +264,12 @@ object Daily {
             val v = Normalise.num(r.data?.get("beatsPerMinute") ?: r.data?.get("bpm"))
             if (v != null) restingHrOut[dayKeyFromIso(r.start, zone)] = v
         }
+        // Derived RHR fills gaps where no source writes resting HR (Samsung
+        // Health doesn't share it with Health Connect): 5th percentile of the
+        // day's raw HR samples, >=500-sample gate — core/Readiness maths, port
+        // of web patterns.ts. Source wins; derived only fills holes.
+        val derivedRhr = derivedRestingHr(Zones.hrSamples(heartRate), zone)
+        for ((d, v) in derivedRhr) if (restingHrOut[d] == null) restingHrOut[d] = v
 
         val latest = Zones.hrSamples(heartRate).lastOrNull()
         val latestHeartRate = latest?.let { it.second to iso(it.first) }
