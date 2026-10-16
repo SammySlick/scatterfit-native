@@ -145,7 +145,6 @@ class RoutineStorageTest {
         assertEquals(10, set.repsMin)
         assertNull(set.repsMax)
         assertNull(set.timeSecondsMin)
-        assertNull(set.timeSecondsMax)
         assertEquals("sec", set.timeUnit)
         assertNull(set.note)
         assertNull(set.difficulty)
@@ -162,8 +161,7 @@ class RoutineStorageTest {
     @Test
     fun `timeLabel formats seconds in clock format`() {
         assertEquals("00:30", timeLabel(PlannedSet(timeSecondsMin = 30)))
-        assertEquals("00:30 - 00:45", timeLabel(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)))
-        assertEquals("00:45", timeLabel(PlannedSet(timeSecondsMax = 45)))
+        assertEquals("00:45", timeLabel(PlannedSet(timeSecondsMin = 45)))
         assertEquals("", timeLabel(PlannedSet()))
     }
 
@@ -177,29 +175,27 @@ class RoutineStorageTest {
         assertEquals("1:30:00", formatClockTime(5400))
         assertEquals("2:00:00", formatClockTime(7200))
 
-        assertEquals("00:30", displayTimeLabel(30, null))
-        assertEquals("00:30 - 00:45", displayTimeLabel(30, 45))
-        assertEquals("01:30", displayTimeLabel(90, null))
-        assertEquals("09:59", displayTimeLabel(599, null))
-        assertEquals("1:00:00", displayTimeLabel(3600, null))
-        assertEquals("1:30:00", displayTimeLabel(5400, null))
-        assertEquals("2:00:00", displayTimeLabel(7200, null))
-        assertEquals("", displayTimeLabel(null, null))
+        assertEquals("00:30", displayTimeLabel(30))
+        assertEquals("01:30", displayTimeLabel(90))
+        assertEquals("09:59", displayTimeLabel(599))
+        assertEquals("1:00:00", displayTimeLabel(3600))
+        assertEquals("1:30:00", displayTimeLabel(5400))
+        assertEquals("2:00:00", displayTimeLabel(7200))
+        assertEquals("", displayTimeLabel(null))
     }
 
     @Test
     fun `timeLabelScaled formats sec min hour correctly with rounding`() {
         // sec unit
         assertEquals("30 secs", timeLabelScaled(PlannedSet(timeSecondsMin = 30), "sec"))
-        assertEquals("30-45 secs", timeLabelScaled(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45), "sec"))
 
         // min unit
         assertEquals("90 mins", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "min"))
-        assertEquals("1-1.5 mins", timeLabelScaled(PlannedSet(timeSecondsMin = 60, timeSecondsMax = 90), "min"))
+        assertEquals("1.5 mins", timeLabelScaled(PlannedSet(timeSecondsMin = 90), "min"))
 
         // hour unit
         assertEquals("1.5 hours", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "hour"))
-        assertEquals("1-1.5 hours", timeLabelScaled(PlannedSet(timeSecondsMin = 3600, timeSecondsMax = 5400), "hour"))
+        assertEquals("0.1 hours", timeLabelScaled(PlannedSet(timeSecondsMin = 30), "hour"))
 
         // empty
         assertEquals("", timeLabelScaled(PlannedSet(), "hour"))
@@ -219,15 +215,15 @@ class RoutineStorageTest {
     }
 
     @Test
-    fun `timed exercise round-trip serialises timeSeconds fields and isTimed flag`() {
+    fun `timed exercise round-trip serialises timeSeconds and collapses legacy max`() {
         val timedEx = RoutineExercise(
             exerciseId = "plank",
             exerciseName = "Plank",
             isTimed = true,
             tempo = null,
             sets = listOf(
-                PlannedSet(type = "normal", timeSecondsMin = 45, timeSecondsMax = 60),
-                PlannedSet(type = "normal", timeSecondsMin = 60, timeSecondsMax = null)
+                PlannedSet(type = "normal", timeSecondsMin = 45),
+                PlannedSet(type = "normal", timeSecondsMin = 60)
             )
         )
         val routine = Routine(name = "Core", exercises = listOf(timedEx))
@@ -239,9 +235,36 @@ class RoutineStorageTest {
         val ex = decoded.first().exercises.first()
         assertTrue(ex.isTimed)
         assertEquals(45, ex.sets[0].timeSecondsMin)
-        assertEquals(60, ex.sets[0].timeSecondsMax)
         assertEquals(60, ex.sets[1].timeSecondsMin)
-        assertNull(ex.sets[1].timeSecondsMax)
+    }
+
+    @Test
+    fun `legacy time ranges decode collapsed to single value`() {
+        val legacyJson = """
+        [
+          {
+            "id": "r1",
+            "name": "Upper A",
+            "exercises": [
+              {
+                "exerciseId": "dead-hangs",
+                "exerciseName": "Dead Hangs",
+                "isTimed": true,
+                "sets": [
+                  {"type": "normal", "timeSecondsMin": 30, "timeSecondsMax": 50},
+                  {"type": "normal", "timeSecondsMin": 90, "timeSecondsMax": null}
+                ]
+              }
+            ]
+          }
+        ]
+        """.trimIndent()
+
+        val decoded = decodeRoutinesJson(legacyJson)
+        val sets = decoded.first().exercises.first().sets
+        assertEquals(30, sets[0].timeSecondsMin)
+        assertNull(sets[0].timeSecondsMax)
+        assertEquals(90, sets[1].timeSecondsMin)
     }
 
     @Test
@@ -401,14 +424,14 @@ class RoutineStorageTest {
             exerciseName = "Plank",
             isTimed = true,
             sets = listOf(
-                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45),
-                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45),
-                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)
+                PlannedSet(timeSecondsMin = 30),
+                PlannedSet(timeSecondsMin = 30),
+                PlannedSet(timeSecondsMin = 30)
             )
         )
         val timedSummary = formatExerciseSetsSummary(exTimedIdentical)
         assertEquals(1, timedSummary.size)
-        assertEquals("3 × 00:30 - 00:45", timedSummary.first())
+        assertEquals("3 × 00:30", timedSummary.first())
 
         // Differing sets expand to per-set lines with kg suffix
         val exDiffering = RoutineExercise(

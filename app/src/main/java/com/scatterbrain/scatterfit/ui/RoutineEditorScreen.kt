@@ -722,7 +722,7 @@ private fun HevyExerciseCard(
                 )
             }
 
-            // Sets rows (SET | KG | REPS (min/max) or TIME (min/max))
+            // Sets rows (SET | KG | REPS (min/max) or TIME (single value))
             exercise.sets.forEachIndexed { setIndex, set ->
                 var kgText by remember(set.weightKg) {
                     mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "")
@@ -900,11 +900,8 @@ private fun HevyExerciseCard(
                             }
                         } else {
                             val setUnit = set.timeUnit.ifBlank { "sec" }
-                            var timeMinText by remember(set.timeSecondsMin, setUnit) {
+                            var timeText by remember(set.timeSecondsMin, setUnit) {
                                 mutableStateOf(set.timeSecondsMin?.let { timeEntryText(it, setUnit) } ?: "")
-                            }
-                            var timeMaxText by remember(set.timeSecondsMax, setUnit) {
-                                mutableStateOf(set.timeSecondsMax?.let { timeEntryText(it, setUnit) } ?: "")
                             }
 
                             Row(
@@ -912,10 +909,10 @@ private fun HevyExerciseCard(
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 BasicTextField(
-                                    value = timeMinText,
+                                    value = timeText,
                                     onValueChange = { input ->
                                         val clean = input.filter { it.isDigit() || it == '.' }
-                                        timeMinText = clean
+                                        timeText = clean
                                         val seconds = timeEntryToSeconds(clean, setUnit)
                                         val updated = exercise.sets.toMutableList()
                                         updated[setIndex] = set.copy(timeSecondsMin = seconds)
@@ -931,40 +928,12 @@ private fun HevyExerciseCard(
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     cursorBrush = SolidColor(TealHighlight),
                                     decorationBox = { innerTextField ->
-                                        if (timeMinText.isEmpty()) {
-                                            Text("Min", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                                        if (timeText.isEmpty()) {
+                                            Text("Time", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                                         }
                                         innerTextField()
                                     },
-                                    modifier = Modifier.width(34.dp)
-                                )
-                                Text("–", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 2.dp))
-                                BasicTextField(
-                                    value = timeMaxText,
-                                    onValueChange = { input ->
-                                        val clean = input.filter { it.isDigit() || it == '.' }
-                                        timeMaxText = clean
-                                        val seconds = timeEntryToSeconds(clean, setUnit)
-                                        val updated = exercise.sets.toMutableList()
-                                        updated[setIndex] = set.copy(timeSecondsMax = seconds)
-                                        onUpdateExercise(exercise.copy(sets = updated))
-                                    },
-                                    singleLine = true,
-                                    textStyle = LocalTextStyle.current.copy(
-                                        color = if (timeMaxText.isNotBlank()) TextForeground else TextMuted,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        textAlign = TextAlign.Center
-                                    ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    cursorBrush = SolidColor(TealHighlight),
-                                    decorationBox = { innerTextField ->
-                                        if (timeMaxText.isEmpty()) {
-                                            Text("Max", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                                        }
-                                        innerTextField()
-                                    },
-                                    modifier = Modifier.width(34.dp)
+                                    modifier = Modifier.weight(1f)
                                 )
 
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -1012,7 +981,6 @@ private fun HevyExerciseCard(
                             repsMin = lastSet?.repsMin,
                             repsMax = lastSet?.repsMax,
                             timeSecondsMin = lastSet?.timeSecondsMin,
-                            timeSecondsMax = lastSet?.timeSecondsMax,
                             timeUnit = lastSet?.timeUnit ?: "sec"
                         )
                         onUpdateExercise(exercise.copy(sets = exercise.sets + newSet))
