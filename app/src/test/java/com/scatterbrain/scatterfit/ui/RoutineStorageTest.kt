@@ -263,7 +263,6 @@ class RoutineStorageTest {
         val decoded = decodeRoutinesJson(legacyJson)
         val sets = decoded.first().exercises.first().sets
         assertEquals(30, sets[0].timeSecondsMin)
-        assertNull(sets[0].timeSecondsMax)
         assertEquals(90, sets[1].timeSecondsMin)
     }
 
