@@ -1,5 +1,6 @@
 package com.scatterbrain.scatterfit.ui
 
+import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.ScoringSettings
 import com.scatterbrain.scatterfit.data.AssembledDaily
 import com.scatterbrain.scatterfit.data.SleepNight
@@ -190,5 +191,72 @@ class DayCardTest {
         assertTrue(validResult.isValid)
         assertNull(validResult.weightError)
         assertNull(validResult.bodyFatError)
+    }
+
+    @Test
+    fun `ring state - done state shows checkmark`() {
+        val stepsDone = computeDayRingModel(GoalId.STEPS, 10500.0, defaultSettings)
+        assertEquals(RingState.DONE, stepsDone.state)
+        assertEquals(1f, stepsDone.fraction)
+
+        val calDone = computeDayRingModel(GoalId.CALORIES, 2050.0, defaultSettings)
+        assertEquals(RingState.DONE, calDone.state)
+        assertEquals(1f, calDone.fraction)
+
+        val trainDone = computeDayRingModel(GoalId.EXERCISE, 30.0, defaultSettings)
+        assertEquals(RingState.DONE, trainDone.state)
+        assertEquals(1f, trainDone.fraction)
+    }
+
+    @Test
+    fun `ring state - in progress shows fractional arc`() {
+        val stepsProgress = computeDayRingModel(GoalId.STEPS, 5000.0, defaultSettings)
+        assertEquals(RingState.IN_PROGRESS, stepsProgress.state)
+        assertEquals(0.5f, stepsProgress.fraction, 0.001f)
+
+        val calProgress = computeDayRingModel(GoalId.CALORIES, 1500.0, defaultSettings)
+        assertEquals(RingState.IN_PROGRESS, calProgress.state)
+        assertEquals(0.75f, calProgress.fraction, 0.001f)
+    }
+
+    @Test
+    fun `ring state - out of band shows orange`() {
+        val calOver = computeDayRingModel(GoalId.CALORIES, 2600.0, defaultSettings)
+        assertEquals(RingState.OUT_OF_BAND, calOver.state)
+        assertEquals(1.0f, calOver.fraction, 0.001f)
+
+        val proteinUnder = computeDayRingModel(GoalId.PROTEIN, 80.0, defaultSettings)
+        assertEquals(RingState.OUT_OF_BAND, proteinUnder.state)
+        assertEquals(0.5f, proteinUnder.fraction, 0.001f)
+
+        val sleepUnder = computeDayRingModel(GoalId.SLEEP, 300.0, defaultSettings)
+        assertEquals(RingState.OUT_OF_BAND, sleepUnder.state)
+        assertEquals(300f / 480f, sleepUnder.fraction, 0.001f)
+    }
+
+    @Test
+    fun `ring state - no data shows empty`() {
+        val nullSteps = computeDayRingModel(GoalId.STEPS, null, defaultSettings)
+        assertEquals(RingState.NO_DATA, nullSteps.state)
+        assertEquals(0f, nullSteps.fraction)
+
+        val zeroCalories = computeDayRingModel(GoalId.CALORIES, 0.0, defaultSettings)
+        assertEquals(RingState.NO_DATA, zeroCalories.state)
+        assertEquals(0f, zeroCalories.fraction)
+
+        val zeroTraining = computeDayRingModel(GoalId.EXERCISE, 0.0, defaultSettings)
+        assertEquals(RingState.NO_DATA, zeroTraining.state)
+        assertEquals(0f, zeroTraining.fraction)
+    }
+
+    @Test
+    fun `alcohol and weight have no ring`() {
+        val alcohol = computeDayRingModel(GoalId.ALCOHOL, 2.5, defaultSettings)
+        assertEquals(RingState.NO_DATA, alcohol.state)
+        assertEquals(0f, alcohol.fraction)
+
+        val weight = computeDayRingModel(GoalId.WEIGHT, 76.4, defaultSettings)
+        assertEquals(RingState.NO_DATA, weight.state)
+        assertEquals(0f, weight.fraction)
     }
 }
