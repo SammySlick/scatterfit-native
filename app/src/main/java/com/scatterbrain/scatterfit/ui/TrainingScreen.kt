@@ -310,7 +310,7 @@ fun RoutineOverviewScreen(
 
                             // Subtitle: Rest / Tempo
                             val subtitleParts = buildList {
-                                if (ex.restSeconds > 0) add("Rest: ${ex.restSeconds}s")
+                                if (ex.restSeconds > 0) add("Rest: ${ex.restSeconds} secs")
                                 if (!ex.tempo.isNullOrBlank()) add("Tempo: ${ex.tempo}")
                             }
                             if (subtitleParts.isNotEmpty()) {

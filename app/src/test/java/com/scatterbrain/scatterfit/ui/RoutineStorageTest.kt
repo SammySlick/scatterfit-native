@@ -160,25 +160,35 @@ class RoutineStorageTest {
 
     @Test
     fun `timeLabel formats seconds min only, min-max range, and empty`() {
-        assertEquals("30s", timeLabel(PlannedSet(timeSecondsMin = 30)))
-        assertEquals("30-45s", timeLabel(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)))
-        assertEquals("45s", timeLabel(PlannedSet(timeSecondsMax = 45)))
+        assertEquals("30 secs", timeLabel(PlannedSet(timeSecondsMin = 30)))
+        assertEquals("30-45 secs", timeLabel(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)))
+        assertEquals("45 secs", timeLabel(PlannedSet(timeSecondsMax = 45)))
         assertEquals("", timeLabel(PlannedSet()))
+    }
+
+    @Test
+    fun `displayTimeLabel auto-scales for readability across thresholds`() {
+        assertEquals("30 secs", displayTimeLabel(30, null))
+        assertEquals("30-45 secs", displayTimeLabel(30, 45))
+        assertEquals("1.5 mins", displayTimeLabel(90, null))
+        assertEquals("90 mins", displayTimeLabel(5400, null))
+        assertEquals("2 hours", displayTimeLabel(7200, null))
+        assertEquals("", displayTimeLabel(null, null))
     }
 
     @Test
     fun `timeLabelScaled formats sec min hour correctly with rounding`() {
         // sec unit
-        assertEquals("30s", timeLabelScaled(PlannedSet(timeSecondsMin = 30), "sec"))
-        assertEquals("30-45s", timeLabelScaled(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45), "sec"))
+        assertEquals("30 secs", timeLabelScaled(PlannedSet(timeSecondsMin = 30), "sec"))
+        assertEquals("30-45 secs", timeLabelScaled(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45), "sec"))
 
         // min unit
-        assertEquals("90 min", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "min"))
-        assertEquals("1-1.5 min", timeLabelScaled(PlannedSet(timeSecondsMin = 60, timeSecondsMax = 90), "min"))
+        assertEquals("90 mins", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "min"))
+        assertEquals("1-1.5 mins", timeLabelScaled(PlannedSet(timeSecondsMin = 60, timeSecondsMax = 90), "min"))
 
         // hour unit
-        assertEquals("1.5 h", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "hour"))
-        assertEquals("1-1.5 h", timeLabelScaled(PlannedSet(timeSecondsMin = 3600, timeSecondsMax = 5400), "hour"))
+        assertEquals("1.5 hours", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "hour"))
+        assertEquals("1-1.5 hours", timeLabelScaled(PlannedSet(timeSecondsMin = 3600, timeSecondsMax = 5400), "hour"))
 
         // empty
         assertEquals("", timeLabelScaled(PlannedSet(), "hour"))
@@ -305,7 +315,7 @@ class RoutineStorageTest {
 
     @Test
     fun `formatExerciseSetsSummary collapses identical sets and expands differing sets`() {
-        // Identical rep-based sets collapse to compact form
+        // Identical rep-based sets collapse to compact form with kg suffix
         val exIdentical = RoutineExercise(
             exerciseId = "bench",
             exerciseName = "Bench Press",
@@ -318,9 +328,9 @@ class RoutineStorageTest {
         )
         val identicalSummary = formatExerciseSetsSummary(exIdentical)
         assertEquals(1, identicalSummary.size)
-        assertEquals("4 × 8-12 @ 60", identicalSummary.first())
+        assertEquals("4 × 8-12 @ 60 kg", identicalSummary.first())
 
-        // Identical timed sets collapse
+        // Identical timed sets collapse to auto-scaled long-form time
         val exTimedIdentical = RoutineExercise(
             exerciseId = "plank",
             exerciseName = "Plank",
@@ -333,9 +343,9 @@ class RoutineStorageTest {
         )
         val timedSummary = formatExerciseSetsSummary(exTimedIdentical)
         assertEquals(1, timedSummary.size)
-        assertEquals("3 × 30-45s", timedSummary.first())
+        assertEquals("3 × 30-45 secs", timedSummary.first())
 
-        // Differing sets expand to per-set lines
+        // Differing sets expand to per-set lines with kg suffix
         val exDiffering = RoutineExercise(
             exerciseId = "squat",
             exerciseName = "Squat",
@@ -346,7 +356,30 @@ class RoutineStorageTest {
         )
         val differingSummary = formatExerciseSetsSummary(exDiffering)
         assertEquals(2, differingSummary.size)
-        assertEquals("Set 1 (warmup): 40kg × 12", differingSummary[0])
-        assertEquals("Set 2: 60kg × 8-12 · slow", differingSummary[1])
+        assertEquals("Set 1 (warmup): 40 kg × 12", differingSummary[0])
+        assertEquals("Set 2: 60 kg × 8-12 · slow", differingSummary[1])
+
+        // Empty sets render 'Set N: —' instead of collapsing to count
+        val exEmpty = RoutineExercise(
+            exerciseId = "curl",
+            exerciseName = "Bicep Curl",
+            sets = listOf(
+                PlannedSet(),
+                PlannedSet()
+            )
+        )
+        val emptySummary = formatExerciseSetsSummary(exEmpty)
+        assertEquals(2, emptySummary.size)
+        assertEquals("Set 1: —", emptySummary[0])
+        assertEquals("Set 2: —", emptySummary[1])
+
+        // Pluralization: single set without weight or target
+        val exSingle = RoutineExercise(
+            exerciseId = "shrug",
+            exerciseName = "Shrug",
+            sets = listOf(PlannedSet(type = "normal", weightKg = 50.0))
+        )
+        val singleSummary = formatExerciseSetsSummary(exSingle)
+        assertEquals("1 × 50 kg", singleSummary.first())
     }
 }

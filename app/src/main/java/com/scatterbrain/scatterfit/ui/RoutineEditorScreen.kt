@@ -11,12 +11,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -493,14 +495,16 @@ private fun HevyExerciseCard(
                 }
             }
 
-            // 2. SUB-ROW: [Rest] + [Note] + [Tempo] + [Time] chips
+            // 2. SUB-ROW: [Rest] + [Note] + [Tempo] + [Time] + [Unit] chips
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Rest chip (tap cycles 0 -> 30 -> 45 -> 60 -> 90 -> 120 -> 180 -> 0)
-                val restLabel = if (exercise.restSeconds == 0) "Rest: OFF" else "Rest: ${exercise.restSeconds}s"
+                val restLabel = if (exercise.restSeconds == 0) "Rest: OFF" else "Rest: ${exercise.restSeconds} secs"
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -517,7 +521,9 @@ private fun HevyExerciseCard(
                         text = "⏱ $restLabel",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (exercise.restSeconds > 0) TealHighlight else TextMuted
+                        color = if (exercise.restSeconds > 0) TealHighlight else TextMuted,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
@@ -535,7 +541,9 @@ private fun HevyExerciseCard(
                         text = if (hasNote) "Note" else "+ Note",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (hasNote) TealHighlight else TextMuted
+                        color = if (hasNote) TealHighlight else TextMuted,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
@@ -554,7 +562,9 @@ private fun HevyExerciseCard(
                         text = tempoChipLabel,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (hasTempo) TealHighlight else TextMuted
+                        color = if (hasTempo) TealHighlight else TextMuted,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
@@ -574,7 +584,9 @@ private fun HevyExerciseCard(
                         text = if (isTimed) "Time: ON" else "Time",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (isTimed) TealHighlight else TextMuted
+                        color = if (isTimed) TealHighlight else TextMuted,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
@@ -583,6 +595,7 @@ private fun HevyExerciseCard(
                     val unitLabel = exercise.timeUnit.ifBlank { "sec" }
                     Box(
                         modifier = Modifier
+                            .defaultMinSize(minWidth = 48.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(SecondaryFill)
                             .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
@@ -594,13 +607,16 @@ private fun HevyExerciseCard(
                                 }
                                 onUpdateExercise(exercise.copy(timeUnit = nextUnit))
                             }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = unitLabel,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TealHighlight
+                            color = TealHighlight,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -1049,8 +1065,10 @@ fun RoutineSummaryCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Header summary row
+            val setsText = if (totalSets == 1) "1 set" else "$totalSets sets"
+            val estText = if (estMin == 1) "1 min" else "$estMin mins"
             Text(
-                text = "Exercises ${exercises.size} · Total Sets $totalSets · Est. ${estMin}min",
+                text = "Exercises ${exercises.size} · Total $setsText · Est. $estText",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextForeground
