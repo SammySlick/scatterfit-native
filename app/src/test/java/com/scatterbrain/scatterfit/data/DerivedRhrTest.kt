@@ -3,6 +3,7 @@ package com.scatterbrain.scatterfit.data
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlinx.serialization.json.jsonObject
 import java.time.ZoneId
 
 /** Derived RHR fills gaps where no source writes resting HR (Samsung Health
