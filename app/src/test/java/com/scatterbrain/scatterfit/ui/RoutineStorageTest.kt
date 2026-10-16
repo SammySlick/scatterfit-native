@@ -93,4 +93,132 @@ class RoutineStorageTest {
         assertEquals("r2", list.first().id)
         assertNull(list.find { it.id == "r1" })
     }
+
+    @Test
+    fun `migration test - decode old JSON shape applies new defaults`() {
+        val oldJson = """
+            [
+              {
+                "id": "old-routine-1",
+                "name": "Pull Day",
+                "exercises": [
+                  {
+                    "exerciseId": "lat-pulldown",
+                    "exerciseName": "Lat Pulldown",
+                    "sets": [
+                      {
+                        "type": "normal",
+                        "weightKg": 60.0,
+                        "reps": 10
+                      }
+                    ]
+                  }
+                ],
+                "createdAt": 1000,
+                "updatedAt": 2000
+              }
+            ]
+        """.trimIndent()
+
+        val decoded = json.decodeFromString<List<Routine>>(oldJson)
+        assertEquals(1, decoded.size)
+        val r = decoded.first()
+        val ex = r.exercises.first()
+        assertEquals(0, ex.restSeconds)
+        assertNull(ex.note)
+        assertNull(ex.customName)
+        assertEquals("Lat Pulldown", ex.displayName)
+
+        val set = ex.sets.first()
+        assertNull(set.note)
+        assertNull(set.difficulty)
+    }
+
+    @Test
+    fun `customName displays instead of library name when set, falls back when blank`() {
+        val exWithCustom = RoutineExercise(
+            exerciseId = "lat-pulldown",
+            exerciseName = "Lat Pulldown",
+            customName = "Cable D-Handle Pulldown"
+        )
+        assertEquals("Cable D-Handle Pulldown", exWithCustom.displayName)
+
+        val exBlankCustom = RoutineExercise(
+            exerciseId = "lat-pulldown",
+            exerciseName = "Lat Pulldown",
+            customName = "   "
+        )
+        assertEquals("Lat Pulldown", exBlankCustom.displayName)
+
+        val exNullCustom = RoutineExercise(
+            exerciseId = "lat-pulldown",
+            exerciseName = "Lat Pulldown",
+            customName = null
+        )
+        assertEquals("Lat Pulldown", exNullCustom.displayName)
+    }
+
+    @Test
+    fun `cycleDifficulty transitions null to easy to medium to hard to null`() {
+        assertEquals("easy", cycleDifficulty(null))
+        assertEquals("medium", cycleDifficulty("easy"))
+        assertEquals("hard", cycleDifficulty("medium"))
+        assertNull(cycleDifficulty("hard"))
+    }
+
+    @Test
+    fun `summary counts sets by muscle correctly`() {
+        val exercises = listOf(
+            RoutineExercise(
+                exerciseId = "barbell-bench-press",
+                exerciseName = "Barbell Bench Press",
+                sets = listOf(PlannedSet(), PlannedSet(), PlannedSet())
+            ),
+            RoutineExercise(
+                exerciseId = "incline-dumbbell-bench-press",
+                exerciseName = "Incline DB Bench Press",
+                sets = listOf(PlannedSet(), PlannedSet())
+            ),
+            RoutineExercise(
+                exerciseId = "skull-crusher",
+                exerciseName = "Skull Crusher",
+                sets = listOf(PlannedSet(), PlannedSet(), PlannedSet())
+            )
+        )
+
+        val lookup: (String) -> String = { id ->
+            when (id) {
+                "barbell-bench-press", "incline-dumbbell-bench-press" -> "chest"
+                "skull-crusher" -> "triceps"
+                else -> "other"
+            }
+        }
+
+        val muscleSets = calculateSetsByMuscle(exercises, lookup)
+        assertEquals(5, muscleSets["chest"])
+        assertEquals(3, muscleSets["triceps"])
+    }
+
+    @Test
+    fun `calculateRoutineEstimateMinutes rounds to nearest 5 minutes`() {
+        // Exercise 1: 3 sets, rest = 60s -> 3 * 40 + 2 * 60 = 240s (4 min)
+        // Exercise 2: 3 sets, rest = 60s -> 3 * 40 + 2 * 60 = 240s (4 min)
+        // Total = 480s = 8 min -> rounds to 10 min
+        val exercises = listOf(
+            RoutineExercise(
+                exerciseId = "ex1",
+                exerciseName = "Ex 1",
+                restSeconds = 60,
+                sets = listOf(PlannedSet(), PlannedSet(), PlannedSet())
+            ),
+            RoutineExercise(
+                exerciseId = "ex2",
+                exerciseName = "Ex 2",
+                restSeconds = 60,
+                sets = listOf(PlannedSet(), PlannedSet(), PlannedSet())
+            )
+        )
+        val est = calculateRoutineEstimateMinutes(exercises)
+        assertEquals(10, est)
+    }
 }

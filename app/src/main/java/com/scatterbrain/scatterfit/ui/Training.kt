@@ -19,6 +19,8 @@ data class PlannedSet(
     val type: String = "normal", // normal | warmup | failure
     val weightKg: Double? = null,
     val reps: Int? = null,
+    val note: String? = null,
+    val difficulty: String? = null, // easy | medium | hard
 )
 
 @Serializable
@@ -26,7 +28,12 @@ data class RoutineExercise(
     val exerciseId: String,
     val exerciseName: String,
     val sets: List<PlannedSet> = emptyList(),
-)
+    val restSeconds: Int = 0, // 0 = OFF
+    val note: String? = null, // exercise-level note
+    val customName: String? = null, // when set, displays instead of library name
+) {
+    val displayName: String get() = customName?.takeIf { it.isNotBlank() } ?: exerciseName
+}
 
 @Serializable
 data class Routine(

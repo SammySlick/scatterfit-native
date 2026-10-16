@@ -24,10 +24,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -41,6 +42,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -59,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -75,12 +78,50 @@ import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BorderInput
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
+import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
+import com.scatterbrain.scatterfit.ui.theme.StateBad
+import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import java.util.UUID
+
+fun cycleDifficulty(current: String?): String? = when (current?.lowercase()) {
+    null -> "easy"
+    "easy" -> "medium"
+    "medium" -> "hard"
+    "hard" -> null
+    else -> null
+}
+
+fun calculateRoutineEstimateMinutes(exercises: List<RoutineExercise>): Int {
+    if (exercises.isEmpty()) return 0
+    var totalSeconds = 0
+    for (ex in exercises) {
+        val sets = ex.sets.size
+        if (sets == 0) continue
+        val rest = if (ex.restSeconds > 0) ex.restSeconds else 60
+        totalSeconds += sets * 40 + (sets - 1).coerceAtLeast(0) * rest
+    }
+    val totalMin = totalSeconds / 60.0
+    return (kotlin.math.round(totalMin / 5.0) * 5).toInt().coerceAtLeast(5)
+}
+
+fun calculateSetsByMuscle(
+    exercises: List<RoutineExercise>,
+    lookupMuscle: (String) -> String = { "other" },
+): Map<String, Int> {
+    val counts = mutableMapOf<String, Int>()
+    for (ex in exercises) {
+        val muscle = lookupMuscle(ex.exerciseId).lowercase()
+        counts[muscle] = (counts[muscle] ?: 0) + ex.sets.size
+    }
+    return counts
+}
+
+private val REST_DURATIONS = listOf(0, 30, 45, 60, 90, 120, 180)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,10 +147,7 @@ fun RoutineEditorScreen(
     }
 
     var showExercisePicker by remember { mutableStateOf(false) }
-    var exerciseTargetIndex by remember { mutableIntStateOf(-1) } // -1 = append new
-
-    var editingSetExerciseIndex by remember { mutableIntStateOf(-1) }
-    var editingSetIndex by remember { mutableIntStateOf(-1) }
+    var exerciseTargetIndex by remember { mutableIntStateOf(-1) }
 
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var validationError by remember { mutableStateOf<String?>(null) }
@@ -170,7 +208,7 @@ fun RoutineEditorScreen(
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Delete routine",
-                                tint = Color(0xFFE57373)
+                                tint = StateBad
                             )
                         }
                     }
@@ -226,7 +264,7 @@ fun RoutineEditorScreen(
                 if (validationError != null) {
                     Text(
                         text = validationError!!,
-                        color = Color(0xFFE57373),
+                        color = StateBad,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -251,9 +289,9 @@ fun RoutineEditorScreen(
                     )
                 )
 
-                // Exercises List
+                // Exercises List (Hevy-style Cards with in-place editing)
                 exercises.forEachIndexed { exIndex, ex ->
-                    ExerciseRowCard(
+                    HevyExerciseCard(
                         exercise = ex,
                         canMoveUp = exIndex > 0,
                         canMoveDown = exIndex < exercises.size - 1,
@@ -268,26 +306,8 @@ fun RoutineEditorScreen(
                         onDeleteExercise = {
                             exercises.removeAt(exIndex)
                         },
-                        onAddSet = {
-                            val lastSet = ex.sets.lastOrNull()
-                            val newSet = PlannedSet(
-                                type = "normal",
-                                weightKg = lastSet?.weightKg,
-                                reps = lastSet?.reps
-                            )
-                            exercises[exIndex] = ex.copy(sets = ex.sets + newSet)
-                        },
-                        onSetClick = { setIndex ->
-                            editingSetExerciseIndex = exIndex
-                            editingSetIndex = setIndex
-                        },
-                        onSetLongClick = { setIndex ->
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            val updatedSets = ex.sets.toMutableList()
-                            if (setIndex in updatedSets.indices) {
-                                updatedSets.removeAt(setIndex)
-                                exercises[exIndex] = ex.copy(sets = updatedSets)
-                            }
+                        onUpdateExercise = { updated ->
+                            exercises[exIndex] = updated
                         }
                     )
                 }
@@ -301,6 +321,14 @@ fun RoutineEditorScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("+ Add Exercise", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+
+                // PART 3: Routine Summary Block (Exercises n · Total Sets n · Est X min + Muscle Bars)
+                if (exercises.isNotEmpty()) {
+                    RoutineSummaryCard(
+                        exercises = exercises,
+                        lookupMuscle = { id -> library.find { it.id == id }?.muscle ?: "other" }
+                    )
                 }
             }
         }
@@ -316,7 +344,7 @@ fun RoutineEditorScreen(
                     exerciseName = selectedRef.name,
                     sets = listOf(PlannedSet(type = "normal", weightKg = null, reps = null))
                 )
-                if (exerciseTargetIndex >= 0 && exerciseTargetIndex in exercises.indices) {
+                if (exerciseTargetIndex in exercises.indices) {
                     exercises[exerciseTargetIndex] = newEx
                 } else {
                     exercises.add(newEx)
@@ -324,35 +352,6 @@ fun RoutineEditorScreen(
                 showExercisePicker = false
             },
             onDismissRequest = { showExercisePicker = false }
-        )
-    }
-
-    // Edit Set Dialog
-    if (editingSetExerciseIndex in exercises.indices && editingSetIndex in exercises[editingSetExerciseIndex].sets.indices) {
-        val targetEx = exercises[editingSetExerciseIndex]
-        val targetSet = targetEx.sets[editingSetIndex]
-
-        EditSetDialog(
-            set = targetSet,
-            setNumber = editingSetIndex + 1,
-            onDismiss = {
-                editingSetExerciseIndex = -1
-                editingSetIndex = -1
-            },
-            onSave = { updatedSet ->
-                val updatedSets = targetEx.sets.toMutableList()
-                updatedSets[editingSetIndex] = updatedSet
-                exercises[editingSetExerciseIndex] = targetEx.copy(sets = updatedSets)
-                editingSetExerciseIndex = -1
-                editingSetIndex = -1
-            },
-            onDelete = {
-                val updatedSets = targetEx.sets.toMutableList()
-                updatedSets.removeAt(editingSetIndex)
-                exercises[editingSetExerciseIndex] = targetEx.copy(sets = updatedSets)
-                editingSetExerciseIndex = -1
-                editingSetIndex = -1
-            }
         )
     }
 
@@ -369,7 +368,7 @@ fun RoutineEditorScreen(
                         showDeleteConfirmDialog = false
                         onDeleteRoutine(initialRoutine.id)
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE57373), contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(containerColor = StateBad, contentColor = Color.Black)
                 ) {
                     Text("Delete", fontWeight = FontWeight.Bold)
                 }
@@ -383,20 +382,29 @@ fun RoutineEditorScreen(
     }
 }
 
+/**
+ * Hevy-style Exercise Card with in-place text editing, sets table, inline rest & note chips.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ExerciseRowCard(
+private fun HevyExerciseCard(
     exercise: RoutineExercise,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onDeleteExercise: () -> Unit,
-    onAddSet: () -> Unit,
-    onSetClick: (Int) -> Unit,
-    onSetLongClick: (Int) -> Unit,
+    onUpdateExercise: (RoutineExercise) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var isEditingName by remember { mutableStateOf(false) }
+    var nameInput by remember(exercise.displayName) { mutableStateOf(exercise.displayName) }
+
+    var isEditingNote by remember { mutableStateOf(false) }
+    var noteInput by remember(exercise.note) { mutableStateOf(exercise.note ?: "") }
+
+    val haptic = LocalHapticFeedback.current
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -406,24 +414,62 @@ private fun ExerciseRowCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Exercise Header (Title, Reorder Arrows, Delete)
+            // 1. HEADER: Name (in-place editable) + Reorder arrows + Delete '×'
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = exercise.exerciseName,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextForeground,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (isEditingName) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = nameInput,
+                            onValueChange = { nameInput = it },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextForeground,
+                                unfocusedTextColor = TextForeground,
+                                focusedBorderColor = TealHighlight,
+                                unfocusedBorderColor = BorderInput
+                            )
+                        )
+                        IconButton(
+                            onClick = {
+                                isEditingName = false
+                                val trimmed = nameInput.trim()
+                                if (trimmed.isNotBlank()) {
+                                    onUpdateExercise(exercise.copy(customName = trimmed))
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("✓", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                } else {
+                    Text(
+                        text = exercise.displayName,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                nameInput = exercise.displayName
+                                isEditingName = true
+                            },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (canMoveUp) {
@@ -442,157 +488,399 @@ private fun ExerciseRowCard(
                 }
             }
 
-            // Sets Chips Row
-            LazyRow(
+            // 2. SUB-ROW: [Rest: <X>s | OFF] chip + [Note] chip
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(exercise.sets.size) { setIndex ->
-                    val set = exercise.sets[setIndex]
-                    val typePrefix = when (set.type) {
-                        "warmup" -> "W: "
-                        "failure" -> "F: "
-                        else -> ""
-                    }
-                    val weightStr = set.weightKg?.let { if (it % 1.0 == 0.0) "${it.toInt()}kg" else "${it}kg" } ?: "BW"
-                    val repsStr = set.reps?.let { "${it}r" } ?: "reps"
-                    val label = "$typePrefix$repsStr @ $weightStr"
+                // Rest chip (tap cycles 0 -> 30 -> 45 -> 60 -> 90 -> 120 -> 180 -> 0)
+                val restLabel = if (exercise.restSeconds == 0) "Rest: OFF" else "Rest: ${exercise.restSeconds}s"
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SecondaryFill)
+                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
+                        .clickable {
+                            val currentIndex = REST_DURATIONS.indexOf(exercise.restSeconds)
+                            val nextIndex = if (currentIndex < 0 || currentIndex == REST_DURATIONS.size - 1) 0 else currentIndex + 1
+                            onUpdateExercise(exercise.copy(restSeconds = REST_DURATIONS[nextIndex]))
+                        }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "⏱ $restLabel",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (exercise.restSeconds > 0) TealHighlight else TextMuted
+                    )
+                }
 
+                // Note chip
+                val hasNote = !exercise.note.isNullOrBlank()
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SecondaryFill)
+                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
+                        .clickable { isEditingNote = !isEditingNote }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = if (hasNote) "Note" else "+ Note",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (hasNote) TealHighlight else TextMuted
+                    )
+                }
+            }
+
+            // Inline multi-line note editor (if toggled open)
+            if (isEditingNote) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedTextField(
+                        value = noteInput,
+                        onValueChange = { noteInput = it },
+                        placeholder = { Text("Exercise note (e.g. 2-0-2-1, 10-12 reps)", color = TextMuted.copy(alpha = 0.5f)) },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextForeground,
+                            unfocusedTextColor = TextForeground,
+                            focusedBorderColor = TealHighlight,
+                            unfocusedBorderColor = BorderInput
+                        )
+                    )
+                    IconButton(
+                        onClick = {
+                            isEditingNote = false
+                            onUpdateExercise(exercise.copy(note = noteInput.trim().ifEmpty { null }))
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Text("✓", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                }
+            }
+
+            // 3. NOTES DISPLAY: Muted clipboard block lines if note exists
+            if (!exercise.note.isNullOrBlank() && !isEditingNote) {
+                Text(
+                    text = exercise.note,
+                    fontSize = 11.sp,
+                    color = TextMuted,
+                    modifier = Modifier.clickable {
+                        noteInput = exercise.note
+                        isEditingNote = true
+                    }
+                )
+            }
+
+            // 4. SETS TABLE: Header row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("SET", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
+                Text("KG", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text("REPS", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text("DIFF", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp), textAlign = TextAlign.Center)
+                Text("DONE", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(34.dp), textAlign = TextAlign.Center)
+            }
+
+            // Sets rows (in-place text inputs for KG & REPS, difficulty cycling on tap)
+            exercise.sets.forEachIndexed { setIndex, set ->
+                var kgText by remember(set.weightKg) {
+                    mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "")
+                }
+                var repsText by remember(set.reps) {
+                    mutableStateOf(set.reps?.toString() ?: "")
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val updated = exercise.sets.toMutableList()
+                                updated.removeAt(setIndex)
+                                onUpdateExercise(exercise.copy(sets = updated))
+                            }
+                        )
+                        .padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Set # column (or tap cycles type)
+                    val setBadge = when (set.type) {
+                        "warmup" -> "W"
+                        "failure" -> "F"
+                        else -> "${setIndex + 1}"
+                    }
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SecondaryFill)
-                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
-                            .combinedClickable(
-                                onClick = { onSetClick(setIndex) },
-                                onLongClick = { onSetLongClick(setIndex) }
-                            )
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .width(36.dp)
+                            .clickable {
+                                val nextType = when (set.type) {
+                                    "normal" -> "warmup"
+                                    "warmup" -> "failure"
+                                    else -> "normal"
+                                }
+                                val updated = exercise.sets.toMutableList()
+                                updated[setIndex] = set.copy(type = nextType)
+                                onUpdateExercise(exercise.copy(sets = updated))
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = label,
+                            text = setBadge,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
                             color = when (set.type) {
                                 "warmup" -> AccentTeal
-                                "failure" -> Color(0xFFE57373)
-                                else -> TextForeground
+                                "failure" -> StateBad
+                                else -> TextMuted
                             }
                         )
                     }
-                }
 
-                item {
+                    // KG Input
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Transparent)
-                            .border(BorderStroke(1.dp, TealHighlight.copy(alpha = 0.5f)), RoundedCornerShape(8.dp))
-                            .clickable(onClick = onAddSet)
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .weight(1f)
+                            .padding(horizontal = 4.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(SecondaryFill)
+                            .border(BorderStroke(1.dp, BorderInput), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("+ Set", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TealHighlight)
+                        BasicTextField(
+                            value = kgText,
+                            onValueChange = { input ->
+                                val clean = input.filter { ch -> ch.isDigit() || ch == '.' }
+                                kgText = clean
+                                val updated = exercise.sets.toMutableList()
+                                updated[setIndex] = set.copy(weightKg = clean.toDoubleOrNull())
+                                onUpdateExercise(exercise.copy(sets = updated))
+                            },
+                            singleLine = true,
+                            textStyle = LocalTextStyle.current.copy(
+                                color = TextForeground,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            cursorBrush = SolidColor(TealHighlight),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // REPS Input
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(SecondaryFill)
+                            .border(BorderStroke(1.dp, BorderInput), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BasicTextField(
+                            value = repsText,
+                            onValueChange = { input ->
+                                val clean = input.filter { ch -> ch.isDigit() }
+                                repsText = clean
+                                val updated = exercise.sets.toMutableList()
+                                updated[setIndex] = set.copy(reps = clean.toIntOrNull())
+                                onUpdateExercise(exercise.copy(sets = updated))
+                            },
+                            singleLine = true,
+                            textStyle = LocalTextStyle.current.copy(
+                                color = TextForeground,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            cursorBrush = SolidColor(TealHighlight),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // DIFFICULTY chip (Cycles none -> easy -> medium -> hard -> none on tap)
+                    val diffColor = when (set.difficulty?.lowercase()) {
+                        "easy" -> StateLocked
+                        "medium" -> JudgementWarn
+                        "hard" -> StateBad
+                        else -> TextMuted
+                    }
+                    val diffLabel = when (set.difficulty?.lowercase()) {
+                        "easy" -> "EASY"
+                        "medium" -> "MED"
+                        "hard" -> "HARD"
+                        else -> "—"
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(56.dp)
+                            .padding(horizontal = 2.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (set.difficulty != null) diffColor.copy(alpha = 0.15f) else SecondaryFill)
+                            .border(BorderStroke(1.dp, if (set.difficulty != null) diffColor else BorderDefault), RoundedCornerShape(6.dp))
+                            .clickable {
+                                val nextDiff = cycleDifficulty(set.difficulty)
+                                val updated = exercise.sets.toMutableList()
+                                updated[setIndex] = set.copy(difficulty = nextDiff)
+                                onUpdateExercise(exercise.copy(sets = updated))
+                            }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = diffLabel,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = diffColor,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    // DONE box (visual only in editor)
+                    Box(
+                        modifier = Modifier
+                            .width(34.dp)
+                            .padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(4.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("✓", fontSize = 11.sp, color = TextMuted.copy(alpha = 0.35f))
+                        }
                     }
                 }
+            }
+
+            // 5. ROW ACTIONS: "+ Add Set" full-width button
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SecondaryFill)
+                    .clickable {
+                        val lastSet = exercise.sets.lastOrNull()
+                        val newSet = PlannedSet(
+                            type = "normal",
+                            weightKg = lastSet?.weightKg,
+                            reps = lastSet?.reps,
+                            difficulty = lastSet?.difficulty
+                        )
+                        onUpdateExercise(exercise.copy(sets = exercise.sets + newSet))
+                    }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+ Add Set", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TealHighlight)
             }
         }
     }
 }
 
+/**
+ * Routine Summary Card showing Exercises count, Total Sets, Estimated Duration, and Muscle Bars.
+ */
 @Composable
-private fun EditSetDialog(
-    set: PlannedSet,
-    setNumber: Int,
-    onDismiss: () -> Unit,
-    onSave: (PlannedSet) -> Unit,
-    onDelete: () -> Unit,
+private fun RoutineSummaryCard(
+    exercises: List<RoutineExercise>,
+    lookupMuscle: (String) -> String,
+    modifier: Modifier = Modifier,
 ) {
-    var weightInput by remember { mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "") }
-    var repsInput by remember { mutableStateOf(set.reps?.toString() ?: "") }
-    var currentType by remember { mutableStateOf(set.type) } // normal -> warmup -> failure
+    val totalSets = exercises.sumOf { it.sets.size }
+    val estMin = calculateRoutineEstimateMinutes(exercises)
+    val setsByMuscle = calculateSetsByMuscle(exercises, lookupMuscle)
+    val maxSetsInMuscle = setsByMuscle.values.maxOrNull() ?: 1
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = DarkCardSurface,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Set $setNumber", color = TextForeground, fontWeight = FontWeight.Bold)
-                TextButton(
-                    onClick = {
-                        // Cycle type: normal -> warmup -> failure -> normal
-                        currentType = when (currentType) {
-                            "normal" -> "warmup"
-                            "warmup" -> "failure"
-                            else -> "normal"
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+        border = BorderStroke(1.dp, BorderDefault)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Header summary row
+            Text(
+                text = "Exercises ${exercises.size} · Total Sets $totalSets · Est. ${estMin}min",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextForeground
+            )
+
+            // Horizontal Muscle Bars
+            if (setsByMuscle.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    setsByMuscle.entries.sortedByDescending { it.value }.forEach { (muscle, count) ->
+                        val fraction = (count.toFloat() / maxSetsInMuscle.toFloat()).coerceIn(0.05f, 1f)
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = muscle.uppercase(),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextMuted,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = "$count ${if (count == 1) "set" else "sets"}",
+                                    fontSize = 10.sp,
+                                    color = TextMuted
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(CircleShape)
+                                    .background(SecondaryFill)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(fraction = fraction)
+                                        .height(6.dp)
+                                        .clip(CircleShape)
+                                        .background(TealHighlight)
+                                )
+                            }
                         }
                     }
-                ) {
-                    Text(
-                        text = currentType.uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        color = when (currentType) {
-                            "warmup" -> AccentTeal
-                            "failure" -> Color(0xFFE57373)
-                            else -> TextMuted
-                        }
-                    )
                 }
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = weightInput,
-                    onValueChange = { weightInput = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                    label = { Text("Weight (kg, optional)", color = TextMuted) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextForeground,
-                        unfocusedTextColor = TextForeground,
-                        focusedBorderColor = TealHighlight,
-                        unfocusedBorderColor = BorderInput
-                    )
-                )
-
-                OutlinedTextField(
-                    value = repsInput,
-                    onValueChange = { repsInput = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Reps (optional)", color = TextMuted) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextForeground,
-                        unfocusedTextColor = TextForeground,
-                        focusedBorderColor = TealHighlight,
-                        unfocusedBorderColor = BorderInput
-                    )
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val w = weightInput.toDoubleOrNull()
-                    val r = repsInput.toIntOrNull()
-                    onSave(PlannedSet(type = currentType, weightKg = w, reps = r))
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black)
-            ) {
-                Text("Save", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDelete) {
-                Text("Delete Set", color = Color(0xFFE57373))
-            }
         }
-    )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
