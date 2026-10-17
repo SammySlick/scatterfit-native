@@ -76,7 +76,6 @@ import com.scatterbrain.scatterfit.ui.theme.StateSlip
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
@@ -187,14 +186,6 @@ fun MyDayScreen(
                 SyncHub.updateLocalWeights(weightStorage.loadAll().flatMap { it.toHealthRecords() })
             }
         )
-    }
-
-    var showWorkoutHint by remember { mutableStateOf(false) }
-    LaunchedEffect(showWorkoutHint) {
-        if (showWorkoutHint) {
-            delay(2000L)
-            showWorkoutHint = false
-        }
     }
 
     BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen || showFoodLoggerScreen) {
@@ -389,13 +380,11 @@ fun MyDayScreen(
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
-        // Quick Actions strip (Log food / Log drink / Log workout / Log weight)
+        // Quick Actions strip (Log food / Log drink / Log weight)
         QuickActionsStrip(
             onLogFoodClick = { if (!isFutureDay) showFoodLoggerScreen = true },
             onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
-            onLogWorkoutClick = onOpenTraining,
             onLogWeightClick = { showWeighInDialog = true },
-            workoutHintVisible = showWorkoutHint,
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
@@ -639,55 +628,31 @@ fun DeltaPointsBlock(
 fun QuickActionsStrip(
     onLogFoodClick: () -> Unit,
     onLogDrinkClick: () -> Unit,
-    onLogWorkoutClick: () -> Unit,
-    onLogWeightClick: () -> Unit = {},
+    onLogWeightClick: () -> Unit,
     modifier: Modifier = Modifier,
-    workoutHintVisible: Boolean = false,
 ) {
-    Column(
+    Row(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            QuickActionButton(
-                label = "Log food",
-                onClick = onLogFoodClick,
-                modifier = Modifier.weight(1f)
-            )
+        QuickActionButton(
+            label = "Log food",
+            onClick = onLogFoodClick,
+            modifier = Modifier.weight(1f)
+        )
 
-            QuickActionButton(
-                label = "Log drink",
-                onClick = onLogDrinkClick,
-                modifier = Modifier.weight(1f)
-            )
+        QuickActionButton(
+            label = "Log drink",
+            onClick = onLogDrinkClick,
+            modifier = Modifier.weight(1f)
+        )
 
-            QuickActionButton(
-                label = "Log workout",
-                onClick = onLogWorkoutClick,
-                modifier = Modifier.weight(1f)
-            )
-
-            QuickActionButton(
-                label = "Log weight",
-                onClick = onLogWeightClick,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        if (workoutHintVisible) {
-            // TODO: Lifting section coming in the redesign spec
-            Text(
-                text = "Lifting section coming",
-                fontSize = 11.sp,
-                color = TextMuted,
-                textAlign = TextAlign.Center
-            )
-        }
+        QuickActionButton(
+            label = "Log weight",
+            onClick = onLogWeightClick,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
@@ -765,9 +730,7 @@ fun QuickActionsStripPreview() {
         QuickActionsStrip(
             onLogFoodClick = {},
             onLogDrinkClick = {},
-            onLogWorkoutClick = {},
             onLogWeightClick = {},
-            workoutHintVisible = true,
             modifier = Modifier.padding(16.dp)
         )
     }

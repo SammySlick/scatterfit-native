@@ -246,6 +246,18 @@ fun SessionPlayerScreen(
         if (!showAbandonConfirm) showAbandonConfirm = true else onAbandon()
     }
 
+    val previousHistory = remember { sessionRecordsStorage.loadAll() }
+    var finishedSessionRecord by remember { mutableStateOf<SessionRecord?>(null) }
+
+    if (finishedSessionRecord != null) {
+        WorkoutSummaryScreen(
+            record = finishedSessionRecord!!,
+            previousHistory = previousHistory,
+            onDone = { onFinish(finishedSessionRecord!!) }
+        )
+        return
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = AppBackground
@@ -319,7 +331,7 @@ fun SessionPlayerScreen(
                                     LoggedSession(dayKey = dayKey, name = workoutTitle, durationMinutes = durationMins)
                                 )
                                 DailyRepository.notifySessionRecorded(finishedRecord)
-                                onFinish(finishedRecord)
+                                finishedSessionRecord = finishedRecord
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black),
                             shape = RoundedCornerShape(8.dp)
