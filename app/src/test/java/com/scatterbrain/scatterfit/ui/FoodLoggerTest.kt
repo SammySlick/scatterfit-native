@@ -479,4 +479,60 @@ class FoodLoggerTest {
         val remainingOver = (kcalTarget - eatenOver).coerceAtLeast(0)
         assertEquals(0, remainingOver)
     }
+
+    @Test
+    fun `FoodHome totals equal sum of stored LoggedMeals for the day including legacy no-mealType rows`() {
+        val legacyJson = """{"id":"m-legacy","name":"Old Snack","kcal":250.0,"protein":15.0,"timestamp":1000,"dayKey":"$today"}"""
+        val modernMeal = LoggedMeal(id = "m-modern", name = "Modern Lunch", kcal = 550.0, protein = 40.0, dayKey = today, mealType = "lunch")
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val decodedLegacy = json.decodeFromString<LoggedMeal>(legacyJson)
+
+        val mealsForDay = listOf(decodedLegacy, modernMeal)
+        val totalKcal = mealsForDay.sumOf { it.kcal }.toInt()
+        val totalProtein = mealsForDay.sumOf { it.protein ?: 0.0 }.toInt()
+
+        assertEquals(800, totalKcal)
+        assertEquals(55, totalProtein)
+    }
+
+    @Test
+    fun `parity test - Day Card calories equals Food home consumed for the same dayKey`() {
+        val meal1 = LoggedMeal(id = "1", name = "Eggs & Toast", kcal = 400.0, protein = 25.0, timestamp = nowMs, dayKey = today, mealType = "breakfast")
+        val meal2 = LoggedMeal(id = "2", name = "Chicken Rice", kcal = 750.0, protein = 55.0, timestamp = nowMs, dayKey = today, mealType = "lunch")
+        val meals = listOf(meal1, meal2)
+
+        // 1. FoodHome consumed calculation
+        val foodHomeConsumed = meals.sumOf { it.kcal }.toInt()
+
+        // 2. DayCard calories calculation via pipeline
+        val records = mapOf(RecordMethod.FOOD_LOG to meals.map { it.toHealthRecord() })
+        val daily = Daily.buildDailyDataFromMaps(
+            records = records,
+            zones = Zones.DEFAULT_ZONES,
+            zone = defaultZone,
+            nowMs = nowMs
+        )
+        val dayCardCalories = daily.caloriesEaten[today]?.toInt() ?: 0
+
+        // Parity assertion: must be exactly equal
+        assertEquals(1150, foodHomeConsumed)
+        assertEquals(foodHomeConsumed, dayCardCalories)
+    }
+
+    @Test
+    fun `section grouping includes legacy snacks alongside typed meals`() {
+        val legacyJson = """{"id":"m-leg","name":"Apple","kcal":95.0,"timestamp":1000,"dayKey":"$today"}"""
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val legacyMeal = json.decodeFromString<LoggedMeal>(legacyJson)
+        val breakfastMeal = LoggedMeal(id = "m-bf", name = "Oatmeal", kcal = 350.0, mealType = "breakfast", dayKey = today)
+
+        val allMeals = listOf(legacyMeal, breakfastMeal)
+        val bySection = allMeals.groupBy { it.mealType.lowercase() }
+
+        assertEquals(1, bySection["breakfast"]?.size)
+        assertEquals("Oatmeal", bySection["breakfast"]?.first()?.name)
+
+        assertEquals(1, bySection["snacks"]?.size)
+        assertEquals("Apple", bySection["snacks"]?.first()?.name)
+    }
 }

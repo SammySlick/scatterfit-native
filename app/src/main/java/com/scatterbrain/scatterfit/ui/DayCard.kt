@@ -53,6 +53,7 @@ import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
+import com.scatterbrain.scatterfit.ui.theme.StateBad
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
@@ -111,12 +112,16 @@ fun computeDayCardTicks(
 enum class MetricBarColor {
     TEAL,
     GREEN,
-    ORANGE
+    ORANGE,
+    RED
 }
 
 fun computeCaloriesBarColor(caloriesEaten: Double?, target: Int, greenTolerance: Int = 150): MetricBarColor {
-    if (caloriesEaten == null || caloriesEaten <= 0.0) return MetricBarColor.TEAL
+    if (caloriesEaten == null || caloriesEaten <= 0.0 || target <= 0) return MetricBarColor.TEAL
+    val overKcal = caloriesEaten - target
+    val maxOrangeOverKcal = target * 0.10
     return when {
+        overKcal > maxOrangeOverKcal + 0.0001 -> MetricBarColor.RED
         caloriesEaten > target + greenTolerance -> MetricBarColor.ORANGE
         caloriesEaten >= target - greenTolerance -> MetricBarColor.GREEN
         else -> MetricBarColor.TEAL
@@ -141,6 +146,7 @@ fun getBarColor(colorType: MetricBarColor): Color = when (colorType) {
     MetricBarColor.TEAL -> AccentTeal
     MetricBarColor.GREEN -> StateLocked
     MetricBarColor.ORANGE -> JudgementWarn
+    MetricBarColor.RED -> StateBad
 }
 
 @Composable

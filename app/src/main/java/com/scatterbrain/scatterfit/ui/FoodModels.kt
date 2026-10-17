@@ -58,6 +58,30 @@ fun guessMealType(hour: Int): String = when {
     else -> "snacks"
 }
 
+fun com.scatterbrain.scatterfit.data.MealEntry.toLoggedMeal(dayKey: String): LoggedMeal {
+    val guessedType = when (meal.lowercase()) {
+        "breakfast", "lunch", "dinner", "snacks" -> meal.lowercase()
+        else -> guessMealType(
+            time?.let {
+                runCatching {
+                    java.time.Instant.parse(it).atZone(java.time.ZoneId.systemDefault()).hour
+                }.getOrNull()
+            } ?: 12
+        )
+    }
+    return LoggedMeal(
+        id = "pipeline-$dayKey-${name.hashCode()}-${kcal.toInt()}",
+        name = name,
+        kcal = kcal,
+        protein = protein,
+        carbs = carbs,
+        fat = fat,
+        timestamp = time?.let { com.scatterbrain.scatterfit.data.parseMillis(it) } ?: System.currentTimeMillis(),
+        dayKey = dayKey,
+        mealType = guessedType
+    )
+}
+
 data class MealPreset(
     val name: String,
     val kcal: Double,
@@ -157,7 +181,7 @@ class FoodTrackerViewModel(
     val savedFoodStore: SavedFoodStore? = null,
     initialDayKey: String = todayKey(),
 ) : ViewModel() {
-    var activeDayKey: String = initialDayKey
+    var activeDayKey by mutableStateOf(initialDayKey)
         private set
     val inMemoryStorage = mutableMapOf<String, MutableList<LoggedMeal>>()
 
@@ -184,6 +208,7 @@ class FoodTrackerViewModel(
         setDayKey(initialDayKey)
         refreshPresets()
         refreshSavedFoods()
+        syncStorageToPipeline()
     }
 
     fun refreshSavedFoods() {

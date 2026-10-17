@@ -16,6 +16,30 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+fun isDailyEquivalent(current: AssembledDaily?, candidate: AssembledDaily?): Boolean {
+    if (current === candidate) return true
+    if (current == null || candidate == null) return false
+
+    // Compare dayKeys cheaply
+    if (current.caloriesEaten.keys != candidate.caloriesEaten.keys) return false
+    if (current.steps.keys != candidate.steps.keys) return false
+    if (current.protein.keys != candidate.protein.keys) return false
+    if (current.trainingMinutes.keys != candidate.trainingMinutes.keys) return false
+
+    // Compare per-day values
+    if (current.caloriesEaten != candidate.caloriesEaten) return false
+    if (current.steps != candidate.steps) return false
+    if (current.protein != candidate.protein) return false
+    if (current.trainingMinutes != candidate.trainingMinutes) return false
+
+    // Compare sleep totals per day
+    val currentSleep = current.sleep.mapValues { it.value.totalMin }
+    val candidateSleep = candidate.sleep.mapValues { it.value.totalMin }
+    if (currentSleep != candidateSleep) return false
+
+    return true
+}
+
 object DailyRepository {
     private val _daily = MutableStateFlow<AssembledDaily?>(null)
     val daily: StateFlow<AssembledDaily?> = _daily.asStateFlow()
@@ -69,11 +93,16 @@ object DailyRepository {
                     }
                 }
                 if (newDaily != null) {
-                    _daily.value = newDaily
-                    if (!firstDailyPublished) {
-                        firstDailyPublished = true
-                        val elapsed = System.currentTimeMillis() - startMs
-                        Log.d("ScatterFitSync", "first daily from records in ${elapsed}ms")
+                    val currentDaily = _daily.value
+                    if (currentDaily != null && isDailyEquivalent(currentDaily, newDaily)) {
+                        Log.d("ScatterFitSync", "DailyRepository: incoming daily equivalent to current snapshot — skipping republish")
+                    } else {
+                        _daily.value = newDaily
+                        if (!firstDailyPublished) {
+                            firstDailyPublished = true
+                            val elapsed = System.currentTimeMillis() - startMs
+                            Log.d("ScatterFitSync", "first daily from records in ${elapsed}ms")
+                        }
                     }
                 }
 
@@ -85,6 +114,22 @@ object DailyRepository {
                         writeJob = scope.launch(Dispatchers.IO) {
                             delay(3000L)
                             snapshotStorage.save(newDaily)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Final settle write: when sync finishes (syncing transitions to false), ensure final write lands
+        scope.launch {
+            SyncHub.syncing.collect { isSyncing ->
+                if (!isSyncing && snapshotStorage != null) {
+                    val settled = _daily.value
+                    if (settled != null) {
+                        writeJob?.cancel()
+                        writeJob = scope.launch(Dispatchers.IO) {
+                            delay(3000L)
+                            snapshotStorage.save(settled)
                         }
                     }
                 }

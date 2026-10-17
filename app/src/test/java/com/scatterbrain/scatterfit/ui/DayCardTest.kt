@@ -124,22 +124,31 @@ class DayCardTest {
     }
 
     @Test
-    fun `bar colour logic - calories shows teal in progress, green in band, orange over goal`() {
+    fun `bar colour logic - calories shows teal in progress, green in band, orange over goal, red over 10 percent`() {
+        // Target 2500, greenTolerance 150
         // In progress (< target - 150) -> TEAL
-        val calProgress = computeCaloriesBarColor(1500.0, 2000, greenTolerance = 150)
+        val calProgress = computeCaloriesBarColor(2000.0, 2500, greenTolerance = 150)
         assertEquals(MetricBarColor.TEAL, calProgress)
 
-        // In band (1850..2150) -> GREEN
-        val calInBand = computeCaloriesBarColor(2050.0, 2000, greenTolerance = 150)
+        // In band (2350..2650) -> GREEN
+        val calInBand = computeCaloriesBarColor(2550.0, 2500, greenTolerance = 150)
         assertEquals(MetricBarColor.GREEN, calInBand)
 
-        // Over goal (> 2150) -> ORANGE
-        val calOver = computeCaloriesBarColor(2300.0, 2000, greenTolerance = 150)
-        assertEquals(MetricBarColor.ORANGE, calOver)
+        // Over tolerance by < 10% -> ORANGE
+        val calOrange = computeCaloriesBarColor(2680.0, 2500, greenTolerance = 150)
+        assertEquals(MetricBarColor.ORANGE, calOrange)
+
+        // Boundary at exactly 10% over target (2500 * 1.10 = 2750) -> ORANGE
+        val calBoundary10 = computeCaloriesBarColor(2750.0, 2500, greenTolerance = 150)
+        assertEquals(MetricBarColor.ORANGE, calBoundary10)
+
+        // Over target by 10.1% (2500 * 1.101 = 2752.5) -> RED
+        val calRed101 = computeCaloriesBarColor(2752.5, 2500, greenTolerance = 150)
+        assertEquals(MetricBarColor.RED, calRed101)
 
         // Null / 0 -> TEAL
-        assertEquals(MetricBarColor.TEAL, computeCaloriesBarColor(null, 2000))
-        assertEquals(MetricBarColor.TEAL, computeCaloriesBarColor(0.0, 2000))
+        assertEquals(MetricBarColor.TEAL, computeCaloriesBarColor(null, 2500))
+        assertEquals(MetricBarColor.TEAL, computeCaloriesBarColor(0.0, 2500))
     }
 
     @Test

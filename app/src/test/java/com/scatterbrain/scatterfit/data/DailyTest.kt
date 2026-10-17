@@ -1,6 +1,7 @@
 package com.scatterbrain.scatterfit.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlinx.serialization.json.*
@@ -173,5 +174,43 @@ class DailyTest {
         val merged = Daily.mergeSessionRecordsIntoDaily(base, listOf(rec1, rec2))
         val expectedMins = initialMins + 45.0 + 1.0
         assertEquals(expectedMins, merged.trainingMinutes[testDay]!!, 0.0001)
+    }
+
+    @Test fun `isDailyEquivalent - identical records return true (skip recompute)`() {
+        val a = built()
+        val b = built()
+        assertTrue(isDailyEquivalent(a, b))
+        assertTrue(isDailyEquivalent(a, a.copy()))
+    }
+
+    @Test fun `isDailyEquivalent - changed records return false (triggers rebuild)`() {
+        val a = built()
+        // Altered calories
+        val alteredCalories = a.caloriesEaten.toMutableMap()
+        alteredCalories["2026-10-07"] = (alteredCalories["2026-10-07"] ?: 0.0) + 100.0
+        val b = a.copy(caloriesEaten = alteredCalories)
+        assertFalse(isDailyEquivalent(a, b))
+
+        // Altered steps
+        val alteredSteps = a.steps.toMutableMap()
+        alteredSteps["2026-10-07"] = (alteredSteps["2026-10-07"] ?: 0.0) + 500.0
+        val c = a.copy(steps = alteredSteps)
+        assertFalse(isDailyEquivalent(a, c))
+    }
+
+    @Test fun `incremental-vs-full decision by lastSyncTimestamp`() {
+        val now = 100_000_000L
+
+        // Never synced (0L) -> full sync
+        com.scatterbrain.scatterfit.sync.SyncHub.setLastSyncTimestamp(0L)
+        assertTrue(com.scatterbrain.scatterfit.sync.SyncHub.shouldRunFullSync(now))
+
+        // Synced 10 hours ago (< 24h) -> incremental sync
+        com.scatterbrain.scatterfit.sync.SyncHub.setLastSyncTimestamp(now - 10 * 3600 * 1000L)
+        assertFalse(com.scatterbrain.scatterfit.sync.SyncHub.shouldRunFullSync(now))
+
+        // Synced 25 hours ago (> 24h) -> full sync
+        com.scatterbrain.scatterfit.sync.SyncHub.setLastSyncTimestamp(now - 25 * 3600 * 1000L)
+        assertTrue(com.scatterbrain.scatterfit.sync.SyncHub.shouldRunFullSync(now))
     }
 }

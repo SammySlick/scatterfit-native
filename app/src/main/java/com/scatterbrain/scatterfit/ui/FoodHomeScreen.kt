@@ -40,6 +40,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.scatterbrain.scatterfit.data.DailyRepository
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -90,13 +91,26 @@ fun FoodHomeScreen(
 ) {
     BackHandler(onBack = onBackClick)
 
-    val mealsForDay by viewModel.mealsForDay.collectAsState()
+    val storedMeals by viewModel.mealsForDay.collectAsState()
     val presets by viewModel.presets.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
     val favourites by viewModel.favourites.collectAsState()
+    val repoDaily by DailyRepository.daily.collectAsState()
 
     val activeDay = viewModel.activeDayKey
     val today = remember { todayKey() }
+
+    val pipelineMeals = repoDaily?.meals?.get(activeDay) ?: emptyList()
+
+    val displayMeals = remember(storedMeals, pipelineMeals, activeDay) {
+        if (storedMeals.isNotEmpty()) {
+            storedMeals
+        } else if (pipelineMeals.isNotEmpty()) {
+            pipelineMeals.map { it.toLoggedMeal(activeDay) }
+        } else {
+            emptyList()
+        }
+    }
 
     var macroMode by remember { mutableStateOf(MacroCardMode.CONSUMED) }
 
@@ -130,11 +144,18 @@ fun FoodHomeScreen(
         }.getOrDefault(activeDay)
     }
 
-    // Totals for active day
-    val totalKcal = remember(mealsForDay) { mealsForDay.sumOf { it.kcal }.roundToInt() }
-    val totalProtein = remember(mealsForDay) { mealsForDay.sumOf { it.protein ?: 0.0 }.roundToInt() }
-    val totalCarbs = remember(mealsForDay) { mealsForDay.sumOf { it.carbs ?: 0.0 }.roundToInt() }
-    val totalFat = remember(mealsForDay) { mealsForDay.sumOf { it.fat ?: 0.0 }.roundToInt() }
+    // Totals for active day matching DailyRepository & Day Card parity
+    val calFromDaily = repoDaily?.caloriesEaten?.get(activeDay)
+    val totalKcal = (calFromDaily ?: displayMeals.sumOf { it.kcal }).roundToInt()
+
+    val protFromDaily = repoDaily?.protein?.get(activeDay)
+    val totalProtein = (protFromDaily ?: displayMeals.sumOf { it.protein ?: 0.0 }).roundToInt()
+
+    val carbsFromDaily = repoDaily?.carbs?.get(activeDay)
+    val totalCarbs = (carbsFromDaily ?: displayMeals.sumOf { it.carbs ?: 0.0 }).roundToInt()
+
+    val fatFromDaily = repoDaily?.fat?.get(activeDay)
+    val totalFat = (fatFromDaily ?: displayMeals.sumOf { it.fat ?: 0.0 }).roundToInt()
 
     val kcalTarget = settings.kcalTarget
     val proteinTarget = settings.proteinTarget
@@ -281,21 +302,36 @@ fun FoodHomeScreen(
                         val isRemaining = macroMode == MacroCardMode.REMAINING
                         val remainingKcal = (kcalTarget - totalKcal).coerceAtLeast(0)
                         val isOverGoal = totalKcal > kcalTarget
+                        val overKcal = (totalKcal - kcalTarget).coerceAtLeast(0)
 
-                        val bigKcalNumber = if (isRemaining) {
-                            if (isOverGoal) 0 else remainingKcal
+                        // When consumed > target in REMAINING mode: hero reads "620 kcal over 2,500" (number Bold red StateBad, caption muted)
+                        val isOverHero = isRemaining && isOverGoal
+
+                        val bigKcalText = if (isOverHero) {
+                            String.format(Locale.US, "%,d", overKcal)
+                        } else if (isRemaining) {
+                            String.format(Locale.US, "%,d", remainingKcal)
                         } else {
-                            totalKcal
+                            String.format(Locale.US, "%,d", totalKcal)
+                        }
+
+                        val numberColor = if (isOverHero) StateBad else TextForeground
+
+                        val captionText = if (isOverHero) {
+                            "kcal over %,d".format(Locale.US, kcalTarget)
+                        } else {
+                            "of %,d kcal".format(Locale.US, kcalTarget)
                         }
 
                         val barFillFraction = if (isRemaining) {
-                            if (kcalTarget > 0) (remainingKcal.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
+                            if (isOverGoal) 1f else if (kcalTarget > 0) (remainingKcal.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
                         } else {
                             if (kcalTarget > 0) (totalKcal.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
                         }
 
-                        val barFillColor = if (isRemaining && isOverGoal) {
-                            JudgementWarn
+                        // The kcal bar turns RED (StateBad) when consumed exceeds target by > 10% of target; between 100% and 110% stays orange (JudgementWarn).
+                        val barFillColor = if (isOverGoal) {
+                            getBarColor(computeCaloriesBarColor(totalKcal.toDouble(), kcalTarget, settings.tolerances.kcalGreen))
                         } else {
                             AccentTeal
                         }
@@ -307,14 +343,14 @@ fun FoodHomeScreen(
                                 verticalAlignment = Alignment.Bottom
                             ) {
                                 Text(
-                                    text = String.format(Locale.US, "%,d", bigKcalNumber),
+                                    text = bigKcalText,
                                     fontSize = 48.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextForeground,
+                                    color = numberColor,
                                     lineHeight = 52.sp
                                 )
                                 Text(
-                                    text = "of %,d kcal".format(Locale.US, kcalTarget),
+                                    text = captionText,
                                     fontSize = 13.sp,
                                     color = TextMuted,
                                     modifier = Modifier.padding(bottom = 6.dp)
@@ -372,29 +408,6 @@ fun FoodHomeScreen(
                             )
                         }
                     }
-                }
-
-                // If user activated Search with query -> show live search results
-                if (searchQuery.isNotBlank()) {
-                    LiveFoodSearchResults(
-                        query = searchQuery,
-                        presets = presets,
-                        favourites = favourites,
-                        recipes = recipes,
-                        onSelectPreset = { preset ->
-                            viewModel.applyPreset(preset)
-                            isLoggerOpen = true
-                            searchQuery = ""
-                        },
-                        onSelectFavourite = { fav ->
-                            viewModel.logFavourite(fav)
-                            searchQuery = ""
-                        },
-                        onSelectRecipe = { recipe ->
-                            viewModel.logRecipePortion(recipe)
-                            searchQuery = ""
-                        }
-                    )
                 }
 
                 // If Logger is toggled open -> show the full FoodLoggerScreen content inline
@@ -519,12 +532,42 @@ fun FoodHomeScreen(
                     letterSpacing = 1.sp
                 )
 
+                // 4. SEARCH BAR POSITION: moved between "FOOD LOG" header and the Breakfast section card
+                SearchBarField(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // If user activated Search with query -> show live search results right below search bar
+                if (searchQuery.isNotBlank()) {
+                    LiveFoodSearchResults(
+                        query = searchQuery,
+                        presets = presets,
+                        favourites = favourites,
+                        recipes = recipes,
+                        onSelectPreset = { preset ->
+                            viewModel.applyPreset(preset)
+                            isLoggerOpen = true
+                            searchQuery = ""
+                        },
+                        onSelectFavourite = { fav ->
+                            viewModel.logFavourite(fav)
+                            searchQuery = ""
+                        },
+                        onSelectRecipe = { recipe ->
+                            viewModel.logRecipePortion(recipe)
+                            searchQuery = ""
+                        }
+                    )
+                }
+
                 // Meal Sections: BREAKFAST / LUNCH / DINNER / SNACKS
                 val sections = listOf("breakfast", "lunch", "dinner", "snacks")
 
                 sections.forEach { sectionKey ->
                     val isExpanded = expandedSections.contains(sectionKey)
-                    val sectionMeals = mealsForDay.filter { it.mealType.equals(sectionKey, ignoreCase = true) }
+                    val sectionMeals = displayMeals.filter { it.mealType.equals(sectionKey, ignoreCase = true) }
 
                     val sectionKcal = sectionMeals.sumOf { it.kcal }.roundToInt()
                     val sectionProtein = sectionMeals.sumOf { it.protein ?: 0.0 }.roundToInt()
@@ -561,15 +604,6 @@ fun FoodHomeScreen(
                         }
                     )
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // 4. SEARCH BAR: Pinned above bottom nav
-                SearchBarField(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth()
-                )
 
                 Spacer(modifier = Modifier.height(80.dp))
             }

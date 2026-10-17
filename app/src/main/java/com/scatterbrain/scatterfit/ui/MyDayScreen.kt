@@ -87,7 +87,7 @@ import java.util.Locale
 fun MyDayScreen(
     modifier: Modifier = Modifier,
     onSettingsClick: () -> Unit = {},
-    onOpenFood: () -> Unit = {},
+    onOpenFood: (String) -> Unit = {},
     onOpenTraining: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
@@ -128,20 +128,6 @@ fun MyDayScreen(
         if (drinkState.libraryDrinks.isEmpty()) {
             drinkViewModel.loadLibraryFromAssets(context)
         }
-    }
-
-    val savedFoodStore = remember { SavedFoodStore(context) }
-
-    val foodViewModel = remember {
-        FoodTrackerViewModel(
-            storage = foodStorage,
-            savedFoodStore = savedFoodStore,
-            initialDayKey = selectedDay
-        )
-    }
-
-    LaunchedEffect(selectedDay) {
-        foodViewModel.setDayKey(selectedDay)
     }
 
     var planVersion by remember { mutableIntStateOf(0) }
@@ -376,7 +362,7 @@ fun MyDayScreen(
 
         // Quick Actions strip (Log food / Log drink / Log weight)
         QuickActionsStrip(
-            onLogFoodClick = { if (!isFutureDay) onOpenFood() },
+            onLogFoodClick = { if (!isFutureDay) onOpenFood(selectedDay) },
             onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
             onLogWeightClick = { showWeighInDialog = true },
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()

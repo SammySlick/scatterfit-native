@@ -48,6 +48,16 @@ fun MainAppScreen(
     modifier: Modifier = Modifier,
     onSettingsClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val foodStorage = remember { FoodStorage(context) }
+    val savedFoodStore = remember { SavedFoodStore(context) }
+    val foodViewModel = remember {
+        FoodTrackerViewModel(
+            storage = foodStorage,
+            savedFoodStore = savedFoodStore
+        )
+    }
+
     var selectedTab by remember { mutableStateOf(AppTab.MY_DAY) }
 
     BackHandler(enabled = selectedTab != AppTab.MY_DAY) {
@@ -85,29 +95,22 @@ fun MainAppScreen(
             when (selectedTab) {
                 AppTab.MY_DAY -> MyDayScreen(
                     onSettingsClick = onSettingsClick,
-                    onOpenFood = { selectedTab = AppTab.FOOD },
+                    onOpenFood = { dayKey ->
+                        foodViewModel.setDayKey(dayKey)
+                        selectedTab = AppTab.FOOD
+                    },
                     onOpenTraining = { selectedTab = AppTab.TRAINING }
                 )
                 AppTab.ODYSSEY -> OdysseyScreen(
                     onSettingsClick = onSettingsClick
                 )
                 AppTab.FOOD -> {
-                    val context = LocalContext.current
-                    val foodStorage = remember { FoodStorage(context) }
-                    val savedFoodStore = remember { SavedFoodStore(context) }
-                    val foodViewModel = remember {
-                        FoodTrackerViewModel(
-                            storage = foodStorage,
-                            savedFoodStore = savedFoodStore
-                        )
-                    }
                     FoodHomeScreen(
                         viewModel = foodViewModel,
                         onBackClick = { selectedTab = AppTab.MY_DAY }
                     )
                 }
                 AppTab.TRAINING -> {
-                    val context = LocalContext.current
                     val routineStorage = remember { RoutineStorage(context) }
                     TrainingScreen(
                         storage = routineStorage,

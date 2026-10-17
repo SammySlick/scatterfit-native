@@ -76,9 +76,29 @@ object SyncHub {
         return out
     }
 
+    private var syncPrefs: android.content.SharedPreferences? = null
+    private var inMemoryLastSync: Long = 0L
+
+    fun getLastSyncTimestamp(): Long {
+        return syncPrefs?.getLong("last_sync_timestamp", 0L) ?: inMemoryLastSync
+    }
+
+    fun setLastSyncTimestamp(ts: Long) {
+        inMemoryLastSync = ts
+        syncPrefs?.edit()?.putLong("last_sync_timestamp", ts)?.apply()
+    }
+
+    fun shouldRunFullSync(nowMs: Long = System.currentTimeMillis()): Boolean {
+        val lastSync = getLastSyncTimestamp()
+        if (lastSync <= 0L) return true
+        val elapsed = nowMs - lastSync
+        return elapsed > 24 * 3600 * 1000L // > 24h
+    }
+
     fun init(context: Context, scope: CoroutineScope) {
         if (initJob != null) return
         val appContext = context.applicationContext
+        syncPrefs = appContext.getSharedPreferences("scatterfit_sync_prefs", Context.MODE_PRIVATE)
         store = SyncStore(File(appContext.filesDir, "hc-sync"))
         engine = SyncEngine(store!!, nowMs = { System.currentTimeMillis() })
         try {
@@ -154,16 +174,27 @@ object SyncHub {
     suspend fun syncNow(
         methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
         windowFromOverride: Long? = null,
+        forceFull: Boolean = false,
     ): SyncEngine.SyncResult? {
         awaitInit()
         val e = engine ?: return null
         val c = client ?: return null
         if (!_syncing.compareAndSet(false, true)) { Log.d(TAG, "syncNow: already running, skip"); return null }
-        Log.d(TAG, "syncNow: STARTING engine sync (windowFromOverride=$windowFromOverride)")
+
+        val now = System.currentTimeMillis()
+        val effectiveWindowFrom = if (windowFromOverride != null) {
+            windowFromOverride
+        } else if (!forceFull && !shouldRunFullSync(now)) {
+            now - 2 * 86_400_000L // Incremental 2-day window
+        } else {
+            null // Full 120d sync
+        }
+
+        Log.d(TAG, "syncNow: STARTING engine sync (effectiveWindowFrom=$effectiveWindowFrom, forceFull=$forceFull)")
         return try {
             val result = e.sync(
                 methods = methods,
-                windowFromOverride = windowFromOverride,
+                windowFromOverride = effectiveWindowFrom,
                 reader = { ms, fromMs, toMs, onSlice ->
                     var sliceN = 0
                     val read = HcReaders.readAll(c, fromMs, toMs, ms) { m, sliceEnd, sliceRecords ->
@@ -182,8 +213,8 @@ object SyncHub {
                 onProgress = { snapshot -> _records.value = publishFood(snapshot) },
             )
             Log.d(TAG, "sync done: mergedMethods=${result.merged.size} mergedRows=${result.merged.values.sumOf { it.size }}")
+            setLastSyncTimestamp(now)
             _records.value = publishFood(result.merged)
-            _lastError.value = null
             _lastError.value = null
             _status.value = if (result.merged.isEmpty()) {
                 // Sync ran, read everything it was allowed to — and got nothing.
