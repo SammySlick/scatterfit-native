@@ -30,7 +30,9 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
             Log.d(logTag, "permission result: ${granted.size} granted=$granted")
             if (granted.containsAll(HcPermissions.read)) {
-                SyncService.start(this)
+                if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                    SyncService.start(this)
+                }
             }
         }
 
@@ -53,7 +55,11 @@ class MainActivity : ComponentActivity() {
                     if (SyncHub.records.value == null) {
                         SyncHub.setStatus("Health Connect: syncing…")
                     }
-                    SyncService.start(this@MainActivity)
+                    if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                        SyncService.start(this@MainActivity)
+                    } else {
+                        Log.d(logTag, "ensureHcPermissions: activity not resumed (${lifecycle.currentState}), deferring sync")
+                    }
                 } else if (!requestedPermissions) {
                     requestedPermissions = true
                     Log.d(logTag, "onResume: LAUNCHING permission request (${HcPermissions.read.size} permissions)")
