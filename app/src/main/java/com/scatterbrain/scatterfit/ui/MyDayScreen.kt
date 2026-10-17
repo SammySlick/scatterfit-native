@@ -339,26 +339,26 @@ fun MyDayScreen(
                 textAlign = TextAlign.Center
             )
 
-            // RIGHT: Calendar icon button + Settings gear button
+            // RIGHT: Calendar icon button + Settings gear button (calendar then gear, 8dp gap; 24dp icon with 40dp tap target)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 IconButton(
                     onClick = { showCalendarSheet = true },
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     CalendarIcon(
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(24.dp),
                         tint = TextForeground
                     )
                 }
                 IconButton(
                     onClick = onSettingsClick,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     SettingsIcon(
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(24.dp),
                         tint = AccentTeal
                     )
                 }
@@ -370,6 +370,7 @@ fun MyDayScreen(
             daily = repoDaily,
             dayKey = selectedDay,
             planName = todayPlan,
+            drinksCount = drinkState.loggedDrinks.size,
             onMetricClick = { metricId ->
                 activeMetricId = metricId
             },
@@ -388,11 +389,12 @@ fun MyDayScreen(
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
-        // Quick Actions strip (Log meal / Log drink / Log workout)
+        // Quick Actions strip (Log food / Log drink / Log workout / Log weight)
         QuickActionsStrip(
-            onLogMealClick = { if (!isFutureDay) showFoodLoggerScreen = true },
+            onLogFoodClick = { if (!isFutureDay) showFoodLoggerScreen = true },
             onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
             onLogWorkoutClick = onOpenTraining,
+            onLogWeightClick = { showWeighInDialog = true },
             workoutHintVisible = showWorkoutHint,
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
@@ -635,9 +637,10 @@ fun DeltaPointsBlock(
 
 @Composable
 fun QuickActionsStrip(
-    onLogMealClick: () -> Unit,
+    onLogFoodClick: () -> Unit,
     onLogDrinkClick: () -> Unit,
     onLogWorkoutClick: () -> Unit,
+    onLogWeightClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     workoutHintVisible: Boolean = false,
 ) {
@@ -652,8 +655,8 @@ fun QuickActionsStrip(
             verticalAlignment = Alignment.CenterVertically
         ) {
             QuickActionButton(
-                label = "Log meal",
-                onClick = onLogMealClick,
+                label = "Log food",
+                onClick = onLogFoodClick,
                 modifier = Modifier.weight(1f)
             )
 
@@ -666,6 +669,12 @@ fun QuickActionsStrip(
             QuickActionButton(
                 label = "Log workout",
                 onClick = onLogWorkoutClick,
+                modifier = Modifier.weight(1f)
+            )
+
+            QuickActionButton(
+                label = "Log weight",
+                onClick = onLogWeightClick,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -754,9 +763,10 @@ private fun QuickActionButton(
 fun QuickActionsStripPreview() {
     ScatterFitTheme {
         QuickActionsStrip(
-            onLogMealClick = {},
+            onLogFoodClick = {},
             onLogDrinkClick = {},
             onLogWorkoutClick = {},
+            onLogWeightClick = {},
             workoutHintVisible = true,
             modifier = Modifier.padding(16.dp)
         )

@@ -3,18 +3,22 @@ package com.scatterbrain.scatterfit.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -26,13 +30,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -42,11 +41,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.MetricId
 import com.scatterbrain.scatterfit.core.ScoringSettings
-import com.scatterbrain.scatterfit.core.SquareBand
-import com.scatterbrain.scatterfit.core.squareBand
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.AssembledDaily
 import com.scatterbrain.scatterfit.data.SleepNight
@@ -61,223 +57,90 @@ import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.temporal.TemporalAdjusters
 import java.util.Locale
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
-data class DayCardStatus(
-    val caloriesPassed: Boolean,
-    val stepsPassed: Boolean,
-    val proteinPassed: Boolean,
-    val sleepPassed: Boolean,
-    val trainingPassed: Boolean,
+data class DayCardTicks(
+    val completedCount: Int,
+    val totalTarget: Int, // 4 on training days, 3 on rest days
+    val hasWeightBonus: Boolean,
 ) {
-    val completedCount: Int = listOf(
-        caloriesPassed,
-        stepsPassed,
-        proteinPassed,
-        trainingPassed,
-    ).count { it }
-
-    val headerText: String = if (completedCount == 4) "All done ✓" else "$completedCount/4 done"
+    val counterText: String = "$completedCount / $totalTarget"
 }
 
-enum class RingState {
-    DONE,        // Full teal circle + 10dp white checkmark centred inside
-    IN_PROGRESS, // Teal arc, sweep = progress fraction (0..1)
-    OUT_OF_BAND, // JudgementWarn orange arc (fraction 0..1), no checkmark
-    NO_DATA      // Track only, empty
-}
-
-data class DayRingModel(
-    val state: RingState,
-    val fraction: Float,
-)
-
-fun computeDayRingModel(
-    metricId: GoalId,
-    value: Double?,
-    settings: ScoringSettings,
-): DayRingModel {
-    if (value == null || value <= 0.0) {
-        return DayRingModel(RingState.NO_DATA, 0f)
-    }
-
-    return when (metricId) {
-        GoalId.CALORIES -> {
-            val target = settings.kcalTarget.toDouble()
-            val fraction = (value / target).toFloat().coerceIn(0f, 1f)
-            val d = abs(value - target)
-            when {
-                d <= settings.tolerances.kcalGreen -> DayRingModel(RingState.DONE, 1f)
-                value > target + settings.tolerances.kcalGreen -> DayRingModel(RingState.OUT_OF_BAND, fraction)
-                else -> DayRingModel(RingState.IN_PROGRESS, fraction)
-            }
-        }
-        GoalId.STEPS -> {
-            val target = settings.stepTarget.toDouble()
-            val fraction = (value / target).toFloat().coerceIn(0f, 1f)
-            if (value >= target) {
-                DayRingModel(RingState.DONE, 1f)
-            } else {
-                DayRingModel(RingState.IN_PROGRESS, fraction)
-            }
-        }
-        GoalId.PROTEIN -> {
-            val target = settings.proteinTarget.toDouble()
-            val fraction = (value / target).toFloat().coerceIn(0f, 1f)
-            if (value >= target || abs(value - target) <= settings.tolerances.proteinGreenUnder) {
-                DayRingModel(RingState.DONE, 1f)
-            } else {
-                DayRingModel(RingState.OUT_OF_BAND, fraction)
-            }
-        }
-        GoalId.SLEEP -> {
-            val target = settings.sleepTargetHours * 60.0
-            val fraction = (value / target).toFloat().coerceIn(0f, 1f)
-            if (value >= target) {
-                DayRingModel(RingState.DONE, 1f)
-            } else {
-                DayRingModel(RingState.OUT_OF_BAND, fraction)
-            }
-        }
-        GoalId.EXERCISE -> {
-            if (value > 0.0) {
-                DayRingModel(RingState.DONE, 1f)
-            } else {
-                DayRingModel(RingState.NO_DATA, 0f)
-            }
-        }
-        else -> DayRingModel(RingState.NO_DATA, 0f)
-    }
-}
-
-fun computeDayCardStatus(
+fun computeDayCardTicks(
     daily: AssembledDaily?,
     settings: ScoringSettings = ScoringSettings(),
     todayKey: String,
-): DayCardStatus {
+    isTrainingDay: Boolean,
+): DayCardTicks {
+    val totalM = if (isTrainingDay) 4 else 3
     if (daily == null) {
-        return DayCardStatus(
-            caloriesPassed = false,
-            stepsPassed = false,
-            proteinPassed = false,
-            sleepPassed = false,
-            trainingPassed = false,
-        )
+        return DayCardTicks(completedCount = 0, totalTarget = totalM, hasWeightBonus = false)
     }
 
-    val calBand = squareBand(GoalId.CALORIES, daily.caloriesEaten[todayKey], settings)
-    val stepBand = squareBand(GoalId.STEPS, daily.steps[todayKey], settings)
-    val protBand = squareBand(GoalId.PROTEIN, daily.protein[todayKey], settings)
-    val sleepBand = squareBand(GoalId.SLEEP, daily.sleep[todayKey]?.totalMin, settings)
-    val trainBand = squareBand(GoalId.EXERCISE, daily.trainingMinutes[todayKey], settings)
+    val calVal = daily.caloriesEaten[todayKey] ?: 0.0
+    // Ticked if calories in band (or logged within goal)
+    val calTicked = calVal > 0.0 && calVal <= (settings.kcalTarget + settings.tolerances.kcalGreen)
 
-    return DayCardStatus(
-        caloriesPassed = calBand == SquareBand.GREEN,
-        stepsPassed = stepBand == SquareBand.GREEN,
-        proteinPassed = protBand == SquareBand.GREEN,
-        sleepPassed = sleepBand == SquareBand.GREEN,
-        trainingPassed = trainBand == SquareBand.GREEN,
+    val stepVal = daily.steps[todayKey] ?: 0.0
+    val stepTicked = stepVal >= settings.stepTarget
+
+    val protVal = daily.protein[todayKey] ?: 0.0
+    val protTicked = protVal >= settings.proteinTarget
+
+    val trainMins = daily.trainingMinutes[todayKey] ?: 0.0
+    // Training days only! Rest days never auto-tick training.
+    val trainTicked = isTrainingDay && trainMins > 0.0
+
+    val weightVal = daily.weight[todayKey]
+    val hasWeightToday = weightVal != null && weightVal > 0.0
+
+    val baseCount = listOf(calTicked, stepTicked, protTicked).count { it } + if (trainTicked) 1 else 0
+    val completedCount = (baseCount + if (hasWeightToday) 1 else 0).coerceAtLeast(0)
+
+    return DayCardTicks(
+        completedCount = completedCount,
+        totalTarget = totalM,
+        hasWeightBonus = hasWeightToday
     )
 }
 
-@Composable
-fun DayRing(
-    model: DayRingModel,
-    modifier: Modifier = Modifier,
-) {
-    val animatedFraction by animateFloatAsState(
-        targetValue = model.fraction,
-        animationSpec = tween(durationMillis = 300),
-        label = "ringSweep"
-    )
+enum class MetricBarColor {
+    TEAL,
+    GREEN,
+    ORANGE
+}
 
-    Box(
-        modifier = modifier.size(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(24.dp)) {
-            val strokeWidthPx = 3.dp.toPx()
-            val arcSize = Size(size.width - strokeWidthPx, size.height - strokeWidthPx)
-            val arcTopLeft = Offset(strokeWidthPx / 2f, strokeWidthPx / 2f)
-            val centerOffset = Offset(size.width / 2f, size.height / 2f)
-            val radius = (size.minDimension - strokeWidthPx) / 2f
-
-            // 1. Subtle circle track
-            drawCircle(
-                color = BorderDefault,
-                radius = radius,
-                center = centerOffset,
-                style = Stroke(width = strokeWidthPx)
-            )
-
-            // 2. Arc based on state
-            when (model.state) {
-                RingState.DONE -> {
-                    drawArc(
-                        color = TealHighlight,
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
-                    )
-                }
-                RingState.IN_PROGRESS -> {
-                    if (animatedFraction > 0f) {
-                        drawArc(
-                            color = TealHighlight,
-                            startAngle = -90f,
-                            sweepAngle = animatedFraction * 360f,
-                            useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
-                        )
-                    }
-                }
-                RingState.OUT_OF_BAND -> {
-                    if (animatedFraction > 0f) {
-                        drawArc(
-                            color = JudgementWarn,
-                            startAngle = -90f,
-                            sweepAngle = animatedFraction * 360f,
-                            useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
-                        )
-                    }
-                }
-                RingState.NO_DATA -> { /* track only */ }
-            }
-
-            // 3. 10dp white checkmark when DONE
-            if (model.state == RingState.DONE) {
-                val checkSize = 10.dp.toPx()
-                val left = centerOffset.x - checkSize / 2f
-                val top = centerOffset.y - checkSize / 2f
-                val path = Path().apply {
-                    moveTo(left + checkSize * 0.15f, top + checkSize * 0.50f)
-                    lineTo(left + checkSize * 0.42f, top + checkSize * 0.78f)
-                    lineTo(left + checkSize * 0.85f, top + checkSize * 0.22f)
-                }
-                drawPath(
-                    path = path,
-                    color = Color.White,
-                    style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                )
-            }
-        }
+fun computeCaloriesBarColor(caloriesEaten: Double?, target: Int, greenTolerance: Int = 150): MetricBarColor {
+    if (caloriesEaten == null || caloriesEaten <= 0.0) return MetricBarColor.TEAL
+    return when {
+        caloriesEaten > target + greenTolerance -> MetricBarColor.ORANGE
+        caloriesEaten >= target - greenTolerance -> MetricBarColor.GREEN
+        else -> MetricBarColor.TEAL
     }
+}
+
+fun computeStepsBarColor(steps: Double?, target: Int): MetricBarColor {
+    if (steps == null || steps <= 0.0) return MetricBarColor.TEAL
+    return if (steps >= target) MetricBarColor.GREEN else MetricBarColor.TEAL
+}
+
+fun computeProteinBarColor(protein: Double?, target: Int): MetricBarColor {
+    if (protein == null || protein <= 0.0) return MetricBarColor.TEAL
+    return if (protein >= target) MetricBarColor.GREEN else MetricBarColor.TEAL
+}
+
+fun isDrinksSectionVisible(drinksCount: Int, units: Double): Boolean {
+    return drinksCount > 0 || units > 0.0
+}
+
+fun getBarColor(colorType: MetricBarColor): Color = when (colorType) {
+    MetricBarColor.TEAL -> AccentTeal
+    MetricBarColor.GREEN -> StateLocked
+    MetricBarColor.ORANGE -> JudgementWarn
 }
 
 @Composable
@@ -287,23 +150,23 @@ fun DayCard(
     dayKey: String = remember { todayKey() },
     settings: ScoringSettings = remember { ScoringSettings() },
     planName: String? = null,
+    drinksCount: Int? = null,
     onMetricClick: (MetricId) -> Unit = {},
     onPlanEditorClick: (() -> Unit)? = null,
     onWeighInClick: (() -> Unit)? = null,
     onResetToToday: (() -> Unit)? = null,
 ) {
-    val status = remember(daily, settings, dayKey) {
-        computeDayCardStatus(daily, settings, dayKey)
-    }
-
-    val dateFormatted = remember(dayKey) {
-        runCatching {
-            val date = LocalDate.parse(dayKey)
-            date.format(DateTimeFormatter.ofPattern("EEEE d MMM", Locale.US))
-        }.getOrDefault(dayKey)
+    val isTrainingDay = planName != null && !planName.equals("Rest day", ignoreCase = true)
+    val ticks = remember(daily, settings, dayKey, isTrainingDay) {
+        computeDayCardTicks(daily, settings, dayKey, isTrainingDay)
     }
 
     val isCurrentToday = dayKey == remember { todayKey() }
+
+    // Hero calculations: when nothing eaten, shows kcalTarget (not 0); over goal -> 0
+    val kcalTarget = settings.kcalTarget
+    val kcalEaten = daily?.caloriesEaten?.get(dayKey)?.roundToInt() ?: 0
+    val kcalLeft = (kcalTarget - kcalEaten).coerceAtLeast(0)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -315,29 +178,35 @@ fun DayCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header row: "N/4 done" (or "All done ✓") on left, date + "Back to today" chip on right
+            // PART 1 — HERO BLOCK
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = status.headerText,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextForeground
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                // Left: Big kcal left number + caption
+                Column {
                     Text(
-                        text = dateFormatted,
-                        fontSize = 11.sp,
+                        text = String.format(Locale.US, "%,d", kcalLeft),
+                        fontSize = 56.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground,
+                        lineHeight = 60.sp
+                    )
+                    Text(
+                        text = "kcal left of %,d".format(Locale.US, kcalTarget),
+                        fontSize = 13.sp,
                         color = TextMuted
                     )
+                }
+
+                // Right: Ticked fraction + Back to today if past/future
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     if (!isCurrentToday && onResetToToday != null) {
                         Box(
                             modifier = Modifier
@@ -355,247 +224,281 @@ fun DayCard(
                             )
                         }
                     }
+
+                    Text(
+                        text = ticks.counterText,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TealHighlight
+                    )
+                    Text(
+                        text = "ticked",
+                        fontSize = 11.sp,
+                        color = TextMuted
+                    )
                 }
             }
 
+            // PART 2 — BARS REPLACE RINGS (Calories, Steps, Protein rows)
+
             // 1. Calories row
             val calRaw = daily?.caloriesEaten?.get(dayKey)
-            val calVal = calRaw?.roundToInt()
-            val calTarget = settings.kcalTarget
-            val calText = if (calVal != null && calVal > 0) {
-                val diff = calTarget - calVal
-                if (diff >= 0) {
-                    "%,d / %,d kcal · %,d left".format(calVal, calTarget, diff)
-                } else {
-                    "%,d / %,d kcal · %,d over".format(calVal, calTarget, -diff)
-                }
-            } else {
-                "— / %,d kcal".format(calTarget)
-            }
-            val calRingModel = remember(calRaw, settings) {
-                computeDayRingModel(GoalId.CALORIES, calRaw, settings)
-            }
-            DayCardRow(
+            val calFraction = if (calRaw != null && kcalTarget > 0) (calRaw.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
+            val calColor = getBarColor(computeCaloriesBarColor(calRaw, kcalTarget, settings.tolerances.kcalGreen))
+            DayCardBarRow(
+                icon = { FlameIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
                 label = "Calories",
-                valueText = calText,
-                ringContent = { DayRing(calRingModel) },
-                valueColor = if (status.caloriesPassed) StateLocked else TextForeground,
-                onMetricClick = { onMetricClick(MetricId.CALORIES_EATEN) }
+                currentText = String.format(Locale.US, "%,d", calRaw?.roundToInt() ?: 0),
+                targetText = " of %,d kcal".format(Locale.US, kcalTarget),
+                progressFraction = calFraction,
+                fillColor = calColor,
+                onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
             )
 
             // 2. Steps row
             val stepRaw = daily?.steps?.get(dayKey)
-            val stepVal = stepRaw?.roundToInt()
             val stepTarget = settings.stepTarget
-            val stepText = if (stepVal != null && stepVal > 0) {
-                val toGo = (stepTarget - stepVal).coerceAtLeast(0)
-                if (toGo > 0) {
-                    "%,d / %,d · %,d to go".format(stepVal, stepTarget, toGo)
-                } else {
-                    "%,d / %,d".format(stepVal, stepTarget)
-                }
-            } else {
-                "— / %,d".format(stepTarget)
-            }
-            val stepRingModel = remember(stepRaw, settings) {
-                computeDayRingModel(GoalId.STEPS, stepRaw, settings)
-            }
-            DayCardRow(
+            val stepFraction = if (stepRaw != null && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
+            val stepColor = getBarColor(computeStepsBarColor(stepRaw, stepTarget))
+            DayCardBarRow(
+                icon = { FootstepsIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
                 label = "Steps",
-                valueText = stepText,
-                ringContent = { DayRing(stepRingModel) },
-                valueColor = if (status.stepsPassed) StateLocked else TextForeground,
-                onMetricClick = { onMetricClick(MetricId.STEPS) }
+                currentText = String.format(Locale.US, "%,d", stepRaw?.roundToInt() ?: 0),
+                targetText = " of %,d steps".format(Locale.US, stepTarget),
+                progressFraction = stepFraction,
+                fillColor = stepColor,
+                onClick = { onMetricClick(MetricId.STEPS) }
             )
 
             // 3. Protein row
             val protRaw = daily?.protein?.get(dayKey)
-            val protVal = protRaw?.roundToInt()
             val protTarget = settings.proteinTarget
-            val protText = if (protVal != null && protVal > 0) {
-                "%,d / %,d g".format(protVal, protTarget)
-            } else {
-                "— / %,d g".format(protTarget)
-            }
-            val protRingModel = remember(protRaw, settings) {
-                computeDayRingModel(GoalId.PROTEIN, protRaw, settings)
-            }
-            DayCardRow(
+            val protFraction = if (protRaw != null && protTarget > 0) (protRaw.toFloat() / protTarget.toFloat()).coerceIn(0f, 1f) else 0f
+            val protColor = getBarColor(computeProteinBarColor(protRaw, protTarget))
+            DayCardBarRow(
+                icon = { ProteinIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
                 label = "Protein",
-                valueText = protText,
-                ringContent = { DayRing(protRingModel) },
-                valueColor = if (status.proteinPassed) StateLocked else TextForeground,
-                onMetricClick = { onMetricClick(MetricId.PROTEIN) }
+                currentText = String.format(Locale.US, "%,d", protRaw?.roundToInt() ?: 0),
+                targetText = " of %,d g".format(Locale.US, protTarget),
+                progressFraction = protFraction,
+                fillColor = protColor,
+                onClick = { onMetricClick(MetricId.PROTEIN) }
             )
 
-            // 4. Sleep row (Morning vs Evening framing)
-            val isMorning = remember {
-                val zone = daily?.zone ?: ZoneId.systemDefault()
-                LocalTime.now(zone).hour < 12
-            }
-            val sleepLabel = if (isMorning) "Sleep" else "Sleep (tonight's job)"
-            val sleepNight = daily?.sleep?.get(dayKey)
-            val sleepTargetH = settings.sleepTargetHours.roundToInt()
-            val sleepText = if (sleepNight != null && sleepNight.totalMin > 0) {
-                val mins = sleepNight.totalMin.roundToInt()
-                "${mins / 60}h ${mins % 60}m"
-            } else {
-                "— / ${sleepTargetH}h"
-            }
-            val sleepRingModel = remember(sleepNight, settings) {
-                computeDayRingModel(GoalId.SLEEP, sleepNight?.totalMin, settings)
-            }
-            DayCardRow(
-                label = sleepLabel,
-                valueText = sleepText,
-                ringContent = { DayRing(sleepRingModel) },
-                valueColor = if (status.sleepPassed) StateLocked else TextForeground,
-                onMetricClick = { onMetricClick(MetricId.SLEEP) }
+            // PART 3 — TRAINING ROW
+            DayCardTrainingRow(
+                isTrainingDay = isTrainingDay,
+                planName = planName,
+                onClick = onPlanEditorClick
             )
 
-            // 5. Training row (plan name + secondary minutes line)
-            val trainRaw = daily?.trainingMinutes?.get(dayKey)
-            val trainMins = trainRaw?.roundToInt() ?: 0
-            val trainSubtitle = if (trainMins > 0) "$trainMins min today" else null
-            val planTitle = planName ?: "Rest day"
-            val trainRingModel = remember(trainRaw, settings) {
-                computeDayRingModel(GoalId.EXERCISE, trainRaw, settings)
-            }
-            DayCardRow(
-                label = "Training",
-                valueText = planTitle,
-                valueSecondaryText = trainSubtitle,
-                ringContent = { DayRing(trainRingModel) },
-                valueColor = if (status.trainingPassed) StateLocked else TextForeground,
-                onMetricClick = onPlanEditorClick
-            )
-
-            // 6. Alcohol row (Conditional: absent if null or 0; tap opens MetricId.ALCOHOL_UNITS; 6dp dot when data)
-            val todayUnits = daily?.alcoholUnits?.get(dayKey) ?: 0.0
-            if (todayUnits > 0.0) {
-                val monday = runCatching {
-                    LocalDate.parse(dayKey).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                }.getOrNull()
-                val weekKeys = if (monday != null) {
-                    (0 until 7).map { monday.plusDays(it.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE) }
-                } else emptyList()
-                val weekUnits = weekKeys.sumOf { daily?.alcoholUnits?.get(it) ?: 0.0 }
-                val alcText = "%.1fu today · %.1fu this week".format(todayUnits, weekUnits)
-
-                DayCardRow(
-                    label = "Alcohol",
-                    valueText = alcText,
-                    ringContent = {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(AccentTeal)
-                        )
-                    },
-                    valueColor = TextForeground,
-                    onMetricClick = { onMetricClick(MetricId.ALCOHOL_UNITS) }
-                )
-            }
-
-            // 7. Weight row (shows weight + body fat if present; 6dp dot when data today)
-            val todayWeight = daily?.weight?.get(dayKey)
-            val todayBf = daily?.bodyFat?.get(dayKey)
-            val latestWeightEntry = daily?.weight?.filterValues { it > 0.0 }?.entries?.maxByOrNull { it.key }
-            val latestBf = if (latestWeightEntry != null) daily?.bodyFat?.get(latestWeightEntry.key) else null
-            val hasWeightToday = todayWeight != null && todayWeight > 0.0
-
-            val weightAnnotated = buildAnnotatedString {
-                if (hasWeightToday) {
-                    val dayShort = runCatching {
-                        LocalDate.parse(dayKey).format(DateTimeFormatter.ofPattern("EEE", Locale.US))
-                    }.getOrDefault("")
-                    val valText = if (todayBf != null && todayBf > 0.0) {
-                        "%.1f kg · %.1f%% · %s".format(todayWeight, todayBf, dayShort)
-                    } else {
-                        "%.1f kg · %s".format(todayWeight, dayShort)
-                    }
-                    withStyle(SpanStyle(color = TextForeground, fontWeight = FontWeight.Bold)) {
-                        append(valText)
-                    }
-                } else if (latestWeightEntry != null && latestWeightEntry.value > 0.0) {
-                    val dayShort = runCatching {
-                        LocalDate.parse(latestWeightEntry.key).format(DateTimeFormatter.ofPattern("EEE", Locale.US))
-                    }.getOrDefault("")
-                    val valText = if (latestBf != null && latestBf > 0.0) {
-                        "%.1f kg · %.1f%% · last: %s".format(latestWeightEntry.value, latestBf, dayShort)
-                    } else {
-                        "%.1f kg · last: %s".format(latestWeightEntry.value, dayShort)
-                    }
-                    withStyle(SpanStyle(color = TextForeground, fontWeight = FontWeight.Bold)) {
-                        append(valText)
-                    }
-                    withStyle(SpanStyle(color = TealHighlight, fontWeight = FontWeight.SemiBold)) {
-                        append(" · weigh in?")
-                    }
-                } else {
-                    withStyle(SpanStyle(color = TealHighlight, fontWeight = FontWeight.SemiBold)) {
-                        append("weigh in?")
-                    }
-                }
-            }
-
+            // PART 4 — CONTEXT CARDS (two side-by-side)
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 44.dp)
-                    .then(if (onWeighInClick != null) Modifier.clickable {
-                        android.util.Log.d("ScatterFitSync", "weigh-in row tapped")
-                        onWeighInClick()
-                    } else Modifier),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.weight(1f, fill = false),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Sleep Card
+                val sleepNight = daily?.sleep?.get(dayKey)
+                val hasSleepData = sleepNight != null && sleepNight.totalMin > 0
+                val sleepPrimary = if (hasSleepData) {
+                    val mins = sleepNight.totalMin.roundToInt()
+                    "${mins / 60}h ${mins % 60}m"
+                } else {
+                    "—"
+                }
+                val sleepSecondary = if (hasSleepData) "last night" else "syncs overnight"
+
+                DayCardContextCard(
+                    modifier = Modifier.weight(1f),
+                    icon = { MoonIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
+                    primaryText = sleepPrimary,
+                    secondaryText = sleepSecondary,
+                    showDot = false,
+                    onClick = { onMetricClick(MetricId.SLEEP) }
+                )
+
+                // Weight Card
+                val todayWeight = daily?.weight?.get(dayKey)
+                val todayBf = daily?.bodyFat?.get(dayKey)
+                val hasWeightToday = todayWeight != null && todayWeight > 0.0
+
+                val weightPrimary = if (hasWeightToday) "%.1f kg".format(Locale.US, todayWeight) else "No weigh-in yet"
+                val weightSecondary = if (hasWeightToday && todayBf != null && todayBf > 0.0) {
+                    "%.1f%% body fat".format(Locale.US, todayBf)
+                } else if (hasWeightToday) {
+                    "Logged"
+                } else {
+                    "Tap to weigh in"
+                }
+
+                DayCardContextCard(
+                    modifier = Modifier.weight(1f),
+                    icon = { ScaleIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
+                    primaryText = weightPrimary,
+                    secondaryText = weightSecondary,
+                    showDot = hasWeightToday,
+                    onClick = onWeighInClick
+                )
+            }
+
+            // PART 5 — DRINKS SECTION (hidden until >= 1 drink logged today)
+            val todayUnits = daily?.alcoholUnits?.get(dayKey) ?: 0.0
+            val todayKcal = daily?.alcoholKcal?.get(dayKey) ?: 0.0
+            val todayDrinksCount = drinksCount ?: if (todayUnits > 0.0) kotlin.math.ceil(todayUnits).toInt() else 0
+
+            if (isDrinksSectionVisible(todayDrinksCount, todayUnits)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onMetricClick(MetricId.ALCOHOL_UNITS) }
+                        .padding(top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (hasWeightToday) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(AccentTeal)
+                    Text(
+                        text = "DRINKS TODAY",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        DrinksStatChip(
+                            modifier = Modifier.weight(1f),
+                            value = "$todayDrinksCount",
+                            label = "DRINKS"
+                        )
+                        DrinksStatChip(
+                            modifier = Modifier.weight(1f),
+                            value = if (todayUnits % 1.0 == 0.0) "${todayUnits.toInt()}" else "%.1f".format(Locale.US, todayUnits),
+                            label = "UNITS"
+                        )
+                        DrinksStatChip(
+                            modifier = Modifier.weight(1f),
+                            value = String.format(Locale.US, "%,d", todayKcal.roundToInt()),
+                            label = "KCAL"
                         )
                     }
-                    Text(
-                        text = "Weight",
-                        fontSize = 12.sp,
-                        color = TextForeground,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
                 }
-                Text(
-                    text = weightAnnotated,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.End
-                )
             }
         }
     }
 }
 
 @Composable
-private fun DayCardRow(
+private fun DayCardBarRow(
+    icon: @Composable () -> Unit,
     label: String,
-    valueText: String,
+    currentText: String,
+    targetText: String,
+    progressFraction: Float,
+    fillColor: Color,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    ringContent: (@Composable () -> Unit)? = null,
-    valueSecondaryText: String? = null,
-    valueColor: Color = TextForeground,
-    onMetricClick: (() -> Unit)? = null,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.70f else 1f,
+        animationSpec = tween(80),
+        label = "rowAlpha"
+    )
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer { this.alpha = alpha }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                icon()
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    color = TextForeground,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(color = TextForeground, fontWeight = FontWeight.Bold, fontSize = 16.sp)) {
+                        append(currentText)
+                    }
+                    withStyle(SpanStyle(color = TextMuted, fontWeight = FontWeight.Normal, fontSize = 13.sp)) {
+                        append(targetText)
+                    }
+                },
+                textAlign = TextAlign.End
+            )
+        }
+
+        // 6dp Progress Bar with 8% white track and minimum 2dp visible fill
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction = progressFraction.coerceIn(0f, 1f))
+                    .widthIn(min = 2.dp)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(fillColor)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DayCardTrainingRow(
+    isTrainingDay: Boolean,
+    planName: String?,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed && isTrainingDay) 0.70f else 1f,
+        animationSpec = tween(80),
+        label = "trainingRowAlpha"
+    )
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
-            .then(if (onMetricClick != null) Modifier.clickable(onClick = onMetricClick) else Modifier),
+            .graphicsLayer { this.alpha = alpha }
+            .then(
+                if (isTrainingDay && onClick != null) {
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onClick
+                    )
+                } else Modifier
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -604,45 +507,149 @@ private fun DayCardRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (ringContent != null) {
-                ringContent()
-            }
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = TextForeground,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = valueText,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = valueColor,
-                    textAlign = TextAlign.End
+            if (isTrainingDay) {
+                DashedCircleIcon(
+                    modifier = Modifier.size(20.dp),
+                    tint = AccentTeal
                 )
-                if (valueSecondaryText != null) {
-                    Text(
-                        text = valueSecondaryText,
-                        fontSize = 11.sp,
-                        color = TextMuted,
-                        textAlign = TextAlign.End
-                    )
-                }
-            }
-            if (onMetricClick != null) {
-                ChevronRightIcon(
-                    modifier = Modifier.size(12.dp),
+            } else {
+                BedIcon(
+                    modifier = Modifier.size(20.dp),
                     tint = TextMuted
                 )
             }
+
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = if (isTrainingDay) (planName ?: "Training") else "Rest day",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextForeground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (isTrainingDay) "Tap to log your session" else "No session planned",
+                    fontSize = 11.sp,
+                    color = TextMuted
+                )
+            }
+        }
+
+        if (isTrainingDay) {
+            ChevronRightIcon(
+                modifier = Modifier.size(14.dp),
+                tint = TextMuted
+            )
+        }
+    }
+}
+
+@Composable
+private fun DayCardContextCard(
+    icon: @Composable () -> Unit,
+    primaryText: String,
+    secondaryText: String,
+    showDot: Boolean,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed && onClick != null) 0.70f else 1f,
+        animationSpec = tween(80),
+        label = "contextCardAlpha"
+    )
+
+    Card(
+        modifier = modifier
+            .graphicsLayer { this.alpha = alpha }
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onClick
+                    )
+                } else Modifier
+            ),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = SecondaryFill),
+        border = BorderStroke(1.dp, BorderDefault)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            if (showDot) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(AccentTeal)
+                        .align(Alignment.TopEnd)
+                )
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                icon()
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = primaryText,
+                    fontSize = if (primaryText.length > 8) 14.sp else 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextForeground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip
+                )
+                Text(
+                    text = secondaryText,
+                    fontSize = 11.sp,
+                    color = TextMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DrinksStatChip(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(SecondaryFill)
+            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = value,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextForeground
+            )
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextMuted,
+                letterSpacing = 0.5.sp
+            )
         }
     }
 }
@@ -670,13 +677,15 @@ fun DayCardPartialPreview() {
             sleep = mapOf(today to SleepNight(today, 460.0, 60.0, 90.0, 260.0, 50.0, "${today}T07:00:00Z")),
             trainingMinutes = mapOf(today to 0.0),
             alcoholUnits = mapOf(today to 2.0),
+            alcoholKcal = mapOf(today to 140.0),
             weight = mapOf("2026-10-12" to 76.4),
             zoneBounds = ZoneBounds(130, 145, 160, 175),
             zone = ZoneId.of("UTC")
         )
         DayCard(
             daily = mockDaily,
-            dayKey = today
+            dayKey = today,
+            planName = "Hypertrophy Push"
         )
     }
 }
@@ -693,12 +702,14 @@ fun DayCardCompletePreview() {
             sleep = mapOf(today to SleepNight(today, 490.0, 80.0, 100.0, 260.0, 50.0, "${today}T07:00:00Z")),
             trainingMinutes = mapOf(today to 45.0),
             weight = mapOf(today to 76.4),
+            bodyFat = mapOf(today to 18.2),
             zoneBounds = ZoneBounds(130, 145, 160, 175),
             zone = ZoneId.of("UTC")
         )
         DayCard(
             daily = mockDaily,
-            dayKey = today
+            dayKey = today,
+            planName = "Rest day"
         )
     }
 }

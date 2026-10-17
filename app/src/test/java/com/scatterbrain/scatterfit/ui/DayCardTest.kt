@@ -1,6 +1,5 @@
 package com.scatterbrain.scatterfit.ui
 
-import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.ScoringSettings
 import com.scatterbrain.scatterfit.data.AssembledDaily
 import com.scatterbrain.scatterfit.data.SleepNight
@@ -25,138 +24,165 @@ class DayCardTest {
     private val defaultBounds = ZoneBounds(130, 145, 160, 175)
 
     @Test
-    fun `all 4 tickable rows passing reports All done`() {
+    fun `tick count maths - training day has M equal 4 and counts all passing`() {
         val daily = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0), // within 150 kcal green tolerance
-            steps = mapOf(today to 10500.0),        // >= 10,000 target
-            protein = mapOf(today to 160.0),        // within 20g green tolerance
-            sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")), // sleep stays context, not a tick
-            trainingMinutes = mapOf(today to 30.0), // > 0m
+            caloriesEaten = mapOf(today to 2000.0), // within goal tolerance -> ticked
+            steps = mapOf(today to 10500.0),        // >= 10k -> ticked
+            protein = mapOf(today to 160.0),        // >= 160g -> ticked
+            sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")), // sleep is context, never ticks
+            trainingMinutes = mapOf(today to 30.0), // training day with logged work -> ticked
             zoneBounds = defaultBounds,
             zone = defaultZone
         )
 
-        val status = computeDayCardStatus(daily, defaultSettings, today)
-        assertEquals(4, status.completedCount)
-        assertEquals("All done ✓", status.headerText)
+        val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = true)
+        assertEquals(4, ticks.totalTarget)
+        assertEquals(4, ticks.completedCount)
+        assertEquals("4 / 4", ticks.counterText)
     }
 
     @Test
-    fun `sleep never counts towards completion count`() {
-        // Calories, steps, protein, training all pass -> 4/4 ("All done ✓") even if sleep fails (0h)
-        val dailyNoSleep = AssembledDaily(
+    fun `tick count maths - rest day has M equal 3 and never auto-ticks training`() {
+        val daily = AssembledDaily(
+            caloriesEaten = mapOf(today to 2000.0), // ticked
+            steps = mapOf(today to 10500.0),        // ticked
+            protein = mapOf(today to 160.0),        // ticked
+            sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")),
+            trainingMinutes = mapOf(today to 0.0),  // rest day
+            zoneBounds = defaultBounds,
+            zone = defaultZone
+        )
+
+        val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = false)
+        assertEquals(3, ticks.totalTarget)
+        assertEquals(3, ticks.completedCount)
+        assertEquals("3 / 3", ticks.counterText)
+    }
+
+    @Test
+    fun `tick count maths - rest day with training minutes still has M equal 3 and does not award training tick`() {
+        val daily = AssembledDaily(
             caloriesEaten = mapOf(today to 2000.0),
             steps = mapOf(today to 10500.0),
             protein = mapOf(today to 160.0),
-            sleep = mapOf(today to SleepNight(today, 0.0, 0.0, 0.0, 0.0, 0.0, "${today}T07:00:00Z")), // 0h sleep
+            trainingMinutes = mapOf(today to 45.0),
+            zoneBounds = defaultBounds,
+            zone = defaultZone
+        )
+
+        val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = false)
+        assertEquals(3, ticks.totalTarget)
+        assertEquals(3, ticks.completedCount)
+        assertEquals("3 / 3", ticks.counterText)
+    }
+
+    @Test
+    fun `tick count maths - weigh-in bonus adds 1 without increasing M and can exceed M`() {
+        // Training day: 4/4 passing + weigh-in bonus -> 5 / 4
+        val dailyTrainingBonus = AssembledDaily(
+            caloriesEaten = mapOf(today to 2000.0),
+            steps = mapOf(today to 10500.0),
+            protein = mapOf(today to 160.0),
             trainingMinutes = mapOf(today to 30.0),
+            weight = mapOf(today to 82.4),
             zoneBounds = defaultBounds,
             zone = defaultZone
         )
-        val statusNoSleep = computeDayCardStatus(dailyNoSleep, defaultSettings, today)
-        assertEquals(4, statusNoSleep.completedCount)
-        assertEquals("All done ✓", statusNoSleep.headerText)
+        val ticksTraining = computeDayCardTicks(dailyTrainingBonus, defaultSettings, today, isTrainingDay = true)
+        assertEquals(4, ticksTraining.totalTarget)
+        assertEquals(5, ticksTraining.completedCount)
+        assertTrue(ticksTraining.hasWeightBonus)
+        assertEquals("5 / 4", ticksTraining.counterText)
 
-        // Only sleep passes (8h) while others fail -> 0/4 done
-        val dailyOnlySleep = AssembledDaily(
-            caloriesEaten = mapOf(today to 0.0),
-            steps = mapOf(today to 0.0),
-            protein = mapOf(today to 0.0),
-            sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")),
-            trainingMinutes = mapOf(today to 0.0),
+        // Rest day: 3/3 passing + weigh-in bonus -> 4 / 3
+        val dailyRestBonus = AssembledDaily(
+            caloriesEaten = mapOf(today to 2000.0),
+            steps = mapOf(today to 10500.0),
+            protein = mapOf(today to 160.0),
+            weight = mapOf(today to 82.4),
             zoneBounds = defaultBounds,
             zone = defaultZone
         )
-        val statusOnlySleep = computeDayCardStatus(dailyOnlySleep, defaultSettings, today)
-        assertEquals(0, statusOnlySleep.completedCount)
-        assertEquals("0/4 done", statusOnlySleep.headerText)
+        val ticksRest = computeDayCardTicks(dailyRestBonus, defaultSettings, today, isTrainingDay = false)
+        assertEquals(3, ticksRest.totalTarget)
+        assertEquals(4, ticksRest.completedCount)
+        assertTrue(ticksRest.hasWeightBonus)
+        assertEquals("4 / 3", ticksRest.counterText)
     }
 
     @Test
-    fun `2 of 4 rows passing reports 2 of 4 done`() {
-        val daily = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0), // PASS (green)
-            steps = mapOf(today to 11000.0),        // PASS (green)
-            protein = mapOf(today to 50.0),         // FAIL (off target)
-            sleep = mapOf(today to SleepNight(today, 500.0, 60.0, 90.0, 290.0, 60.0, "${today}T07:00:00Z")),
-            trainingMinutes = mapOf(today to 0.0),  // FAIL (no training)
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
+    fun `tick count maths - null daily reports 0 and counter is never negative`() {
+        val ticksTraining = computeDayCardTicks(null, defaultSettings, today, isTrainingDay = true)
+        assertEquals(4, ticksTraining.totalTarget)
+        assertEquals(0, ticksTraining.completedCount)
+        assertEquals("0 / 4", ticksTraining.counterText)
 
-        val status = computeDayCardStatus(daily, defaultSettings, today)
-        assertEquals(2, status.completedCount)
-        assertEquals("2/4 done", status.headerText)
+        val ticksRest = computeDayCardTicks(null, defaultSettings, today, isTrainingDay = false)
+        assertEquals(3, ticksRest.totalTarget)
+        assertEquals(0, ticksRest.completedCount)
+        assertEquals("0 / 3", ticksRest.counterText)
     }
 
     @Test
-    fun `0 of 4 rows passing reports 0 of 4 done`() {
-        val daily = AssembledDaily(
-            caloriesEaten = mapOf(today to 3500.0), // FAIL (over by 1500 kcal)
-            steps = mapOf(today to 2000.0),         // FAIL (< 7000 floor)
-            protein = mapOf(today to 20.0),         // FAIL (way below target)
-            sleep = mapOf(today to SleepNight(today, 300.0, 30.0, 50.0, 180.0, 40.0, "${today}T07:00:00Z")),
-            trainingMinutes = mapOf(today to 0.0),  // FAIL (0m)
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
+    fun `bar colour logic - calories shows teal in progress, green in band, orange over goal`() {
+        // In progress (< target - 150) -> TEAL
+        val calProgress = computeCaloriesBarColor(1500.0, 2000, greenTolerance = 150)
+        assertEquals(MetricBarColor.TEAL, calProgress)
 
-        val status = computeDayCardStatus(daily, defaultSettings, today)
-        assertEquals(0, status.completedCount)
-        assertEquals("0/4 done", status.headerText)
+        // In band (1850..2150) -> GREEN
+        val calInBand = computeCaloriesBarColor(2050.0, 2000, greenTolerance = 150)
+        assertEquals(MetricBarColor.GREEN, calInBand)
+
+        // Over goal (> 2150) -> ORANGE
+        val calOver = computeCaloriesBarColor(2300.0, 2000, greenTolerance = 150)
+        assertEquals(MetricBarColor.ORANGE, calOver)
+
+        // Null / 0 -> TEAL
+        assertEquals(MetricBarColor.TEAL, computeCaloriesBarColor(null, 2000))
+        assertEquals(MetricBarColor.TEAL, computeCaloriesBarColor(0.0, 2000))
     }
 
     @Test
-    fun `null daily reports 0 of 4 done`() {
-        val status = computeDayCardStatus(null, defaultSettings, today)
-        assertEquals(0, status.completedCount)
-        assertEquals("0/4 done", status.headerText)
+    fun `bar colour logic - steps shows teal under 10k, green at or over 10k`() {
+        val stepsUnder = computeStepsBarColor(8400.0, 10000)
+        assertEquals(MetricBarColor.TEAL, stepsUnder)
+
+        val stepsMet = computeStepsBarColor(10000.0, 10000)
+        assertEquals(MetricBarColor.GREEN, stepsMet)
+
+        val stepsOver = computeStepsBarColor(12500.0, 10000)
+        assertEquals(MetricBarColor.GREEN, stepsOver)
+
+        assertEquals(MetricBarColor.TEAL, computeStepsBarColor(null, 10000))
     }
 
     @Test
-    fun `alcohol units never count towards completion`() {
-        val baseDaily = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0), // PASS
-            steps = mapOf(today to 10000.0),        // PASS
-            protein = mapOf(today to 50.0),         // FAIL
-            sleep = mapOf(today to SleepNight(today, 360.0, 40.0, 60.0, 200.0, 60.0, "${today}T07:00:00Z")),
-            trainingMinutes = mapOf(today to 0.0),  // FAIL
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
-        val statusWithoutAlcohol = computeDayCardStatus(baseDaily, defaultSettings, today)
-        assertEquals(2, statusWithoutAlcohol.completedCount)
-        assertEquals("2/4 done", statusWithoutAlcohol.headerText)
+    fun `bar colour logic - protein shows teal under 160g, green at or over 160g`() {
+        val protUnder = computeProteinBarColor(120.0, 160)
+        assertEquals(MetricBarColor.TEAL, protUnder)
 
-        val dailyWithAlcohol = baseDaily.copy(
-            alcoholUnits = mapOf(today to 4.5)
-        )
-        val statusWithAlcohol = computeDayCardStatus(dailyWithAlcohol, defaultSettings, today)
-        assertEquals(2, statusWithAlcohol.completedCount)
-        assertEquals("2/4 done", statusWithAlcohol.headerText)
+        val protMet = computeProteinBarColor(160.0, 160)
+        assertEquals(MetricBarColor.GREEN, protMet)
+
+        val protOver = computeProteinBarColor(185.0, 160)
+        assertEquals(MetricBarColor.GREEN, protOver)
+
+        assertEquals(MetricBarColor.TEAL, computeProteinBarColor(null, 160))
     }
 
     @Test
-    fun `weight never counts towards completion`() {
-        val baseDaily = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0), // PASS
-            steps = mapOf(today to 10000.0),        // PASS
-            protein = mapOf(today to 160.0),        // PASS
-            sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")),
-            trainingMinutes = mapOf(today to 30.0), // PASS
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
-        val statusWithoutWeight = computeDayCardStatus(baseDaily, defaultSettings, today)
-        assertEquals(4, statusWithoutWeight.completedCount)
-        assertEquals("All done ✓", statusWithoutWeight.headerText)
+    fun `drinks section visibility - hidden at 0 drinks, visible once drinks or units logged`() {
+        // 0 drinks and 0.0 units -> HIDDEN
+        assertFalse(isDrinksSectionVisible(drinksCount = 0, units = 0.0))
 
-        val dailyWithWeight = baseDaily.copy(
-            weight = mapOf(today to 76.4, "2026-10-13" to 76.8)
-        )
-        val statusWithWeight = computeDayCardStatus(dailyWithWeight, defaultSettings, today)
-        assertEquals(4, statusWithWeight.completedCount)
-        assertEquals("All done ✓", statusWithWeight.headerText)
+        // 1 drink -> VISIBLE
+        assertTrue(isDrinksSectionVisible(drinksCount = 1, units = 0.0))
+
+        // 0 drinks count but units > 0 -> VISIBLE
+        assertTrue(isDrinksSectionVisible(drinksCount = 0, units = 1.5))
+
+        // Both > 0 -> VISIBLE
+        assertTrue(isDrinksSectionVisible(drinksCount = 3, units = 4.2))
     }
 
     @Test
@@ -191,72 +217,5 @@ class DayCardTest {
         assertTrue(validResult.isValid)
         assertNull(validResult.weightError)
         assertNull(validResult.bodyFatError)
-    }
-
-    @Test
-    fun `ring state - done state shows checkmark`() {
-        val stepsDone = computeDayRingModel(GoalId.STEPS, 10500.0, defaultSettings)
-        assertEquals(RingState.DONE, stepsDone.state)
-        assertEquals(1f, stepsDone.fraction)
-
-        val calDone = computeDayRingModel(GoalId.CALORIES, 2050.0, defaultSettings)
-        assertEquals(RingState.DONE, calDone.state)
-        assertEquals(1f, calDone.fraction)
-
-        val trainDone = computeDayRingModel(GoalId.EXERCISE, 30.0, defaultSettings)
-        assertEquals(RingState.DONE, trainDone.state)
-        assertEquals(1f, trainDone.fraction)
-    }
-
-    @Test
-    fun `ring state - in progress shows fractional arc`() {
-        val stepsProgress = computeDayRingModel(GoalId.STEPS, 5000.0, defaultSettings)
-        assertEquals(RingState.IN_PROGRESS, stepsProgress.state)
-        assertEquals(0.5f, stepsProgress.fraction, 0.001f)
-
-        val calProgress = computeDayRingModel(GoalId.CALORIES, 1500.0, defaultSettings)
-        assertEquals(RingState.IN_PROGRESS, calProgress.state)
-        assertEquals(0.75f, calProgress.fraction, 0.001f)
-    }
-
-    @Test
-    fun `ring state - out of band shows orange`() {
-        val calOver = computeDayRingModel(GoalId.CALORIES, 2600.0, defaultSettings)
-        assertEquals(RingState.OUT_OF_BAND, calOver.state)
-        assertEquals(1.0f, calOver.fraction, 0.001f)
-
-        val proteinUnder = computeDayRingModel(GoalId.PROTEIN, 80.0, defaultSettings)
-        assertEquals(RingState.OUT_OF_BAND, proteinUnder.state)
-        assertEquals(0.5f, proteinUnder.fraction, 0.001f)
-
-        val sleepUnder = computeDayRingModel(GoalId.SLEEP, 300.0, defaultSettings)
-        assertEquals(RingState.OUT_OF_BAND, sleepUnder.state)
-        assertEquals(300f / 480f, sleepUnder.fraction, 0.001f)
-    }
-
-    @Test
-    fun `ring state - no data shows empty`() {
-        val nullSteps = computeDayRingModel(GoalId.STEPS, null, defaultSettings)
-        assertEquals(RingState.NO_DATA, nullSteps.state)
-        assertEquals(0f, nullSteps.fraction)
-
-        val zeroCalories = computeDayRingModel(GoalId.CALORIES, 0.0, defaultSettings)
-        assertEquals(RingState.NO_DATA, zeroCalories.state)
-        assertEquals(0f, zeroCalories.fraction)
-
-        val zeroTraining = computeDayRingModel(GoalId.EXERCISE, 0.0, defaultSettings)
-        assertEquals(RingState.NO_DATA, zeroTraining.state)
-        assertEquals(0f, zeroTraining.fraction)
-    }
-
-    @Test
-    fun `alcohol and weight have no ring`() {
-        val alcohol = computeDayRingModel(GoalId.ALCOHOL, 2.5, defaultSettings)
-        assertEquals(RingState.NO_DATA, alcohol.state)
-        assertEquals(0f, alcohol.fraction)
-
-        val weight = computeDayRingModel(GoalId.WEIGHT, 76.4, defaultSettings)
-        assertEquals(RingState.NO_DATA, weight.state)
-        assertEquals(0f, weight.fraction)
     }
 }
