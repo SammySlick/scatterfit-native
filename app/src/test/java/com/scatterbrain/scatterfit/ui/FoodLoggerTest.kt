@@ -4,6 +4,8 @@ import com.scatterbrain.scatterfit.data.Daily
 import com.scatterbrain.scatterfit.data.RecordMethod
 import com.scatterbrain.scatterfit.data.Zones
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.ZoneId
@@ -267,5 +269,159 @@ class FoodLoggerTest {
         assertEquals(650.0, daily.caloriesEaten[yesterday] ?: 0.0, 0.001)
         assertEquals(55.0, daily.protein[yesterday] ?: 0.0, 0.001)
         assertEquals("Steak & Veg", daily.meals[yesterday]?.first()?.name)
+    }
+
+    @Test
+    fun `SavedFoodStore - recipe round-trip, upsert, and delete`() {
+        var rawJson: String? = null
+        val store = SavedFoodStore(
+            prefsProvider = { rawJson },
+            prefsWriter = { rawJson = it }
+        )
+
+        assertTrue(store.allRecipes().isEmpty())
+
+        val r1 = Recipe(
+            id = "r1",
+            name = "Chilli Con Carne",
+            perPortionKcal = 500,
+            perPortionProtein = 40,
+            perPortionCarbs = 45,
+            perPortionFat = 15,
+            portionsInPool = 4
+        )
+        store.upsertRecipe(r1)
+        assertEquals(1, store.allRecipes().size)
+        assertEquals("Chilli Con Carne", store.getRecipe("r1")?.name)
+        assertEquals(4, store.getRecipe("r1")?.portionsInPool)
+
+        // Upsert modified recipe
+        val r1Updated = r1.copy(perPortionKcal = 520, portionsInPool = 6)
+        store.upsertRecipe(r1Updated)
+        assertEquals(1, store.allRecipes().size)
+        assertEquals(520, store.getRecipe("r1")?.perPortionKcal)
+        assertEquals(6, store.getRecipe("r1")?.portionsInPool)
+
+        // Delete recipe
+        store.deleteRecipe("r1")
+        assertTrue(store.allRecipes().isEmpty())
+        assertNull(store.getRecipe("r1"))
+    }
+
+    @Test
+    fun `SavedFoodStore - pool decrement down to zero and clamp at zero`() {
+        var rawJson: String? = null
+        val store = SavedFoodStore(
+            prefsProvider = { rawJson },
+            prefsWriter = { rawJson = it }
+        )
+
+        val recipe = Recipe(
+            id = "r-batch",
+            name = "Bolognese Batch",
+            perPortionKcal = 600,
+            perPortionProtein = 45,
+            portionsInPool = 2
+        )
+        store.upsertRecipe(recipe)
+
+        // Decrement 2 -> 1
+        val step1 = store.decrementPool("r-batch")
+        assertEquals(1, step1?.portionsInPool)
+        assertEquals(1, store.getRecipe("r-batch")?.portionsInPool)
+
+        // Decrement 1 -> 0 ("Pool empty" state)
+        val step2 = store.decrementPool("r-batch")
+        assertEquals(0, step2?.portionsInPool)
+        assertEquals(0, store.getRecipe("r-batch")?.portionsInPool)
+
+        // Decrement below 0 -> clamped at 0, recipe stays
+        val step3 = store.decrementPool("r-batch")
+        assertEquals(0, step3?.portionsInPool)
+        assertEquals(0, store.getRecipe("r-batch")?.portionsInPool)
+        assertEquals(1, store.allRecipes().size) // Never auto-deleted!
+    }
+
+    @Test
+    fun `SavedFoodStore - favourites toggle and idempotence`() {
+        var rawJson: String? = null
+        val store = SavedFoodStore(
+            prefsProvider = { rawJson },
+            prefsWriter = { rawJson = it }
+        )
+
+        val fav = FavouriteFood(id = "fav-1", name = "Greek Yogurt 200g", kcalPerServing = 120, proteinPerServing = 20)
+        assertFalse(store.isFavourite("Greek Yogurt 200g"))
+
+        // Toggle on (upsert)
+        store.toggleFavourite(fav)
+        assertTrue(store.isFavourite("Greek Yogurt 200g"))
+        assertTrue(store.isFavourite("  greek yogurt 200g  ")) // case-insensitive match
+        assertEquals(1, store.allFavourites().size)
+
+        // Toggle off (remove)
+        store.toggleFavourite(fav)
+        assertFalse(store.isFavourite("Greek Yogurt 200g"))
+        assertTrue(store.allFavourites().isEmpty())
+    }
+
+    @Test
+    fun `FoodTrackerViewModel - logging recipe portion writes LoggedMeal and decrements pool`() {
+        var rawJson: String? = null
+        val savedStore = SavedFoodStore(
+            prefsProvider = { rawJson },
+            prefsWriter = { rawJson = it }
+        )
+        val recipe = Recipe(
+            id = "r-curry",
+            name = "Chicken Curry",
+            perPortionKcal = 550,
+            perPortionProtein = 48,
+            perPortionCarbs = 35,
+            perPortionFat = 12,
+            portionsInPool = 3
+        )
+        savedStore.upsertRecipe(recipe)
+
+        val vm = FoodTrackerViewModel(storage = null, savedFoodStore = savedStore, initialDayKey = today)
+        assertEquals(1, vm.recipes.value.size)
+        assertEquals(3, vm.recipes.value.first().portionsInPool)
+
+        // Log one portion
+        vm.logRecipePortion(recipe)
+
+        // Meal is logged for today
+        assertEquals(1, vm.mealsForDay.value.size)
+        val logged = vm.mealsForDay.value.first()
+        assertEquals("Chicken Curry", logged.name)
+        assertEquals(550.0, logged.kcal, 0.001)
+        assertEquals(48.0, logged.protein ?: 0.0, 0.001)
+        assertEquals(35.0, logged.carbs ?: 0.0, 0.001)
+        assertEquals(12.0, logged.fat ?: 0.0, 0.001)
+
+        // Pool decremented 3 -> 2
+        assertEquals(2, savedStore.getRecipe("r-curry")?.portionsInPool)
+        assertEquals(2, vm.recipes.value.first().portionsInPool)
+    }
+
+    @Test
+    fun `FoodTrackerViewModel - logging favourite writes LoggedMeal`() {
+        var rawJson: String? = null
+        val savedStore = SavedFoodStore(
+            prefsProvider = { rawJson },
+            prefsWriter = { rawJson = it }
+        )
+        val fav = FavouriteFood(id = "fav-egg", name = "Boiled Eggs x2", kcalPerServing = 140, proteinPerServing = 12)
+        savedStore.toggleFavourite(fav)
+
+        val vm = FoodTrackerViewModel(storage = null, savedFoodStore = savedStore, initialDayKey = today)
+        assertEquals(1, vm.favourites.value.size)
+
+        vm.logFavourite(fav)
+        assertEquals(1, vm.mealsForDay.value.size)
+        val logged = vm.mealsForDay.value.first()
+        assertEquals("Boiled Eggs x2", logged.name)
+        assertEquals(140.0, logged.kcal, 0.001)
+        assertEquals(12.0, logged.protein ?: 0.0, 0.001)
     }
 }

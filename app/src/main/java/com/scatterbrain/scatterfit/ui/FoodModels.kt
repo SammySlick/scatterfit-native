@@ -145,6 +145,7 @@ class FoodStorage(private val context: Context) {
 
 class FoodTrackerViewModel(
     val storage: FoodStorage? = null,
+    val savedFoodStore: SavedFoodStore? = null,
     initialDayKey: String = todayKey(),
 ) : ViewModel() {
     var activeDayKey: String = initialDayKey
@@ -163,8 +164,80 @@ class FoodTrackerViewModel(
     private val _presets = MutableStateFlow<List<MealPreset>>(emptyList())
     val presets: StateFlow<List<MealPreset>> = _presets.asStateFlow()
 
+    private val _recipes = MutableStateFlow<List<Recipe>>(emptyList())
+    val recipes: StateFlow<List<Recipe>> = _recipes.asStateFlow()
+
+    private val _favourites = MutableStateFlow<List<FavouriteFood>>(emptyList())
+    val favourites: StateFlow<List<FavouriteFood>> = _favourites.asStateFlow()
+
     init {
         setDayKey(initialDayKey)
+        refreshPresets()
+        refreshSavedFoods()
+    }
+
+    fun refreshSavedFoods() {
+        savedFoodStore?.let {
+            _recipes.value = it.allRecipes()
+            _favourites.value = it.allFavourites()
+        }
+    }
+
+    fun logFavourite(favourite: FavouriteFood) {
+        val zone = java.time.ZoneId.systemDefault()
+        val timestamp = if (activeDayKey == todayKey(zone)) {
+            System.currentTimeMillis()
+        } else {
+            val date = runCatching { java.time.LocalDate.parse(activeDayKey) }.getOrDefault(java.time.LocalDate.now(zone))
+            date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        }
+        val meal = LoggedMeal(
+            name = favourite.name,
+            kcal = favourite.kcalPerServing.toDouble(),
+            protein = favourite.proteinPerServing.toDouble(),
+            timestamp = timestamp,
+            dayKey = activeDayKey
+        )
+        if (storage != null) {
+            storage.saveMeal(meal)
+            syncStorageToPipeline()
+        } else {
+            val list = inMemoryStorage.getOrPut(activeDayKey) { mutableListOf() }
+            list.add(meal)
+        }
+        setDayKey(activeDayKey)
+        refreshPresets()
+    }
+
+    fun logRecipePortion(recipe: Recipe) {
+        val zone = java.time.ZoneId.systemDefault()
+        val timestamp = if (activeDayKey == todayKey(zone)) {
+            System.currentTimeMillis()
+        } else {
+            val date = runCatching { java.time.LocalDate.parse(activeDayKey) }.getOrDefault(java.time.LocalDate.now(zone))
+            date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        }
+        val meal = LoggedMeal(
+            name = recipe.name,
+            kcal = recipe.perPortionKcal.toDouble(),
+            protein = recipe.perPortionProtein.toDouble(),
+            carbs = recipe.perPortionCarbs?.toDouble(),
+            fat = recipe.perPortionFat?.toDouble(),
+            timestamp = timestamp,
+            dayKey = activeDayKey
+        )
+        if (storage != null) {
+            storage.saveMeal(meal)
+            syncStorageToPipeline()
+        } else {
+            val list = inMemoryStorage.getOrPut(activeDayKey) { mutableListOf() }
+            list.add(meal)
+        }
+        if (recipe.portionsInPool > 0) {
+            savedFoodStore?.decrementPool(recipe.id)
+            refreshSavedFoods()
+        }
+        setDayKey(activeDayKey)
         refreshPresets()
     }
 
@@ -187,8 +260,9 @@ class FoodTrackerViewModel(
         fatInput = preset.fat?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: ""
     }
 
-    fun saveCurrentMeal(): Boolean {
+    fun saveCurrentMeal(saveAsFavourite: Boolean = false): Boolean {
         val kcal = kcalInput.toDoubleOrNull() ?: return false
+        val cleanName = mealName.trim().ifBlank { "Meal" }
         val zone = java.time.ZoneId.systemDefault()
         val timestamp = if (activeDayKey == todayKey(zone)) {
             System.currentTimeMillis()
@@ -196,10 +270,11 @@ class FoodTrackerViewModel(
             val date = runCatching { java.time.LocalDate.parse(activeDayKey) }.getOrDefault(java.time.LocalDate.now(zone))
             date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
         }
+        val p = proteinInput.toDoubleOrNull()
         val meal = LoggedMeal(
-            name = mealName.trim(),
+            name = cleanName,
             kcal = kcal,
-            protein = proteinInput.toDoubleOrNull(),
+            protein = p,
             carbs = carbsInput.toDoubleOrNull(),
             fat = fatInput.toDoubleOrNull(),
             timestamp = timestamp,
@@ -211,6 +286,17 @@ class FoodTrackerViewModel(
         } else {
             val list = inMemoryStorage.getOrPut(activeDayKey) { mutableListOf() }
             list.add(meal)
+        }
+
+        if (saveAsFavourite) {
+            savedFoodStore?.toggleFavourite(
+                FavouriteFood(
+                    name = cleanName,
+                    kcalPerServing = kcal.toInt(),
+                    proteinPerServing = p?.toInt() ?: 0
+                )
+            )
+            refreshSavedFoods()
         }
 
         mealName = ""

@@ -129,9 +129,12 @@ fun MyDayScreen(
         }
     }
 
+    val savedFoodStore = remember { SavedFoodStore(context) }
+
     val foodViewModel = remember {
         FoodTrackerViewModel(
             storage = foodStorage,
+            savedFoodStore = savedFoodStore,
             initialDayKey = selectedDay
         )
     }
