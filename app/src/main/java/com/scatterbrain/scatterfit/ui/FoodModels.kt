@@ -29,6 +29,7 @@ data class LoggedMeal(
     val fat: Double? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val dayKey: String = "",
+    val mealType: String = "snacks", // breakfast | lunch | dinner | snacks
 ) {
     fun toHealthRecord(): HealthRecord {
         val startIso = Instant.ofEpochMilli(timestamp).toString()
@@ -39,6 +40,7 @@ data class LoggedMeal(
             protein?.let { put("protein", JsonPrimitive(it)) }
             carbs?.let { put("carbs", JsonPrimitive(it)) }
             fat?.let { put("fat", JsonPrimitive(it)) }
+            put("mealType", JsonPrimitive(mealType))
         }
         return HealthRecord(
             app = "app",
@@ -47,6 +49,13 @@ data class LoggedMeal(
             data = data
         )
     }
+}
+
+fun guessMealType(hour: Int): String = when {
+    hour < 11 -> "breakfast"
+    hour < 15 -> "lunch"
+    hour < 21 -> "dinner"
+    else -> "snacks"
 }
 
 data class MealPreset(
@@ -157,6 +166,7 @@ class FoodTrackerViewModel(
     var proteinInput by mutableStateOf("")
     var carbsInput by mutableStateOf("")
     var fatInput by mutableStateOf("")
+    var mealTypeInput by mutableStateOf(guessMealType(java.time.LocalTime.now().hour))
 
     private val _mealsForDay = MutableStateFlow<List<LoggedMeal>>(emptyList())
     val mealsForDay: StateFlow<List<LoggedMeal>> = _mealsForDay.asStateFlow()
@@ -183,7 +193,7 @@ class FoodTrackerViewModel(
         }
     }
 
-    fun logFavourite(favourite: FavouriteFood) {
+    fun logFavourite(favourite: FavouriteFood, targetMealType: String = mealTypeInput) {
         val zone = java.time.ZoneId.systemDefault()
         val timestamp = if (activeDayKey == todayKey(zone)) {
             System.currentTimeMillis()
@@ -196,7 +206,8 @@ class FoodTrackerViewModel(
             kcal = favourite.kcalPerServing.toDouble(),
             protein = favourite.proteinPerServing.toDouble(),
             timestamp = timestamp,
-            dayKey = activeDayKey
+            dayKey = activeDayKey,
+            mealType = targetMealType
         )
         if (storage != null) {
             storage.saveMeal(meal)
@@ -209,7 +220,7 @@ class FoodTrackerViewModel(
         refreshPresets()
     }
 
-    fun logRecipePortion(recipe: Recipe) {
+    fun logRecipePortion(recipe: Recipe, targetMealType: String = mealTypeInput) {
         val zone = java.time.ZoneId.systemDefault()
         val timestamp = if (activeDayKey == todayKey(zone)) {
             System.currentTimeMillis()
@@ -224,7 +235,8 @@ class FoodTrackerViewModel(
             carbs = recipe.perPortionCarbs?.toDouble(),
             fat = recipe.perPortionFat?.toDouble(),
             timestamp = timestamp,
-            dayKey = activeDayKey
+            dayKey = activeDayKey,
+            mealType = targetMealType
         )
         if (storage != null) {
             storage.saveMeal(meal)
@@ -278,7 +290,8 @@ class FoodTrackerViewModel(
             carbs = carbsInput.toDoubleOrNull(),
             fat = fatInput.toDoubleOrNull(),
             timestamp = timestamp,
-            dayKey = activeDayKey
+            dayKey = activeDayKey,
+            mealType = mealTypeInput
         )
         if (storage != null) {
             storage.saveMeal(meal)

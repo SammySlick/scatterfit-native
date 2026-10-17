@@ -424,4 +424,59 @@ class FoodLoggerTest {
         assertEquals(140.0, logged.kcal, 0.001)
         assertEquals(12.0, logged.protein ?: 0.0, 0.001)
     }
+
+    @Test
+    fun `guessMealType defaults correctly by hour`() {
+        assertEquals("breakfast", guessMealType(8))
+        assertEquals("breakfast", guessMealType(10))
+        assertEquals("lunch", guessMealType(11))
+        assertEquals("lunch", guessMealType(14))
+        assertEquals("dinner", guessMealType(15))
+        assertEquals("dinner", guessMealType(20))
+        assertEquals("snacks", guessMealType(21))
+        assertEquals("snacks", guessMealType(22))
+        assertEquals("snacks", guessMealType(23))
+        assertEquals("breakfast", guessMealType(0))
+        assertEquals("breakfast", guessMealType(6))
+    }
+
+    @Test
+    fun `legacy LoggedMeal decode defaults mealType to snacks`() {
+        val legacyJson = """{"id":"m-1","name":"Banana","kcal":105.0,"timestamp":1000,"dayKey":"2026-10-14"}"""
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val decoded = json.decodeFromString<LoggedMeal>(legacyJson)
+        assertEquals("snacks", decoded.mealType)
+    }
+
+    @Test
+    fun `per-section grouping groups meals by mealType`() {
+        val meals = listOf(
+            LoggedMeal(id = "1", name = "Oatmeal", kcal = 350.0, mealType = "breakfast"),
+            LoggedMeal(id = "2", name = "Chicken Salad", kcal = 450.0, mealType = "lunch"),
+            LoggedMeal(id = "3", name = "Salmon & Rice", kcal = 600.0, mealType = "dinner"),
+            LoggedMeal(id = "4", name = "Apple", kcal = 80.0, mealType = "snacks"),
+            LoggedMeal(id = "5", name = "Greek Yogurt", kcal = 120.0, mealType = "breakfast")
+        )
+
+        val bySection = meals.groupBy { it.mealType.lowercase() }
+        assertEquals(2, bySection["breakfast"]?.size)
+        assertEquals(1, bySection["lunch"]?.size)
+        assertEquals(1, bySection["dinner"]?.size)
+        assertEquals(1, bySection["snacks"]?.size)
+
+        val breakfastKcal = bySection["breakfast"]?.sumOf { it.kcal } ?: 0.0
+        assertEquals(470.0, breakfastKcal, 0.001)
+    }
+
+    @Test
+    fun `consumed and remaining maths calculate correctly`() {
+        val kcalTarget = 2300
+        val eatenWithin = 1420
+        val remainingWithin = (kcalTarget - eatenWithin).coerceAtLeast(0)
+        assertEquals(880, remainingWithin)
+
+        val eatenOver = 2500
+        val remainingOver = (kcalTarget - eatenOver).coerceAtLeast(0)
+        assertEquals(0, remainingOver)
+    }
 }

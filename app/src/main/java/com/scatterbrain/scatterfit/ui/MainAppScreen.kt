@@ -38,6 +38,7 @@ import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 enum class AppTab {
     MY_DAY,
     ODYSSEY,
+    FOOD,
     TRAINING,
     ASK
 }
@@ -84,11 +85,27 @@ fun MainAppScreen(
             when (selectedTab) {
                 AppTab.MY_DAY -> MyDayScreen(
                     onSettingsClick = onSettingsClick,
+                    onOpenFood = { selectedTab = AppTab.FOOD },
                     onOpenTraining = { selectedTab = AppTab.TRAINING }
                 )
                 AppTab.ODYSSEY -> OdysseyScreen(
                     onSettingsClick = onSettingsClick
                 )
+                AppTab.FOOD -> {
+                    val context = LocalContext.current
+                    val foodStorage = remember { FoodStorage(context) }
+                    val savedFoodStore = remember { SavedFoodStore(context) }
+                    val foodViewModel = remember {
+                        FoodTrackerViewModel(
+                            storage = foodStorage,
+                            savedFoodStore = savedFoodStore
+                        )
+                    }
+                    FoodHomeScreen(
+                        viewModel = foodViewModel,
+                        onBackClick = { selectedTab = AppTab.MY_DAY }
+                    )
+                }
                 AppTab.TRAINING -> {
                     val context = LocalContext.current
                     val routineStorage = remember { RoutineStorage(context) }
@@ -150,6 +167,19 @@ fun BottomNavBar(
                 onClick = { onTabSelected(AppTab.ODYSSEY) },
                 icon = { tint ->
                     CompassIcon(
+                        modifier = Modifier.size(24.dp),
+                        tint = tint,
+                        strokeWidthDp = 1.8.dp
+                    )
+                }
+            )
+
+            BottomNavItem(
+                label = "Food",
+                isSelected = selectedTab == AppTab.FOOD,
+                onClick = { onTabSelected(AppTab.FOOD) },
+                icon = { tint ->
+                    AppleIcon(
                         modifier = Modifier.size(24.dp),
                         tint = tint,
                         strokeWidthDp = 1.8.dp

@@ -477,6 +477,37 @@ fun FoodLoggerScreen(
                                 letterSpacing = 1.2.sp
                             )
 
+                            // Meal Type Selector Chips: Breakfast / Lunch / Dinner / Snacks
+                            val mealTypes = listOf("breakfast", "lunch", "dinner", "snacks")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                mealTypes.forEach { type ->
+                                    val isSelected = viewModel.mealTypeInput.equals(type, ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) TealHighlight else SecondaryFill)
+                                            .border(
+                                                BorderStroke(1.dp, if (isSelected) TealHighlight else BorderDefault),
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable { viewModel.mealTypeInput = type }
+                                            .padding(vertical = 6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = type.replaceFirstChar { it.uppercase() },
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) Color.Black else TextForeground
+                                        )
+                                    }
+                                }
+                            }
+
                             // Meal Name
                             OutlinedTextField(
                                 value = viewModel.mealName,

@@ -431,6 +431,75 @@ fun DashedCircleIcon(
     }
 }
 
+@Composable
+fun AppleIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground,
+    strokeWidthDp: Dp = 1.8.dp
+) {
+    Canvas(modifier = modifier) {
+        val sw = strokeWidthDp.toPx()
+        val w = size.width
+        val h = size.height
+
+        // Apple body
+        val applePath = Path().apply {
+            moveTo(w * 0.5f, h * 0.32f)
+            cubicTo(w * 0.65f, h * 0.18f, w * 0.90f, h * 0.30f, w * 0.90f, h * 0.58f)
+            cubicTo(w * 0.90f, h * 0.82f, w * 0.70f, h * 0.95f, w * 0.5f, h * 0.95f)
+            cubicTo(w * 0.30f, h * 0.95f, w * 0.10f, h * 0.82f, w * 0.10f, h * 0.58f)
+            cubicTo(w * 0.10f, h * 0.30f, w * 0.35f, h * 0.18f, w * 0.5f, h * 0.32f)
+            close()
+        }
+        drawPath(path = applePath, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Apple stem / leaf
+        val leafPath = Path().apply {
+            moveTo(w * 0.5f, h * 0.30f)
+            cubicTo(w * 0.55f, h * 0.15f, w * 0.70f, h * 0.12f, w * 0.75f, h * 0.12f)
+            cubicTo(w * 0.65f, h * 0.22f, w * 0.58f, h * 0.26f, w * 0.5f, h * 0.30f)
+        }
+        drawPath(path = leafPath, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+@Composable
+fun CameraIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground,
+    strokeWidthDp: Dp = 1.8.dp
+) {
+    Canvas(modifier = modifier) {
+        val sw = strokeWidthDp.toPx()
+        val w = size.width
+        val h = size.height
+
+        // Camera body
+        val bodyRect = Rect(w * 0.12f, h * 0.30f, w * 0.88f, h * 0.88f)
+        val bodyPath = Path().apply {
+            addRoundRect(androidx.compose.ui.geometry.RoundRect(bodyRect, androidx.compose.ui.geometry.CornerRadius(w * 0.08f, h * 0.08f)))
+        }
+        drawPath(path = bodyPath, color = tint, style = Stroke(width = sw))
+
+        // Top flash / lens bump
+        val bumpPath = Path().apply {
+            moveTo(w * 0.35f, h * 0.30f)
+            lineTo(w * 0.40f, h * 0.18f)
+            lineTo(w * 0.60f, h * 0.18f)
+            lineTo(w * 0.65f, h * 0.30f)
+        }
+        drawPath(path = bumpPath, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round))
+
+        // Center lens circle
+        drawCircle(
+            color = tint,
+            radius = w * 0.18f,
+            center = Offset(w * 0.5f, h * 0.59f),
+            style = Stroke(width = sw)
+        )
+    }
+}
+
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 @Composable
 fun ScatterFitIconsPreview() {

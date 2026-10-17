@@ -87,6 +87,7 @@ import java.util.Locale
 fun MyDayScreen(
     modifier: Modifier = Modifier,
     onSettingsClick: () -> Unit = {},
+    onOpenFood: () -> Unit = {},
     onOpenTraining: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
@@ -161,7 +162,6 @@ fun MyDayScreen(
     }
 
     var showCalendarSheet by remember { mutableStateOf(false) }
-    var showFoodLoggerScreen by remember { mutableStateOf(false) }
     var showDrinkLoggerScreen by remember { mutableStateOf(false) }
     var showWeighInDialog by remember { mutableStateOf(false) }
     var activeMetricScreen by remember { mutableStateOf<String?>(null) }
@@ -191,12 +191,11 @@ fun MyDayScreen(
         )
     }
 
-    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen || showFoodLoggerScreen) {
+    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen) {
         when {
             activeMetricId != null -> activeMetricId = null
             activeMetricScreen != null -> activeMetricScreen = null
             showDrinkLoggerScreen -> showDrinkLoggerScreen = false
-            showFoodLoggerScreen -> showFoodLoggerScreen = false
         }
     }
 
@@ -243,14 +242,6 @@ fun MyDayScreen(
         DrinkLoggerScreen(
             viewModel = drinkViewModel,
             onBackClick = { showDrinkLoggerScreen = false }
-        )
-        return
-    }
-
-    if (showFoodLoggerScreen) {
-        FoodLoggerScreen(
-            viewModel = foodViewModel,
-            onBackClick = { showFoodLoggerScreen = false }
         )
         return
     }
@@ -385,7 +376,7 @@ fun MyDayScreen(
 
         // Quick Actions strip (Log food / Log drink / Log weight)
         QuickActionsStrip(
-            onLogFoodClick = { if (!isFutureDay) showFoodLoggerScreen = true },
+            onLogFoodClick = { if (!isFutureDay) onOpenFood() },
             onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
             onLogWeightClick = { showWeighInDialog = true },
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
