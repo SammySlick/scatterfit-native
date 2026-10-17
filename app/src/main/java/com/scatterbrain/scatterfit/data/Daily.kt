@@ -408,6 +408,18 @@ object Daily {
 
     fun todayKeyFor(zone: ZoneId, nowMs: Long): String =
         Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate().toString()
+
+    fun mergeSessionRecordsIntoDaily(daily: AssembledDaily, sessionRecords: List<com.scatterbrain.scatterfit.ui.SessionRecord>): AssembledDaily {
+        if (sessionRecords.isEmpty()) return daily
+        val mergedTrainingMinutes = daily.trainingMinutes.toMutableMap()
+        val byDay = sessionRecords.groupBy { it.dayKey }
+        for ((dayKey, recs) in byDay) {
+            val sessionMinutes = recs.sumOf { (it.durationMinutes ?: 1).toDouble() }
+            val currentMins = mergedTrainingMinutes[dayKey] ?: 0.0
+            mergedTrainingMinutes[dayKey] = currentMins + sessionMinutes
+        }
+        return daily.copy(trainingMinutes = mergedTrainingMinutes)
+    }
 }
 
 /** Tiny tuple helpers (kotlin stdlib caps at 5 with Pair/Triple). */

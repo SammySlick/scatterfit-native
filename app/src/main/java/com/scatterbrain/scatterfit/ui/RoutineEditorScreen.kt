@@ -99,7 +99,7 @@ fun calculateRoutineEstimateMinutes(exercises: List<RoutineExercise>): Int {
         if (sets == 0) continue
         val rest = if (ex.restSeconds > 0) ex.restSeconds else 60
         val setDuration = if (ex.isTimed) {
-            ex.sets.mapNotNull { it.timeSecondsMin }.average().takeIf { !it.isNaN() }?.toInt() ?: 40
+            ex.sets.mapNotNull { it.timeSeconds }.average().takeIf { !it.isNaN() }?.toInt() ?: 40
         } else {
             40
         }
@@ -771,8 +771,7 @@ private fun HevyExerciseCard(
                             PlannedSet(
                                 type = "normal",
                                 weightKg = lastSet?.weightKg,
-                                timeSecondsMin = lastSet?.timeSecondsMin,
-                                timeSecondsMax = lastSet?.timeSecondsMax,
+                                timeSeconds = lastSet?.timeSeconds,
                                 timeUnit = lastSet?.timeUnit ?: "sec"
                             )
                         } else {
@@ -915,9 +914,9 @@ fun RepSetRow(
                 onValueChange = { input ->
                     targetText = input
                     val parsed = parseTargetField(input)
-                    if (parsed != null) {
+                    if (parsed != null || input.isBlank()) {
                         isTargetError = false
-                        onUpdateSet(set.copy(repsMin = parsed.first, repsMax = parsed.second))
+                        onUpdateSet(set.copy(repsMin = parsed?.first, repsMax = parsed?.second))
                     } else {
                         isTargetError = true
                     }
@@ -963,8 +962,8 @@ fun TimeSetRow(
     var kgText by remember(set.weightKg) {
         mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "")
     }
-    var targetText by remember(set.timeSecondsMin, set.timeSecondsMax, setUnit) {
-        mutableStateOf(formatTimeTargetEntry(set.timeSecondsMin, set.timeSecondsMax, setUnit))
+    var targetText by remember(set.timeSeconds, setUnit) {
+        mutableStateOf(formatTimeEntry(set.timeSeconds, setUnit))
     }
     var isTargetError by remember { mutableStateOf(false) }
 
@@ -1072,14 +1071,20 @@ fun TimeSetRow(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                val placeholder = when (setUnit) {
+                    "min" -> "1:30"
+                    "hour", "hrs" -> "0:02"
+                    else -> "30"
+                }
+
                 BasicTextField(
                     value = targetText,
                     onValueChange = { input ->
                         targetText = input
-                        val parsed = parseTimeTargetField(input, setUnit)
-                        if (parsed != null) {
+                        val parsed = parseTimeEntry(input, setUnit)
+                        if (parsed != null || input.isBlank()) {
                             isTargetError = false
-                            onUpdateSet(set.copy(timeSecondsMin = parsed.first, timeSecondsMax = parsed.second))
+                            onUpdateSet(set.copy(timeSeconds = parsed))
                         } else {
                             isTargetError = true
                         }
@@ -1091,12 +1096,12 @@ fun TimeSetRow(
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center
                     ),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    keyboardOptions = KeyboardOptions(keyboardType = if (setUnit == "sec") KeyboardType.Number else KeyboardType.Text),
                     cursorBrush = SolidColor(TealHighlight),
                     decorationBox = { innerTextField ->
                         if (targetText.isEmpty()) {
                             Text(
-                                text = "30-45",
+                                text = placeholder,
                                 color = TextFaint,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal,

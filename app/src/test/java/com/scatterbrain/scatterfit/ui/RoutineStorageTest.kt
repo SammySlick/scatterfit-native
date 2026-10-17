@@ -4,6 +4,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -144,7 +145,7 @@ class RoutineStorageTest {
         val set = ex.sets.first()
         assertEquals(10, set.repsMin)
         assertNull(set.repsMax)
-        assertNull(set.timeSecondsMin)
+        assertNull(set.timeSeconds)
         assertEquals("sec", set.timeUnit)
         assertNull(set.note)
         assertNull(set.difficulty)
@@ -160,9 +161,8 @@ class RoutineStorageTest {
 
     @Test
     fun `timeLabel formats seconds in clock format`() {
-        assertEquals("00:30", timeLabel(PlannedSet(timeSecondsMin = 30)))
-        assertEquals("00:30 - 00:45", timeLabel(PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)))
-        assertEquals("00:45", timeLabel(PlannedSet(timeSecondsMin = 45)))
+        assertEquals("00:30", timeLabel(PlannedSet(timeSeconds = 30)))
+        assertEquals("00:45", timeLabel(PlannedSet(timeSeconds = 45)))
         assertEquals("", timeLabel(PlannedSet()))
     }
 
@@ -177,7 +177,6 @@ class RoutineStorageTest {
         assertEquals("2:00:00", formatClockTime(7200))
 
         assertEquals("00:30", displayTimeLabel(30))
-        assertEquals("00:30 - 00:45", displayTimeLabel(30, 45))
         assertEquals("01:30", displayTimeLabel(90))
         assertEquals("09:59", displayTimeLabel(599))
         assertEquals("1:00:00", displayTimeLabel(3600))
@@ -189,15 +188,15 @@ class RoutineStorageTest {
     @Test
     fun `timeLabelScaled formats sec min hour correctly with rounding`() {
         // sec unit
-        assertEquals("30 secs", timeLabelScaled(PlannedSet(timeSecondsMin = 30), "sec"))
+        assertEquals("30 secs", timeLabelScaled(PlannedSet(timeSeconds = 30), "sec"))
 
         // min unit
-        assertEquals("90 mins", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "min"))
-        assertEquals("1.5 mins", timeLabelScaled(PlannedSet(timeSecondsMin = 90), "min"))
+        assertEquals("90 mins", timeLabelScaled(PlannedSet(timeSeconds = 5400), "min"))
+        assertEquals("1.5 mins", timeLabelScaled(PlannedSet(timeSeconds = 90), "min"))
 
         // hour unit
-        assertEquals("1.5 hours", timeLabelScaled(PlannedSet(timeSecondsMin = 5400), "hour"))
-        assertEquals("0.1 hours", timeLabelScaled(PlannedSet(timeSecondsMin = 360), "hour"))
+        assertEquals("1.5 hours", timeLabelScaled(PlannedSet(timeSeconds = 5400), "hour"))
+        assertEquals("0.1 hours", timeLabelScaled(PlannedSet(timeSeconds = 360), "hour"))
 
         // empty
         assertEquals("", timeLabelScaled(PlannedSet(), "hour"))
@@ -217,15 +216,15 @@ class RoutineStorageTest {
     }
 
     @Test
-    fun `timed exercise round-trip serialises timeSeconds and preserves max`() {
+    fun `timed exercise round-trip serialises timeSeconds`() {
         val timedEx = RoutineExercise(
             exerciseId = "plank",
             exerciseName = "Plank",
             isTimed = true,
             tempo = null,
             sets = listOf(
-                PlannedSet(type = "normal", timeSecondsMin = 45, timeSecondsMax = 60),
-                PlannedSet(type = "normal", timeSecondsMin = 60, timeSecondsMax = null)
+                PlannedSet(type = "normal", timeSeconds = 45),
+                PlannedSet(type = "normal", timeSeconds = 60)
             )
         )
         val routine = Routine(name = "Core", exercises = listOf(timedEx))
@@ -236,14 +235,12 @@ class RoutineStorageTest {
         assertEquals(1, decoded.size)
         val ex = decoded.first().exercises.first()
         assertTrue(ex.isTimed)
-        assertEquals(45, ex.sets[0].timeSecondsMin)
-        assertEquals(60, ex.sets[0].timeSecondsMax)
-        assertEquals(60, ex.sets[1].timeSecondsMin)
-        assertNull(ex.sets[1].timeSecondsMax)
+        assertEquals(45, ex.sets[0].timeSeconds)
+        assertEquals(60, ex.sets[1].timeSeconds)
     }
 
     @Test
-    fun `legacy time ranges decode and restore both min and max`() {
+    fun `legacy time ranges decode collapsed to single value`() {
         val legacyJson = """
         [
           {
@@ -266,10 +263,8 @@ class RoutineStorageTest {
 
         val decoded = decodeRoutinesJson(legacyJson)
         val sets = decoded.first().exercises.first().sets
-        assertEquals(30, sets[0].timeSecondsMin)
-        assertEquals(50, sets[0].timeSecondsMax)
-        assertEquals(90, sets[1].timeSecondsMin)
-        assertNull(sets[1].timeSecondsMax)
+        assertEquals(30, sets[0].timeSeconds)
+        assertEquals(90, sets[1].timeSeconds)
     }
 
     @Test
@@ -285,11 +280,13 @@ class RoutineStorageTest {
                 "exerciseName": "Dead Hangs",
                 "isTimed": true,
                 "sets": [
-                  {"type": "normal", "weightKg": null, "repsMin": null, "repsMax": null, "timeSecondsMin": 30, "timeSecondsMax": 50, "timeUnit": "sec"},
-                  {"type": "normal", "weightKg": null, "repsMin": null, "repsMax": null, "timeSecondsMin": 90, "timeSecondsMax": null, "timeUnit": "sec"}
+                  {"type": "normal", "weightKg": null, "repsMin": null, "repsMax": null, "timeSeconds": 30, "timeUnit": "sec"},
+                  {"type": "normal", "weightKg": null, "repsMin": null, "repsMax": null, "timeSeconds": 90, "timeUnit": "sec"}
                 ]
               }
-            ]
+            ],
+            "createdAt": 1000,
+            "updatedAt": 2000
           }
         ]
         """.trimIndent()
@@ -297,6 +294,33 @@ class RoutineStorageTest {
         val reEncoded = json.encodeToString(decoded1)
         val decoded2 = decodeRoutinesJson(reEncoded)
         assertEquals(decoded1, decoded2)
+    }
+
+    @Test
+    fun `formatTimeEntry and parseTimeEntry round-trips clean time formats and rejects invalid`() {
+        // sec mode: integer digits
+        assertEquals("90", formatTimeEntry(90, "sec"))
+        assertEquals(90, parseTimeEntry("90", "sec"))
+
+        // min mode: MM:SS
+        assertEquals("1:30", formatTimeEntry(90, "min"))
+        assertEquals("0:45", formatTimeEntry(45, "min"))
+        assertEquals(90, parseTimeEntry("1:30", "min"))
+        assertEquals(45, parseTimeEntry("0:45", "min"))
+
+        // hrs mode: HH:MM
+        assertEquals("1:30", formatTimeEntry(5400, "hour"))
+        assertEquals("0:02", formatTimeEntry(120, "hour"))
+        assertEquals(5400, parseTimeEntry("1:30", "hour"))
+        assertEquals(120, parseTimeEntry("0:02", "hour"))
+
+        // Reject >59 in trailing component
+        assertNull(parseTimeEntry("1:75", "min"))
+        assertNull(parseTimeEntry("1:75", "hour"))
+
+        // Reject non-numeric / empty
+        assertNull(parseTimeEntry("abc", "sec"))
+        assertNull(parseTimeEntry("", "sec"))
     }
 
     @Test
@@ -319,13 +343,13 @@ class RoutineStorageTest {
     }
 
     @Test
-    fun `displayTimeEntry formats sub-minute hour as 0 point 008 and scales correctly`() {
-        assertEquals("0.008", displayTimeEntry(30, "hour"))
+    fun `displayTimeEntry formats clean time formats and scales correctly`() {
+        assertEquals("0:00", displayTimeEntry(30, "hour"))
         assertEquals("30", displayTimeEntry(30, "sec"))
-        assertEquals("0.5", displayTimeEntry(30, "min"))
-        assertEquals("1.5", displayTimeEntry(90, "min"))
-        assertEquals("1.5", displayTimeEntry(5400, "hour"))
-        assertEquals("2", displayTimeEntry(7200, "hour"))
+        assertEquals("0:30", displayTimeEntry(30, "min"))
+        assertEquals("1:30", displayTimeEntry(90, "min"))
+        assertEquals("1:30", displayTimeEntry(5400, "hour"))
+        assertEquals("2:00", displayTimeEntry(7200, "hour"))
         assertEquals("", displayTimeEntry(null, "hour"))
     }
 
@@ -357,11 +381,11 @@ class RoutineStorageTest {
     }
 
     @Test
-    fun `re-scale on unit change converts 30 secs to 0 point 5 min`() {
-        val rawSec = 30
-        assertEquals("30", timeEntryText(rawSec, "sec"))
-        assertEquals("0.5", timeEntryText(rawSec, "min"))
-        assertEquals("0.008", timeEntryText(rawSec, "hour"))
+    fun `re-scale on unit change converts 90 secs to 1 colon 30 min and 0 colon 01 hrs`() {
+        val rawSec = 90
+        assertEquals("90", timeEntryText(rawSec, "sec"))
+        assertEquals("1:30", timeEntryText(rawSec, "min"))
+        assertEquals("0:01", timeEntryText(rawSec, "hour"))
     }
 
     @Test
@@ -475,14 +499,14 @@ class RoutineStorageTest {
             exerciseName = "Plank",
             isTimed = true,
             sets = listOf(
-                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45),
-                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45),
-                PlannedSet(timeSecondsMin = 30, timeSecondsMax = 45)
+                PlannedSet(timeSeconds = 30),
+                PlannedSet(timeSeconds = 30),
+                PlannedSet(timeSeconds = 30)
             )
         )
         val timedSummary = formatExerciseSetsSummary(exTimedIdentical)
         assertEquals(1, timedSummary.size)
-        assertEquals("3 × 00:30 - 00:45", timedSummary.first())
+        assertEquals("3 × 00:30", timedSummary.first())
 
         // Differing sets expand to per-set lines with kg suffix
         val exDiffering = RoutineExercise(
@@ -529,8 +553,7 @@ class RoutineStorageTest {
             weightKg = 70.0,
             repsMin = 8,
             repsMax = 12,
-            timeSecondsMin = 30,
-            timeSecondsMax = 45,
+            timeSeconds = 30,
             timeUnit = "sec"
         )
         val initialExercise = RoutineExercise(
@@ -546,8 +569,7 @@ class RoutineStorageTest {
         val setAfterOn = toggledOn.sets.first()
         assertEquals(8, setAfterOn.repsMin)
         assertEquals(12, setAfterOn.repsMax)
-        assertEquals(30, setAfterOn.timeSecondsMin)
-        assertEquals(45, setAfterOn.timeSecondsMax)
+        assertEquals(30, setAfterOn.timeSeconds)
 
         // Toggle Time: OFF (flips isTimed back)
         val toggledOff = toggledOn.copy(isTimed = false)
@@ -555,8 +577,7 @@ class RoutineStorageTest {
         val setAfterOff = toggledOff.sets.first()
         assertEquals(8, setAfterOff.repsMin)
         assertEquals(12, setAfterOff.repsMax)
-        assertEquals(30, setAfterOff.timeSecondsMin)
-        assertEquals(45, setAfterOff.timeSecondsMax)
+        assertEquals(30, setAfterOff.timeSeconds)
     }
 
     @Test
@@ -566,8 +587,7 @@ class RoutineStorageTest {
             weightKg = 80.0,
             repsMin = 10,
             repsMax = 12,
-            timeSecondsMin = 60,
-            timeSecondsMax = 90,
+            timeSeconds = 60,
             timeUnit = "sec"
         )
         val exercise = RoutineExercise(
@@ -594,8 +614,7 @@ class RoutineStorageTest {
         assertEquals(10, reloadedSet.repsMin)
         assertEquals(12, reloadedSet.repsMax)
         // Time values survived intact
-        assertEquals(60, reloadedSet.timeSecondsMin)
-        assertEquals(90, reloadedSet.timeSecondsMax)
+        assertEquals(60, reloadedSet.timeSeconds)
 
         // User toggles Time: OFF
         val routineTimeOff = reloaded.copy(
@@ -604,7 +623,65 @@ class RoutineStorageTest {
         val finalSet = routineTimeOff.exercises.first().sets.first()
         assertEquals(10, finalSet.repsMin)
         assertEquals(12, finalSet.repsMax)
-        assertEquals(60, finalSet.timeSecondsMin)
-        assertEquals(90, finalSet.timeSecondsMax)
+        assertEquals(60, finalSet.timeSeconds)
+    }
+
+    @Test
+    fun `RestTimerState pure functions tick and expire correctly`() {
+        val timer = startRestTimer(45)
+        assertEquals(45, timer.totalSeconds)
+        assertEquals(45, timer.remainingSeconds)
+        assertTrue(timer.isRunning)
+        assertFalse(timer.isExpired)
+
+        val ticked = tickRestTimer(timer)
+        assertEquals(44, ticked.remainingSeconds)
+        assertTrue(ticked.isRunning)
+
+        val nearEnd = RestTimerState(totalSeconds = 45, remainingSeconds = 1, isRunning = true, isExpired = false)
+        val expired = tickRestTimer(nearEnd)
+        assertEquals(0, expired.remainingSeconds)
+        assertFalse(expired.isRunning)
+        assertTrue(expired.isExpired)
+
+        val zeroTimer = startRestTimer(0)
+        assertFalse(zeroTimer.isRunning)
+    }
+
+    @Test
+    fun `SessionRecordsStorage saves and retrieves latestForExercise`() {
+        var rawJson: String? = null
+        val storage = SessionRecordsStorage(
+            prefsProvider = { rawJson },
+            prefsWriter = { rawJson = it }
+        )
+
+        assertTrue(storage.loadAll().isEmpty())
+
+        val record1 = SessionRecord(
+            id = "r1",
+            dayKey = "2026-10-14",
+            name = "Chest Day",
+            startedAt = 1000L,
+            endedAt = 3000L,
+            durationMinutes = 45,
+            exercises = listOf(
+                LoggedExerciseInSession(
+                    exerciseId = "bench-press",
+                    exerciseName = "Bench Press",
+                    sets = listOf(
+                        LoggedSetInSession(weightKg = 70.0, repsMin = 8, repsMax = 12, done = true)
+                    )
+                )
+            )
+        )
+        storage.add(record1)
+
+        val latest = storage.latestForExercise("bench-press")
+        assertNotNull(latest)
+        assertEquals("Bench Press", latest?.exerciseName)
+
+        val summary = formatPreviousSetSummary(latest, 0)
+        assertEquals("70 × 8-12", summary)
     }
 }

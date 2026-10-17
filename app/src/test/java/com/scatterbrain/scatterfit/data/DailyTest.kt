@@ -149,4 +149,29 @@ class DailyTest {
             assertEquals(o["value"]!!.jsonPrimitive.double, d.latestHeartRate!!.first, 0.0001)
         }
     }
+
+    @Test fun `mergeSessionRecordsIntoDaily aggregates durations and falls back to 1 min`() {
+        val base = built()
+        val testDay = "2026-10-07"
+        val initialMins = base.trainingMinutes[testDay] ?: 0.0
+
+        val rec1 = com.scatterbrain.scatterfit.ui.SessionRecord(
+            dayKey = testDay,
+            name = "Lifting A",
+            durationMinutes = 45,
+            startedAt = nowMs,
+            endedAt = nowMs + 45 * 60000L
+        )
+        val rec2 = com.scatterbrain.scatterfit.ui.SessionRecord(
+            dayKey = testDay,
+            name = "Golf",
+            durationMinutes = null,
+            startedAt = nowMs,
+            endedAt = nowMs + 60000L
+        )
+
+        val merged = Daily.mergeSessionRecordsIntoDaily(base, listOf(rec1, rec2))
+        val expectedMins = initialMins + 45.0 + 1.0
+        assertEquals(expectedMins, merged.trainingMinutes[testDay]!!, 0.0001)
+    }
 }

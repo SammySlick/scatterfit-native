@@ -41,6 +41,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +74,7 @@ import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 enum class TrainingTab { PLAN, ROUTINES }
 
@@ -97,6 +99,40 @@ fun TrainingScreen(
     var viewingRoutine by remember { mutableStateOf<Routine?>(null) }
     var editingRoutine by remember { mutableStateOf<Routine?>(null) }
     var isCreatingNew by remember { mutableStateOf(false) }
+
+    val sessionRecordsStorage = remember { SessionRecordsStorage(context) }
+    var activePlayingRoutine by remember { mutableStateOf<Routine?>(null) }
+    var activePlayingSessionName by remember { mutableStateOf<String?>(null) }
+    var activePlayingDayKey by remember { mutableStateOf(todayKey()) }
+    var sessionConfirmationMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(sessionConfirmationMessage) {
+        if (sessionConfirmationMessage != null) {
+            delay(3000L)
+            sessionConfirmationMessage = null
+        }
+    }
+
+    if (activePlayingRoutine != null || activePlayingSessionName != null) {
+        SessionPlayerScreen(
+            routine = activePlayingRoutine,
+            sessionName = activePlayingSessionName,
+            dayKey = activePlayingDayKey,
+            sessionRecordsStorage = sessionRecordsStorage,
+            loggedSessionsStorage = loggedStorage,
+            onFinish = { record ->
+                activePlayingRoutine = null
+                activePlayingSessionName = null
+                loggedSessions = loggedStorage.loadAll()
+                sessionConfirmationMessage = "Session logged!"
+            },
+            onAbandon = {
+                activePlayingRoutine = null
+                activePlayingSessionName = null
+            }
+        )
+        return
+    }
 
     if (editingRoutine != null || isCreatingNew) {
         RoutineEditorScreen(
@@ -127,6 +163,11 @@ fun TrainingScreen(
         RoutineOverviewScreen(
             routine = viewingRoutine!!,
             lookupMuscle = { id -> ExerciseLibrary.lookup(id, context)?.muscle ?: "other" },
+            onStartWorkout = { r ->
+                activePlayingRoutine = r
+                activePlayingSessionName = null
+                activePlayingDayKey = todayKey()
+            },
             onEditClick = { editingRoutine = viewingRoutine },
             onBackClick = { viewingRoutine = null }
         )
@@ -242,7 +283,12 @@ fun TrainingScreen(
                             loggedSessions = loggedStorage.loadAll()
                         },
                         onViewRoutine = { r -> viewingRoutine = r },
-                        onCreateNewRoutine = { isCreatingNew = true }
+                        onCreateNewRoutine = { isCreatingNew = true },
+                        onStartWorkout = { r, sName, dKey ->
+                            activePlayingRoutine = r
+                            activePlayingSessionName = sName
+                            activePlayingDayKey = dKey
+                        }
                     )
                 } else {
                     // ROUTINES tab: existing list + "+ New routine" card
@@ -321,6 +367,7 @@ private fun WeeklyPlannerSection(
     onRemoveLoggedSession: (String) -> Unit,
     onViewRoutine: (Routine) -> Unit,
     onCreateNewRoutine: () -> Unit,
+    onStartWorkout: (Routine?, String?, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val today = remember { todayKey() }
@@ -524,7 +571,17 @@ private fun WeeklyPlannerSection(
                                         Text("View Routine →", color = TealHighlight, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                     }
 
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(TealHighlight)
+                                                .clickable { onStartWorkout(routine, null, dayKey) }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text("Start", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+
                                         if (!isLogged) {
                                             Box(
                                                 modifier = Modifier
@@ -586,7 +643,17 @@ private fun WeeklyPlannerSection(
                                             Text("Edit Name", color = TealHighlight, fontSize = 12.sp)
                                         }
 
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(TealHighlight)
+                                                    .clickable { onStartWorkout(null, sessionName, dayKey) }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("Start", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
                                             if (!isLogged) {
                                                 Box(
                                                     modifier = Modifier
@@ -840,6 +907,7 @@ private fun WeeklyPlannerSection(
 fun RoutineOverviewScreen(
     routine: Routine,
     lookupMuscle: (String) -> String,
+    onStartWorkout: (Routine) -> Unit = {},
     onEditClick: () -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -872,20 +940,37 @@ fun RoutineOverviewScreen(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SecondaryFill)
-                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
-                        .clickable(onClick = onEditClick)
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "Edit",
-                        color = TealHighlight,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(TealHighlight)
+                            .clickable(onClick = { onStartWorkout(routine) })
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Start workout",
+                            color = Color.Black,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SecondaryFill)
+                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
+                            .clickable(onClick = onEditClick)
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Edit",
+                            color = TealHighlight,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 

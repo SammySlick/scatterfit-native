@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.util.Locale
 import java.util.UUID
 
 @Serializable
@@ -20,8 +21,7 @@ data class PlannedSet(
     val weightKg: Double? = null,
     val repsMin: Int? = null,
     val repsMax: Int? = null,
-    val timeSecondsMin: Int? = null,
-    val timeSecondsMax: Int? = null,
+    val timeSeconds: Int? = null,
     val timeUnit: String = "sec", // sec | min | hour
     val note: String? = null,
     val difficulty: String? = null, // easy | medium | hard
@@ -42,31 +42,111 @@ fun formatClockTime(seconds: Int): String {
     val secs = remainder % 60
 
     return if (hours > 0) {
-        String.format(java.util.Locale.US, "%d:%02d:%02d", hours, mins, secs)
+        String.format(Locale.US, "%d:%02d:%02d", hours, mins, secs)
     } else {
-        String.format(java.util.Locale.US, "%02d:%02d", mins, secs)
+        String.format(Locale.US, "%02d:%02d", mins, secs)
     }
 }
 
-fun displayTimeLabel(secondsMin: Int?, secondsMax: Int? = null): String {
-    if (secondsMin == null && secondsMax == null) return ""
-    return when {
-        secondsMin != null && secondsMax != null -> {
-            "${formatClockTime(secondsMin)} - ${formatClockTime(secondsMax)}"
+fun displayTimeLabel(seconds: Int?): String {
+    if (seconds == null) return ""
+    return formatClockTime(seconds)
+}
+
+fun timeLabel(s: PlannedSet): String = displayTimeLabel(s.timeSeconds)
+
+fun timeLabelScaled(s: PlannedSet, timeUnit: String = "sec"): String {
+    val sec = s.timeSeconds ?: return ""
+    return when (timeUnit.lowercase()) {
+        "min" -> {
+            val v = sec / 60.0
+            val rounded = kotlin.math.round(v * 10.0) / 10.0
+            val numStr = if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
+            "$numStr mins"
         }
-        secondsMin != null -> formatClockTime(secondsMin)
-        secondsMax != null -> formatClockTime(secondsMax)
-        else -> ""
+        "hour" -> {
+            val v = sec / 3600.0
+            val rounded = kotlin.math.round(v * 10.0) / 10.0
+            val numStr = if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
+            "$numStr hours"
+        }
+        else -> "$sec secs"
     }
 }
 
-fun timeLabel(s: PlannedSet): String = displayTimeLabel(s.timeSecondsMin, s.timeSecondsMax)
+fun formatTimeEntry(seconds: Int?, unit: String): String {
+    if (seconds == null) return ""
+    val s = seconds.coerceAtLeast(0)
+    return when (unit.lowercase()) {
+        "min" -> {
+            val mins = s / 60
+            val secs = s % 60
+            String.format(Locale.US, "%d:%02d", mins, secs)
+        }
+        "hour", "hrs" -> {
+            val hours = s / 3600
+            val mins = (s % 3600) / 60
+            String.format(Locale.US, "%d:%02d", hours, mins)
+        }
+        else -> "$s"
+    }
+}
+
+fun timeEntryText(seconds: Int?, unit: String): String = formatTimeEntry(seconds, unit)
+fun displayTimeEntry(seconds: Int?, unit: String): String = formatTimeEntry(seconds, unit)
+
+fun parseTimeEntry(text: String, unit: String): Int? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return null
+
+    return when (unit.lowercase()) {
+        "sec" -> {
+            if (!trimmed.all { it.isDigit() }) return null
+            trimmed.toIntOrNull()
+        }
+        "min" -> {
+            if (trimmed.contains(':')) {
+                val parts = trimmed.split(':')
+                if (parts.size != 2) return null
+                val mins = parts[0].toIntOrNull() ?: return null
+                val secs = parts[1].toIntOrNull() ?: return null
+                if (mins < 0 || secs < 0 || secs > 59) return null
+                mins * 60 + secs
+            } else {
+                if (!trimmed.all { it.isDigit() }) return null
+                val m = trimmed.toIntOrNull() ?: return null
+                m * 60
+            }
+        }
+        "hour", "hrs" -> {
+            if (trimmed.contains(':')) {
+                val parts = trimmed.split(':')
+                if (parts.size != 2) return null
+                val hours = parts[0].toIntOrNull() ?: return null
+                val mins = parts[1].toIntOrNull() ?: return null
+                if (hours < 0 || mins < 0 || mins > 59) return null
+                hours * 3600 + mins * 60
+            } else {
+                if (!trimmed.all { it.isDigit() }) return null
+                val h = trimmed.toIntOrNull() ?: return null
+                h * 3600
+            }
+        }
+        else -> {
+            if (!trimmed.all { it.isDigit() }) return null
+            trimmed.toIntOrNull()
+        }
+    }
+}
+
+fun timeEntryToSeconds(text: String, unit: String): Int? = parseTimeEntry(text, unit)
+fun parseTimeTargetField(text: String, unit: String): Int? = parseTimeEntry(text, unit)
 
 fun parseTargetField(text: String): Pair<Int?, Int?>? {
     val trimmed = text.trim()
     if (trimmed.isEmpty()) return Pair(null, null)
 
-    // Clock strings like "1:30" contain ':' and must be rejected
+    // Clock strings like "1:30" contain ':' and must be rejected for reps
     if (!trimmed.all { it.isDigit() || it == '-' || it.isWhitespace() }) {
         return null
     }
@@ -93,124 +173,11 @@ fun parseTargetField(text: String): Pair<Int?, Int?>? {
     return Pair(leftNum, rightNum)
 }
 
-fun parseTimeTargetField(text: String, unit: String): Pair<Int?, Int?>? {
-    val trimmed = text.trim()
-    if (trimmed.isEmpty()) return Pair(null, null)
-
-    if (!trimmed.all { it.isDigit() || it == '-' || it == '.' || it.isWhitespace() }) {
-        return null
-    }
-
-    val dashCount = trimmed.count { it == '-' }
-    if (dashCount > 1) return null
-
-    if (dashCount == 0) {
-        val sec = timeEntryToSeconds(trimmed, unit) ?: return null
-        return Pair(sec, null)
-    }
-
-    val parts = trimmed.split('-').map { it.trim() }
-    if (parts.size != 2) return null
-
-    val leftSec = if (parts[0].isEmpty()) null else timeEntryToSeconds(parts[0], unit) ?: return null
-    val rightSec = if (parts[1].isEmpty()) null else timeEntryToSeconds(parts[1], unit) ?: return null
-
-    if (leftSec == null && rightSec == null) return Pair(null, null)
-
-    return Pair(leftSec, rightSec)
-}
-
 fun formatRepsTargetEntry(minReps: Int?, maxReps: Int?): String = when {
     minReps != null && maxReps != null -> "$minReps-$maxReps"
     minReps != null -> "$minReps"
     maxReps != null -> "-$maxReps"
     else -> ""
-}
-
-fun formatTimeTargetEntry(minSec: Int?, maxSec: Int?, unit: String): String {
-    val minText = timeEntryText(minSec, unit)
-    val maxText = timeEntryText(maxSec, unit)
-    return when {
-        minText.isNotEmpty() && maxText.isNotEmpty() -> "$minText-$maxText"
-        minText.isNotEmpty() -> minText
-        maxText.isNotEmpty() -> "-$maxText"
-        else -> ""
-    }
-}
-
-fun formatTimeUnitValue(seconds: Int, timeUnit: String): String {
-    return when (timeUnit.lowercase()) {
-        "min" -> {
-            val v = seconds / 60.0
-            val rounded = kotlin.math.round(v * 10.0) / 10.0
-            if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
-        }
-        "hour" -> {
-            val v = seconds / 3600.0
-            val rounded = kotlin.math.round(v * 10.0) / 10.0
-            if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
-        }
-        else -> "$seconds"
-    }
-}
-
-fun timeUnitSuffix(timeUnit: String): String = when (timeUnit.lowercase()) {
-    "min" -> " mins"
-    "hour" -> " hours"
-    else -> " secs"
-}
-
-fun timeLabelScaled(s: PlannedSet, timeUnit: String = "sec"): String {
-    val minSec = s.timeSecondsMin
-    val maxSec = s.timeSecondsMax
-    if (minSec == null && maxSec == null) return ""
-    val suffix = timeUnitSuffix(timeUnit)
-    return when {
-        minSec != null && maxSec != null -> {
-            val minFormatted = formatTimeUnitValue(minSec, timeUnit)
-            val maxFormatted = formatTimeUnitValue(maxSec, timeUnit)
-            "$minFormatted-$maxFormatted$suffix"
-        }
-        minSec != null -> "${formatTimeUnitValue(minSec, timeUnit)}$suffix"
-        maxSec != null -> "${formatTimeUnitValue(maxSec, timeUnit)}$suffix"
-        else -> ""
-    }
-}
-
-fun timeEntryText(seconds: Int?, unit: String): String {
-    if (seconds == null) return ""
-    return when (unit.lowercase()) {
-        "min" -> {
-            val v = seconds / 60.0
-            val rounded = kotlin.math.round(v * 10.0) / 10.0
-            if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
-        }
-        "hour", "hrs" -> {
-            val v = seconds / 3600.0
-            if (v < 0.1) {
-                val rounded = kotlin.math.round(v * 1000.0) / 1000.0
-                if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
-            } else {
-                val rounded = kotlin.math.round(v * 10.0) / 10.0
-                if (rounded % 1.0 == 0.0) "${rounded.toInt()}" else "$rounded"
-            }
-        }
-        else -> "$seconds"
-    }
-}
-
-fun displayTimeEntry(seconds: Int?, unit: String): String = timeEntryText(seconds, unit)
-
-fun timeEntryToSeconds(text: String, unit: String): Int? {
-    if (text.isBlank()) return null
-    val d = text.trim().toDoubleOrNull() ?: return null
-    if (d < 0.0) return null
-    val factor = when (unit.lowercase()) {
-        "min" -> 60.0
-        "hour", "hrs" -> 3600.0
-        else -> 1.0
-    }
-    return kotlin.math.round(d * factor).toInt()
 }
 
 fun timeUnitPickerLabel(unit: String): String = when (unit.lowercase()) {
@@ -225,17 +192,20 @@ fun cycleTimeUnit(current: String): String = when (current.lowercase()) {
     else -> "sec"
 }
 
+fun cycleDifficulty(current: String?): String? = when (current?.lowercase()) {
+    null -> "easy"
+    "easy" -> "medium"
+    "medium" -> "hard"
+    "hard" -> null
+    else -> null
+}
+
 fun setTargetLabel(s: PlannedSet, isTimed: Boolean = false): String {
-    return if (isTimed || s.timeSecondsMin != null || s.timeSecondsMax != null) {
-        displayTimeLabel(s.timeSecondsMin, s.timeSecondsMax)
-    } else {
-        repsLabel(s)
-    }
+    return if (isTimed || s.timeSeconds != null) displayTimeLabel(s.timeSeconds) else repsLabel(s)
 }
 
 fun isSetEmpty(s: PlannedSet): Boolean {
-    return s.weightKg == null && s.repsMin == null && s.repsMax == null &&
-           s.timeSecondsMin == null && s.timeSecondsMax == null
+    return s.weightKg == null && s.repsMin == null && s.repsMax == null && s.timeSeconds == null
 }
 
 fun formatSetLine(setNumber: Int, set: PlannedSet, isTimed: Boolean): String {
@@ -250,8 +220,8 @@ fun formatSetLine(setNumber: Int, set: PlannedSet, isTimed: Boolean): String {
         return "Set $setNumber$typePart: —$noteSuffix"
     }
 
-    val targetStr = if (isTimed || set.timeSecondsMin != null || set.timeSecondsMax != null) {
-        displayTimeLabel(set.timeSecondsMin, set.timeSecondsMax)
+    val targetStr = if (isTimed || set.timeSeconds != null) {
+        displayTimeLabel(set.timeSeconds)
     } else {
         repsLabel(set)
     }
@@ -262,7 +232,7 @@ fun formatSetLine(setNumber: Int, set: PlannedSet, isTimed: Boolean): String {
 
     val core = when {
         weightStr != null && targetStr.isNotBlank() -> {
-            if (isTimed || set.timeSecondsMin != null || set.timeSecondsMax != null) "$targetStr @ $weightStr" else "$weightStr × $targetStr"
+            if (isTimed || set.timeSeconds != null) "$targetStr @ $weightStr" else "$weightStr × $targetStr"
         }
         targetStr.isNotBlank() -> targetStr
         weightStr != null -> weightStr
@@ -283,15 +253,14 @@ fun formatExerciseSetsSummary(exercise: RoutineExercise): List<String> {
         it.weightKg == first.weightKg &&
         it.repsMin == first.repsMin &&
         it.repsMax == first.repsMax &&
-        it.timeSecondsMin == first.timeSecondsMin &&
-        it.timeSecondsMax == first.timeSecondsMax &&
+        it.timeSeconds == first.timeSeconds &&
         it.note.isNullOrBlank()
     }
 
     if (allIdentical && first.note.isNullOrBlank()) {
         val count = sets.size
-        val targetStr = if (exercise.isTimed || first.timeSecondsMin != null || first.timeSecondsMax != null) {
-            displayTimeLabel(first.timeSecondsMin, first.timeSecondsMax)
+        val targetStr = if (exercise.isTimed || first.timeSeconds != null) {
+            displayTimeLabel(first.timeSeconds)
         } else {
             repsLabel(first)
         }
@@ -389,6 +358,7 @@ private data class LegacyPlannedSet(
     val reps: Int? = null,
     val repsMin: Int? = null,
     val repsMax: Int? = null,
+    val timeSeconds: Int? = null,
     val timeSecondsMin: Int? = null,
     val timeSecondsMax: Int? = null,
     val timeUnit: String = "sec",
@@ -400,8 +370,7 @@ private data class LegacyPlannedSet(
         weightKg = weightKg,
         repsMin = repsMin ?: reps,
         repsMax = repsMax,
-        timeSecondsMin = timeSecondsMin,
-        timeSecondsMax = timeSecondsMax,
+        timeSeconds = timeSeconds ?: timeSecondsMin ?: timeSecondsMax,
         timeUnit = timeUnit,
         note = note,
         difficulty = difficulty,

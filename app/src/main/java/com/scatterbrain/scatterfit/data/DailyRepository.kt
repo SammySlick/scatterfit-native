@@ -3,6 +3,8 @@ package com.scatterbrain.scatterfit.data
 import android.content.Context
 import android.util.Log
 import com.scatterbrain.scatterfit.sync.SyncHub
+import com.scatterbrain.scatterfit.ui.SessionRecord
+import com.scatterbrain.scatterfit.ui.SessionRecordsStorage
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,16 +21,24 @@ object DailyRepository {
     val daily: StateFlow<AssembledDaily?> = _daily.asStateFlow()
 
     private var storage: DailySnapshotStorage? = null
+    private var sessionRecordsStorage: SessionRecordsStorage? = null
     private var writeJob: Job? = null
 
     fun start(context: Context, scope: CoroutineScope) {
         val s = DailySnapshotStorage(context.applicationContext)
+        val srs = SessionRecordsStorage(context.applicationContext)
         this.storage = s
-        start(scope, s)
+        this.sessionRecordsStorage = srs
+        start(scope, s, srs)
     }
 
-    fun start(scope: CoroutineScope, snapshotStorage: DailySnapshotStorage? = storage) {
+    fun start(
+        scope: CoroutineScope,
+        snapshotStorage: DailySnapshotStorage? = storage,
+        sessionRecordsStorage: SessionRecordsStorage? = this.sessionRecordsStorage,
+    ) {
         this.storage = snapshotStorage
+        this.sessionRecordsStorage = sessionRecordsStorage
         val startMs = System.currentTimeMillis()
 
         // BEFORE the collect, load the snapshot on IO and if present, decode and publish it as _daily immediately
@@ -47,12 +57,15 @@ object DailyRepository {
             SyncHub.records.collect { records ->
                 val newDaily = withContext(Dispatchers.Default) {
                     records?.let {
-                        Daily.buildDailyDataFromMaps(
+                        val d = Daily.buildDailyDataFromMaps(
                             it,
                             Zones.DEFAULT_ZONES,
                             ZoneId.systemDefault(),
                             nowMs = System.currentTimeMillis(),
                         )
+                        sessionRecordsStorage?.let { srs ->
+                            Daily.mergeSessionRecordsIntoDaily(d, srs.loadAll())
+                        } ?: d
                     }
                 }
                 if (newDaily != null) {
@@ -77,5 +90,10 @@ object DailyRepository {
                 }
             }
         }
+    }
+
+    fun notifySessionRecorded(record: SessionRecord) {
+        val current = _daily.value ?: return
+        _daily.value = Daily.mergeSessionRecordsIntoDaily(current, listOf(record))
     }
 }
