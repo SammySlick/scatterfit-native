@@ -283,6 +283,18 @@ class FoodTrackerViewModel(
         refreshPresets()
     }
 
+    fun logCustomMeal(meal: LoggedMeal) {
+        if (storage != null) {
+            storage.saveMeal(meal)
+            syncStorageToPipeline()
+        } else {
+            val list = inMemoryStorage.getOrPut(activeDayKey) { mutableListOf() }
+            list.add(meal)
+        }
+        setDayKey(activeDayKey)
+        refreshPresets()
+    }
+
     fun setDayKey(dayKey: String) {
         activeDayKey = dayKey
         _mealsForDay.value = (storage?.getMealsForDay(dayKey) ?: inMemoryStorage[dayKey] ?: emptyList())

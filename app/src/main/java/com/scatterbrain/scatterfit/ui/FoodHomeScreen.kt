@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,6 +42,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.scatterbrain.scatterfit.data.DailyRepository
+import com.scatterbrain.scatterfit.data.OpenFoodFactsClient
+import com.scatterbrain.scatterfit.data.ProductResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,6 +52,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +80,7 @@ import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -160,10 +163,51 @@ fun FoodHomeScreen(
     var isLoggerOpen by remember { mutableStateOf(false) }
     var editingMealId by remember { mutableStateOf<String?>(null) }
 
-    // Search bar state
+    // Search bar & OFF states
     var searchQuery by remember { mutableStateOf("") }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
+    var pendingConfirmProduct by remember { mutableStateOf<ProductResult?>(null) }
+    var offResults by remember { mutableStateOf<List<ProductResult>>(emptyList()) }
+    var isSearchingOff by remember { mutableStateOf(false) }
+    var searchHasExecuted by remember { mutableStateOf(false) }
 
+    val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+
+    // Debounced text search to Open Food Facts (400ms)
+    LaunchedEffect(searchQuery) {
+        val q = searchQuery.trim()
+        if (q.length >= 2) {
+            delay(400L)
+            isSearchingOff = true
+            offResults = OpenFoodFactsClient.search(q).take(8)
+            isSearchingOff = false
+            searchHasExecuted = true
+        } else {
+            offResults = emptyList()
+            isSearchingOff = false
+            searchHasExecuted = false
+        }
+    }
+
+    // Full screen camera overlay for barcode scanning
+    if (showBarcodeScanner) {
+        BarcodeScannerOverlay(
+            onBarcodeDetected = { barcode ->
+                showBarcodeScanner = false
+                scope.launch {
+                    val product = OpenFoodFactsClient.lookupBarcode(barcode)
+                    if (product != null) {
+                        pendingConfirmProduct = product
+                    } else {
+                        searchQuery = barcode
+                    }
+                }
+            },
+            onDismiss = { showBarcodeScanner = false }
+        )
+        return
+    }
 
     // Date formatting for Day Header: e.g. "Today, Oct 17"
     val dateHeaderLabel = remember(activeDay, today) {
@@ -474,7 +518,7 @@ fun FoodHomeScreen(
                     }
                 }
 
-                // If Logger is toggled open -> show the full FoodLoggerScreen content inline
+                // If Logger is toggled open -> show the full manual entry form inline
                 if (isLoggerOpen) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -608,16 +652,34 @@ fun FoodHomeScreen(
                 SearchBarField(
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
+                    onCameraClick = { showBarcodeScanner = true },
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // If user activated Search with query -> show live search results
-                if (searchQuery.isNotBlank()) {
+                // In-place Confirm Sheet for Scanned or Selected OFF Product
+                if (pendingConfirmProduct != null) {
+                    ConfirmProductCard(
+                        product = pendingConfirmProduct!!,
+                        defaultMealType = viewModel.mealTypeInput,
+                        onConfirm = { mealToLog ->
+                            viewModel.logCustomMeal(mealToLog)
+                            pendingConfirmProduct = null
+                            searchQuery = ""
+                        },
+                        onCancel = { pendingConfirmProduct = null }
+                    )
+                }
+
+                // Live search results (local favourites/presets/recipes + Open Food Facts products)
+                if (searchQuery.isNotBlank() && pendingConfirmProduct == null) {
                     LiveFoodSearchResults(
                         query = searchQuery,
                         presets = presets,
                         favourites = favourites,
                         recipes = recipes,
+                        offResults = offResults,
+                        isSearchingOff = isSearchingOff,
+                        searchHasExecuted = searchHasExecuted,
                         onSelectPreset = { preset ->
                             viewModel.applyPreset(preset)
                             isLoggerOpen = true
@@ -630,6 +692,9 @@ fun FoodHomeScreen(
                         onSelectRecipe = { recipe ->
                             viewModel.logRecipePortion(recipe)
                             searchQuery = ""
+                        },
+                        onSelectOffProduct = { product ->
+                            pendingConfirmProduct = product
                         }
                     )
                 }
@@ -966,7 +1031,6 @@ fun SwipeableMealRow(
                         swipeOffset = newOffset
                     },
                     onDragStopped = {
-                        // Snap to revealed or closed
                         swipeOffset = if (swipeOffset < -maxRevealPx / 2f) -maxRevealPx else 0f
                     }
                 )
@@ -1059,6 +1123,7 @@ private fun MealItemContent(
 private fun SearchBarField(
     query: String,
     onQueryChange: (String) -> Unit,
+    onCameraClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     OutlinedTextField(
@@ -1067,8 +1132,9 @@ private fun SearchBarField(
         placeholder = { Text("Search for a food", color = TextMuted, fontSize = 13.sp) },
         singleLine = true,
         trailingIcon = {
-            // Camera barcode icon (outline, rendered inert this phase)
-            CameraIcon(modifier = Modifier.size(20.dp), tint = TextMuted)
+            IconButton(onClick = onCameraClick) {
+                CameraIcon(modifier = Modifier.size(20.dp), tint = TealHighlight)
+            }
         },
         shape = RoundedCornerShape(24.dp),
         colors = OutlinedTextFieldDefaults.colors(
@@ -1083,6 +1149,145 @@ private fun SearchBarField(
     )
 }
 
+@Composable
+fun ConfirmProductCard(
+    product: ProductResult,
+    defaultMealType: String,
+    onConfirm: (LoggedMeal) -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var selectedMealType by remember { mutableStateOf(defaultMealType) }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+        border = BorderStroke(1.dp, TealHighlight)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = product.productName ?: "Product",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground
+                    )
+                    product.brands?.takeIf { it.isNotBlank() }?.let {
+                        Text(text = it, fontSize = 12.sp, color = TextMuted)
+                    }
+                    val servingInfo = product.servingSize ?: product.servingQuantityGrams?.let { "${it.toInt()}g" }
+                    if (servingInfo != null) {
+                        Text(text = "Serving: $servingInfo", fontSize = 11.sp, color = TealHighlight)
+                    }
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "${product.kcalPerServing} kcal",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TealHighlight
+                    )
+                    Text(
+                        text = "${String.format(Locale.US, "%.1f", product.proteinPerServing)}g protein",
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
+                }
+            }
+
+            // Macros row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SecondaryFill)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                Text("C: ${String.format(Locale.US, "%.1f", product.carbsPerServing)}g", fontSize = 11.sp, color = TextForeground)
+                Text("F: ${String.format(Locale.US, "%.1f", product.fatPerServing)}g", fontSize = 11.sp, color = TextForeground)
+                Text("P: ${String.format(Locale.US, "%.1f", product.proteinPerServing)}g", fontSize = 11.sp, color = TextForeground)
+            }
+
+            // Meal Type Selector Chips
+            val mealTypes = listOf("breakfast", "lunch", "dinner", "snacks")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                mealTypes.forEach { type ->
+                    val isSelected = selectedMealType.equals(type, ignoreCase = true)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) TealHighlight else SecondaryFill)
+                            .border(
+                                BorderStroke(1.dp, if (isSelected) TealHighlight else BorderDefault),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable { selectedMealType = type }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = type.replaceFirstChar { it.uppercase() },
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.Black else TextForeground
+                        )
+                    }
+                }
+            }
+
+            // Action buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Cancel", color = TextMuted)
+                }
+
+                Button(
+                    onClick = {
+                        val meal = LoggedMeal(
+                            name = product.displayName,
+                            kcal = product.kcalPerServing.toDouble(),
+                            protein = product.proteinPerServing,
+                            carbs = product.carbsPerServing,
+                            fat = product.fatPerServing,
+                            mealType = selectedMealType,
+                            isLocal = true
+                        )
+                        onConfirm(meal)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Confirm", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LiveFoodSearchResults(
@@ -1090,9 +1295,13 @@ private fun LiveFoodSearchResults(
     presets: List<MealPreset>,
     favourites: List<FavouriteFood>,
     recipes: List<Recipe>,
+    offResults: List<ProductResult>,
+    isSearchingOff: Boolean,
+    searchHasExecuted: Boolean,
     onSelectPreset: (MealPreset) -> Unit,
     onSelectFavourite: (FavouriteFood) -> Unit,
     onSelectRecipe: (Recipe) -> Unit,
+    onSelectOffProduct: (ProductResult) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val q = query.trim().lowercase()
@@ -1111,13 +1320,12 @@ private fun LiveFoodSearchResults(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text("MATCHING FOODS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TealHighlight)
 
-            if (matchedPresets.isEmpty() && matchedFavourites.isEmpty() && matchedRecipes.isEmpty()) {
-                Text("No matching foods found", fontSize = 12.sp, color = TextMuted)
-            } else {
+            // Local curated items
+            if (matchedFavourites.isNotEmpty() || matchedPresets.isNotEmpty() || matchedRecipes.isNotEmpty()) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -1161,6 +1369,67 @@ private fun LiveFoodSearchResults(
                         }
                     }
                 }
+            }
+
+            // Open Food Facts results
+            if (isSearchingOff) {
+                Text("Searching Open Food Facts…", color = TextMuted, fontSize = 12.sp)
+            } else if (offResults.isNotEmpty()) {
+                Text("OPEN FOOD FACTS (UK)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    offResults.forEach { product ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectOffProduct(product) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                            border = BorderStroke(1.dp, BorderDefault)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = product.productName ?: "Product",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextForeground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    val subtitle = listOfNotNull(
+                                        product.brands?.takeIf { it.isNotBlank() },
+                                        product.servingSize ?: product.servingQuantityGrams?.let { "${it.toInt()}g" }
+                                    ).joinToString(" · ")
+                                    if (subtitle.isNotBlank()) {
+                                        Text(text = subtitle, fontSize = 11.sp, color = TextMuted, maxLines = 1)
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "${product.kcalPerServing} kcal",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TealHighlight
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", product.proteinPerServing)}g P",
+                                        fontSize = 10.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (searchHasExecuted && matchedFavourites.isEmpty() && matchedPresets.isEmpty() && matchedRecipes.isEmpty()) {
+                Text("No matches for '$query' — try a brand name", fontSize = 12.sp, color = TextMuted)
             }
         }
     }
