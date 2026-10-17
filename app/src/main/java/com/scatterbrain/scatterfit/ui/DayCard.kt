@@ -169,10 +169,24 @@ fun DayCard(
 
     val isCurrentToday = dayKey == remember { todayKey() }
 
-    // Hero calculations: when nothing eaten, shows kcalTarget (not 0); over goal -> 0
+    // Hero calculations: when nothing eaten, shows kcalTarget (not 0); over goal -> "N kcal over T" (number Bold red StateBad)
     val kcalTarget = settings.kcalTarget
     val kcalEaten = daily?.caloriesEaten?.get(dayKey)?.roundToInt() ?: 0
-    val kcalLeft = (kcalTarget - kcalEaten).coerceAtLeast(0)
+    val isOverGoal = kcalEaten > kcalTarget
+    val overKcal = (kcalEaten - kcalTarget).coerceAtLeast(0)
+    val remainingKcal = (kcalTarget - kcalEaten).coerceAtLeast(0)
+
+    val heroNumberText = if (isOverGoal) {
+        String.format(Locale.US, "%,d", overKcal)
+    } else {
+        String.format(Locale.US, "%,d", remainingKcal)
+    }
+    val heroNumberColor = if (isOverGoal) StateBad else TextForeground
+    val heroCaptionText = if (isOverGoal) {
+        "kcal over %,d".format(Locale.US, kcalTarget)
+    } else {
+        "kcal left of %,d".format(Locale.US, kcalTarget)
+    }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -192,17 +206,17 @@ fun DayCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                // Left: Big kcal left number + caption
+                // Left: Big kcal number + caption
                 Column {
                     Text(
-                        text = String.format(Locale.US, "%,d", kcalLeft),
+                        text = heroNumberText,
                         fontSize = 56.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextForeground,
+                        color = heroNumberColor,
                         lineHeight = 60.sp
                     )
                     Text(
-                        text = "kcal left of %,d".format(Locale.US, kcalTarget),
+                        text = heroCaptionText,
                         fontSize = 13.sp,
                         color = TextMuted
                     )

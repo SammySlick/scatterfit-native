@@ -151,4 +151,35 @@ class TrainingPlanStorageTest {
         assertEquals("Hypertrophy Push", daySessions.first().name)
         assertEquals(plannedDay, daySessions.first().dayKey)
     }
+
+    @Test
+    fun `PlannedSessionsStorage getPlanForDate agrees between training row, tomorrow card and planner`() {
+        var rawJson: String? = null
+        val storage = PlannedSessionsStorage(
+            prefsProvider = { rawJson },
+            prefsWriter = { rawJson = it }
+        )
+
+        val testDate = java.time.LocalDate.parse("2026-10-18")
+        val routines = listOf(Routine(id = "r-pull", name = "Pull Hypertrophy"))
+
+        // Planner writes a routine
+        storage.upsert(PlannedSessionDay(dayKey = "2026-10-18", routineId = "r-pull"))
+
+        // Both today's training row and tomorrow card read through getPlanForDate
+        val planForToday = storage.getPlanForDate(testDate, routines)
+        val planForTomorrow = storage.getPlanForDate(testDate, routines)
+
+        assertEquals("Pull Hypertrophy", planForToday)
+        assertEquals(planForToday, planForTomorrow)
+
+        // Planner writes a standalone session name
+        storage.upsert(PlannedSessionDay(dayKey = "2026-10-18", sessionName = "Sunday Long Run"))
+        val planRun = storage.getPlanForDate(testDate, routines)
+        assertEquals("Sunday Long Run", planRun)
+
+        // Unplanned date returns null (Rest day)
+        val unplannedDate = java.time.LocalDate.parse("2026-10-19")
+        assertNull(storage.getPlanForDate(unplannedDate, routines))
+    }
 }

@@ -7,8 +7,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,8 +44,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.scatterbrain.scatterfit.data.DailyRepository
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,8 +56,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -72,6 +77,7 @@ import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -81,7 +87,7 @@ import kotlin.math.roundToInt
 
 enum class MacroCardMode { CONSUMED, REMAINING }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FoodHomeScreen(
     viewModel: FoodTrackerViewModel,
@@ -102,13 +108,44 @@ fun FoodHomeScreen(
 
     val pipelineMeals = repoDaily?.meals?.get(activeDay) ?: emptyList()
 
-    val displayMeals = remember(storedMeals, pipelineMeals, activeDay) {
-        if (storedMeals.isNotEmpty()) {
-            storedMeals
-        } else if (pipelineMeals.isNotEmpty()) {
+    // Full meals set: stored meals + pipeline meals not already represented
+    val allCombinedMeals = remember(storedMeals, pipelineMeals, activeDay) {
+        if (storedMeals.isEmpty()) {
             pipelineMeals.map { it.toLoggedMeal(activeDay) }
         } else {
-            emptyList()
+            val storedKeys = storedMeals.map { it.name.trim().lowercase() to it.kcal.roundToInt() }.toSet()
+            val extra = pipelineMeals
+                .filterNot { (it.name.trim().lowercase() to it.kcal.roundToInt()) in storedKeys }
+                .map { it.toLoggedMeal(activeDay) }
+            storedMeals + extra
+        }
+    }
+
+    // Pending delete + undo state (5 second timeout)
+    var pendingDeletedMeal by remember { mutableStateOf<LoggedMeal?>(null) }
+    var undoSecondsRemaining by remember { mutableIntStateOf(5) }
+
+    LaunchedEffect(pendingDeletedMeal) {
+        if (pendingDeletedMeal != null) {
+            undoSecondsRemaining = 5
+            while (undoSecondsRemaining > 0 && pendingDeletedMeal != null) {
+                delay(1000L)
+                undoSecondsRemaining--
+            }
+            val toDelete = pendingDeletedMeal
+            if (toDelete != null) {
+                viewModel.deleteMeal(toDelete.id)
+                pendingDeletedMeal = null
+            }
+        }
+    }
+
+    // Display meals excludes pending delete
+    val displayMeals = remember(allCombinedMeals, pendingDeletedMeal) {
+        if (pendingDeletedMeal != null) {
+            allCombinedMeals.filter { it.id != pendingDeletedMeal!!.id }
+        } else {
+            allCombinedMeals
         }
     }
 
@@ -121,12 +158,11 @@ fun FoodHomeScreen(
 
     // Inline logging / entry mode
     var isLoggerOpen by remember { mutableStateOf(false) }
+    var editingMealId by remember { mutableStateOf<String?>(null) }
 
     // Search bar state
     var searchQuery by remember { mutableStateOf("") }
 
-    var itemPendingDeleteId by remember { mutableStateOf<String?>(null) }
-    val haptic = LocalHapticFeedback.current
     val scrollState = rememberScrollState()
 
     // Date formatting for Day Header: e.g. "Today, Oct 17"
@@ -144,7 +180,7 @@ fun FoodHomeScreen(
         }.getOrDefault(activeDay)
     }
 
-    // Totals for active day matching DailyRepository & Day Card parity
+    // Totals for active day matching DailyRepository & Day Card parity (includes ALL meals, including hidden)
     val calFromDaily = repoDaily?.caloriesEaten?.get(activeDay)
     val totalKcal = (calFromDaily ?: displayMeals.sumOf { it.kcal }).roundToInt()
 
@@ -304,7 +340,6 @@ fun FoodHomeScreen(
                         val isOverGoal = totalKcal > kcalTarget
                         val overKcal = (totalKcal - kcalTarget).coerceAtLeast(0)
 
-                        // When consumed > target in REMAINING mode: hero reads "620 kcal over 2,500" (number Bold red StateBad, caption muted)
                         val isOverHero = isRemaining && isOverGoal
 
                         val bigKcalText = if (isOverHero) {
@@ -329,7 +364,6 @@ fun FoodHomeScreen(
                             if (kcalTarget > 0) (totalKcal.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
                         }
 
-                        // The kcal bar turns RED (StateBad) when consumed exceeds target by > 10% of target; between 100% and 110% stays orange (JudgementWarn).
                         val barFillColor = if (isOverGoal) {
                             getBarColor(computeCaloriesBarColor(totalKcal.toDouble(), kcalTarget, settings.tolerances.kcalGreen))
                         } else {
@@ -389,7 +423,7 @@ fun FoodHomeScreen(
                                 fillColor = protColor
                             )
 
-                            // Carbs Row (optional / untracked target -> "—")
+                            // Carbs Row (optional / untracked target -> "—", kept visible even at zero)
                             MacroMiniRow(
                                 label = "Carbs",
                                 currentGrams = totalCarbs,
@@ -398,7 +432,7 @@ fun FoodHomeScreen(
                                 fillColor = AccentTeal
                             )
 
-                            // Fat Row (optional / untracked target -> "—")
+                            // Fat Row (optional / untracked target -> "—", kept visible even at zero)
                             MacroMiniRow(
                                 label = "Fat",
                                 currentGrams = totalFat,
@@ -406,6 +440,36 @@ fun FoodHomeScreen(
                                 progressFraction = 0f,
                                 fillColor = AccentTeal
                             )
+                        }
+                    }
+                }
+
+                // Inline Undo Bar for Deletes
+                if (pendingDeletedMeal != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = SecondaryFill),
+                        border = BorderStroke(1.dp, TealHighlight.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Meal removed (${undoSecondsRemaining}s)",
+                                color = TextForeground,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            TextButton(onClick = {
+                                pendingDeletedMeal = null
+                            }) {
+                                Text("Undo", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
                         }
                     }
                 }
@@ -430,18 +494,21 @@ fun FoodHomeScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "LOG MEAL (${viewModel.mealTypeInput.uppercase()})",
+                                    text = if (editingMealId != null) "EDIT MEAL" else "LOG MEAL (${viewModel.mealTypeInput.uppercase()})",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TealHighlight
                                 )
-                                TextButton(onClick = { isLoggerOpen = false }) {
+                                TextButton(onClick = {
+                                    isLoggerOpen = false
+                                    editingMealId = null
+                                }) {
                                     Text("✕ Close", color = TextMuted, fontSize = 12.sp)
                                 }
                             }
 
                             // Presets chips if any
-                            if (presets.isNotEmpty()) {
+                            if (presets.isNotEmpty() && editingMealId == null) {
                                 FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -508,6 +575,11 @@ fun FoodHomeScreen(
 
                             Button(
                                 onClick = {
+                                    val priorId = editingMealId
+                                    if (priorId != null) {
+                                        viewModel.deleteMeal(priorId)
+                                        editingMealId = null
+                                    }
                                     if (viewModel.saveCurrentMeal()) {
                                         isLoggerOpen = false
                                     }
@@ -517,7 +589,7 @@ fun FoodHomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("Save Meal", fontWeight = FontWeight.Bold)
+                                Text(if (editingMealId != null) "Update Meal" else "Save Meal", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -532,14 +604,14 @@ fun FoodHomeScreen(
                     letterSpacing = 1.sp
                 )
 
-                // 4. SEARCH BAR POSITION: moved between "FOOD LOG" header and the Breakfast section card
+                // 4. SEARCH BAR POSITION: Moved directly between "FOOD LOG" header and the Breakfast section card
                 SearchBarField(
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // If user activated Search with query -> show live search results right below search bar
+                // If user activated Search with query -> show live search results
                 if (searchQuery.isNotBlank()) {
                     LiveFoodSearchResults(
                         query = searchQuery,
@@ -582,7 +654,6 @@ fun FoodHomeScreen(
                         totalCarbs = sectionCarbs,
                         totalFat = sectionFat,
                         meals = sectionMeals,
-                        itemPendingDeleteId = itemPendingDeleteId,
                         onToggleExpand = {
                             expandedSections = if (isExpanded) {
                                 expandedSections - sectionKey
@@ -592,15 +663,21 @@ fun FoodHomeScreen(
                         },
                         onAddClick = {
                             viewModel.mealTypeInput = sectionKey
+                            editingMealId = null
                             isLoggerOpen = true
                         },
-                        onItemLongClick = { mealId ->
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            itemPendingDeleteId = if (itemPendingDeleteId == mealId) null else mealId
+                        onEditMeal = { mealToEdit ->
+                            viewModel.mealName = mealToEdit.name
+                            viewModel.kcalInput = if (mealToEdit.kcal % 1.0 == 0.0) "${mealToEdit.kcal.toInt()}" else "${mealToEdit.kcal}"
+                            viewModel.proteinInput = mealToEdit.protein?.let { if (it % 1.0 == 0.0) "${it.toInt()}" else "$it" } ?: ""
+                            viewModel.carbsInput = mealToEdit.carbs?.let { if (it % 1.0 == 0.0) "${it.toInt()}" else "$it" } ?: ""
+                            viewModel.fatInput = mealToEdit.fat?.let { if (it % 1.0 == 0.0) "${it.toInt()}" else "$it" } ?: ""
+                            viewModel.mealTypeInput = mealToEdit.mealType
+                            editingMealId = mealToEdit.id
+                            isLoggerOpen = true
                         },
-                        onDeleteMeal = { mealId ->
-                            viewModel.deleteMeal(mealId)
-                            itemPendingDeleteId = null
+                        onDeleteMeal = { mealToDelete ->
+                            pendingDeletedMeal = mealToDelete
                         }
                     )
                 }
@@ -659,7 +736,6 @@ private fun MacroMiniRow(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MealSectionCard(
     sectionTitle: String,
@@ -669,13 +745,16 @@ private fun MealSectionCard(
     totalCarbs: Int,
     totalFat: Int,
     meals: List<LoggedMeal>,
-    itemPendingDeleteId: String?,
     onToggleExpand: () -> Unit,
     onAddClick: () -> Unit,
-    onItemLongClick: (String) -> Unit,
-    onDeleteMeal: (String) -> Unit,
+    onEditMeal: (LoggedMeal) -> Unit,
+    onDeleteMeal: (LoggedMeal) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val localMeals = meals.filter { it.isLocal }
+    val otherAppMeals = meals.filter { !it.isLocal }
+    var isOtherAppsExpanded by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -763,7 +842,7 @@ private fun MealSectionCard(
 
             // Expanded Meal Items inside
             if (isExpanded) {
-                if (meals.isEmpty()) {
+                if (localMeals.isEmpty() && otherAppMeals.isEmpty()) {
                     Text(
                         text = "No $sectionTitle logged yet",
                         fontSize = 11.sp,
@@ -771,78 +850,206 @@ private fun MealSectionCard(
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 } else {
-                    val timeFormat = SimpleDateFormat("HH:mm", Locale.US)
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        meals.forEach { meal ->
-                            val isPendingDelete = itemPendingDeleteId == meal.id
-                            val timeStr = timeFormat.format(Date(meal.timestamp))
+                        // LOCAL MEALS: swipe-left to reveal actions
+                        localMeals.forEach { meal ->
+                            SwipeableMealRow(
+                                meal = meal,
+                                onEditClick = { onEditMeal(meal) },
+                                onDeleteClick = { onDeleteMeal(meal) }
+                            )
+                        }
 
-                            Column(
+                        // HC-SOURCED ENTRIES: Hidden by default with disclosure one-liner
+                        if (otherAppMeals.isNotEmpty()) {
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(SecondaryFill)
-                                    .combinedClickable(
-                                        onClick = {},
-                                        onLongClick = { onItemLongClick(meal.id) }
-                                    )
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                                    .clickable { isOtherAppsExpanded = !isOtherAppsExpanded }
+                                    .padding(vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = meal.name.ifBlank { "Meal" },
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = TextForeground,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = timeStr,
-                                            fontSize = 10.sp,
-                                            color = TextMuted
-                                        )
-                                    }
+                                Text(
+                                    text = "${otherAppMeals.size} ${if (otherAppMeals.size == 1) "item" else "items"} from other apps (included in totals)",
+                                    fontSize = 11.sp,
+                                    color = TextMuted
+                                )
+                                Text(
+                                    text = if (isOtherAppsExpanded) "▴" else "▾",
+                                    fontSize = 11.sp,
+                                    color = TextMuted
+                                )
+                            }
 
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "${meal.kcal.toInt()} kcal",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = TextForeground
-                                        )
-                                        meal.protein?.let {
-                                            Text(
-                                                text = "${it.toInt()}g P",
-                                                fontSize = 10.sp,
-                                                color = TealHighlight
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Inline expandable delete confirmation
-                                if (isPendingDelete) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 8.dp),
-                                        horizontalArrangement = Arrangement.End
-                                    ) {
-                                        TextButton(onClick = { onDeleteMeal(meal.id) }) {
-                                            Text("Delete meal", color = StateBad, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
+                            if (isOtherAppsExpanded) {
+                                otherAppMeals.forEach { hcMeal ->
+                                    ReadonlyMealRow(meal = hcMeal)
                                 }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun SwipeableMealRow(
+    meal: LoggedMeal,
+    onEditClick: (LoggedMeal) -> Unit,
+    onDeleteClick: (LoggedMeal) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var swipeOffset by remember { mutableFloatStateOf(0f) }
+    val maxRevealWidth = 140.dp
+    val maxRevealPx = with(LocalDensity.current) { maxRevealWidth.toPx() }
+    val animatedOffset by animateFloatAsState(targetValue = swipeOffset, label = "swipeOffset")
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(DarkCardSurface)
+    ) {
+        // Underneath: Actions revealed on swipe left
+        Row(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // EDIT button
+            Box(
+                modifier = Modifier
+                    .size(width = 62.dp, height = 48.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(TealHighlight)
+                    .clickable {
+                        swipeOffset = 0f
+                        onEditClick(meal)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Edit", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // DELETE button
+            Box(
+                modifier = Modifier
+                    .size(width = 62.dp, height = 48.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(StateBad)
+                    .clickable {
+                        swipeOffset = 0f
+                        onDeleteClick(meal)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Delete", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // Foreground: The meal card itself, shifts left when swiped
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer { translationX = animatedOffset }
+                .draggable(
+                    orientation = Orientation.Horizontal,
+                    state = rememberDraggableState { delta ->
+                        val newOffset = (swipeOffset + delta).coerceIn(-maxRevealPx, 0f)
+                        swipeOffset = newOffset
+                    },
+                    onDragStopped = {
+                        // Snap to revealed or closed
+                        swipeOffset = if (swipeOffset < -maxRevealPx / 2f) -maxRevealPx else 0f
+                    }
+                )
+                .clip(RoundedCornerShape(8.dp))
+                .background(SecondaryFill)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            MealItemContent(meal = meal)
+        }
+    }
+}
+
+@Composable
+fun ReadonlyMealRow(
+    meal: LoggedMeal,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(SecondaryFill.copy(alpha = 0.6f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        MealItemContent(meal = meal, tag = "External")
+    }
+}
+
+@Composable
+private fun MealItemContent(
+    meal: LoggedMeal,
+    tag: String? = null,
+) {
+    val timeFormat = SimpleDateFormat("HH:mm", Locale.US)
+    val timeStr = timeFormat.format(Date(meal.timestamp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = meal.name.ifBlank { "Meal" },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextForeground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (tag != null) {
+                    Text(
+                        text = tag,
+                        fontSize = 10.sp,
+                        color = TextMuted,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(DarkCardSurface)
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
+            }
+            Text(
+                text = timeStr,
+                fontSize = 10.sp,
+                color = TextMuted
+            )
+        }
+
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "${meal.kcal.toInt()} kcal",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextForeground
+            )
+            meal.protein?.let {
+                Text(
+                    text = "${it.toInt()}g P",
+                    fontSize = 10.sp,
+                    color = TealHighlight
+                )
             }
         }
     }

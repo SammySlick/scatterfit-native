@@ -30,6 +30,7 @@ data class LoggedMeal(
     val timestamp: Long = System.currentTimeMillis(),
     val dayKey: String = "",
     val mealType: String = "snacks", // breakfast | lunch | dinner | snacks
+    val isLocal: Boolean = true,
 ) {
     fun toHealthRecord(): HealthRecord {
         val startIso = Instant.ofEpochMilli(timestamp).toString()
@@ -69,6 +70,9 @@ fun com.scatterbrain.scatterfit.data.MealEntry.toLoggedMeal(dayKey: String): Log
             } ?: 12
         )
     }
+    val isAppLocal = source.equals("local", ignoreCase = true) ||
+            source.equals("app", ignoreCase = true) ||
+            source.contains("scatterfit", ignoreCase = true)
     return LoggedMeal(
         id = "pipeline-$dayKey-${name.hashCode()}-${kcal.toInt()}",
         name = name,
@@ -78,7 +82,8 @@ fun com.scatterbrain.scatterfit.data.MealEntry.toLoggedMeal(dayKey: String): Log
         fat = fat,
         timestamp = time?.let { com.scatterbrain.scatterfit.data.parseMillis(it) } ?: System.currentTimeMillis(),
         dayKey = dayKey,
-        mealType = guessedType
+        mealType = guessedType,
+        isLocal = isAppLocal
     )
 }
 

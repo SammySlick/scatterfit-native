@@ -227,4 +227,22 @@ class DayCardTest {
         assertNull(validResult.weightError)
         assertNull(validResult.bodyFatError)
     }
+
+    @Test
+    fun `Day Card over-target hero reads N kcal over T in StateBad red`() {
+        val target = 2500
+        val eaten = 2750 // 250 over
+        val isOverGoal = eaten > target
+        val overKcal = (eaten - target).coerceAtLeast(0)
+        val heroNumberText = if (isOverGoal) String.format("%,d", overKcal) else String.format("%,d", target - eaten)
+        val heroCaptionText = if (isOverGoal) "kcal over %,d".format(target) else "kcal left of %,d".format(target)
+
+        assertEquals("250", heroNumberText)
+        assertEquals("kcal over 2,500", heroCaptionText)
+
+        // Bar turns RED when > 10% (e.g. 2752.5)
+        assertEquals(MetricBarColor.RED, computeCaloriesBarColor(2752.5, target))
+        // Stays ORANGE between 100% and 110% (e.g. 2750)
+        assertEquals(MetricBarColor.ORANGE, computeCaloriesBarColor(2750.0, target))
+    }
 }

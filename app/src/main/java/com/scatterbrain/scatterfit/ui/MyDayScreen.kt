@@ -101,7 +101,12 @@ fun MyDayScreen(
     val foodStorage = remember { FoodStorage(context) }
     val drinkStorage = remember { DrinkStorage(context) }
     val weightStorage = remember { WeightStorage(context) }
-    val planStorage = remember { TrainingPlanStorage(context) }
+    val plannedStorage = remember { PlannedSessionsStorage(context) }
+    val routineStorage = remember { RoutineStorage(context) }
+
+    LaunchedEffect(Unit) {
+        migrateLegacyTrainingPlanIfPresent(context, plannedStorage)
+    }
 
     val repoDaily by DailyRepository.daily.collectAsState()
     val momentumSource: MomentumSource? = remember(repoDaily) {
@@ -110,7 +115,6 @@ fun MyDayScreen(
         }
     }
 
-    // Day-keyed persistent drink tracking ViewModel
     val drinkViewModel = remember {
         DrinkTrackerViewModel(
             storage = drinkStorage,
@@ -130,12 +134,12 @@ fun MyDayScreen(
         }
     }
 
-    var planVersion by remember { mutableIntStateOf(0) }
+    val routines = remember { routineStorage.loadRoutines() }
     val selectedDate = remember(selectedDay) {
         runCatching { LocalDate.parse(selectedDay) }.getOrDefault(LocalDate.now())
     }
-    val todayPlan = remember(selectedDate, planVersion) {
-        planStorage.getPlanForDate(selectedDate)
+    val todayPlan = remember(selectedDate, routines) {
+        plannedStorage.getPlanForDate(selectedDate, routines)
     }
 
     val streak = remember(repoDaily, selectedDay) {
@@ -379,8 +383,8 @@ fun MyDayScreen(
             val tomorrowDateText = remember(tomorrowDate) {
                 tomorrowDate.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US))
             }
-            val tomorrowPlan = remember(tomorrowDate, planVersion) {
-                planStorage.getPlanForDate(tomorrowDate)
+            val tomorrowPlan = remember(tomorrowDate, routines) {
+                plannedStorage.getPlanForDate(tomorrowDate, routines)
             }
 
             Card(

@@ -63,6 +63,39 @@ class PlannedSessionsStorage(
         val current = load().filterNot { it.dayKey == dayKey }
         save(current)
     }
+
+    fun getPlanForDate(date: LocalDate, routines: List<Routine> = emptyList()): String? {
+        val dayKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val planned = get(dayKey) ?: return null
+        if (!planned.sessionName.isNullOrBlank()) return planned.sessionName
+        if (planned.routineId != null) {
+            val r = routines.find { it.id == planned.routineId }
+            return r?.name ?: "Training"
+        }
+        return null
+    }
+}
+
+fun migrateLegacyTrainingPlanIfPresent(context: Context, plannedStorage: PlannedSessionsStorage) {
+    val prefs = context.getSharedPreferences("scatterfit_plan_prefs", Context.MODE_PRIVATE)
+    val raw = prefs.getString("weekly_plan", null) ?: return
+    try {
+        val json = Json { ignoreUnknownKeys = true }
+        val oldPlan = json.decodeFromString<Map<String, String?>>(raw)
+        if (oldPlan.isNotEmpty()) {
+            val todayDate = LocalDate.now()
+            val monday = todayDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            for (i in 0L..6L) {
+                val d = monday.plusDays(i)
+                val dayKey = d.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                val planName = oldPlan[d.dayOfWeek.name]
+                if (!planName.isNullOrBlank() && plannedStorage.get(dayKey) == null) {
+                    plannedStorage.upsert(PlannedSessionDay(dayKey = dayKey, sessionName = planName))
+                }
+            }
+        }
+    } catch (_: Exception) {}
+    prefs.edit().remove("weekly_plan").apply()
 }
 
 class LoggedSessionsStorage(

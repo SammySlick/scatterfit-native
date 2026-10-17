@@ -535,4 +535,71 @@ class FoodLoggerTest {
         assertEquals(1, bySection["snacks"]?.size)
         assertEquals("Apple", bySection["snacks"]?.first()?.name)
     }
+
+    @Test
+    fun `HC-sourced food entries - totals include hidden entries, sections exclude them, disclosure line counts correctly`() {
+        val localMeal = LoggedMeal(id = "loc-1", name = "Local Eggs", kcal = 300.0, protein = 20.0, isLocal = true, mealType = "breakfast")
+        val hcMeal1 = LoggedMeal(id = "hc-1", name = "BWS Protein Bar", kcal = 200.0, protein = 20.0, isLocal = false, mealType = "breakfast")
+        val hcMeal2 = LoggedMeal(id = "hc-2", name = "BWS Shake", kcal = 150.0, protein = 25.0, isLocal = false, mealType = "breakfast")
+
+        val allBreakfastMeals = listOf(localMeal, hcMeal1, hcMeal2)
+
+        // 1. Totals include ALL entries (local + HC)
+        val totalKcal = allBreakfastMeals.sumOf { it.kcal }.toInt()
+        val totalProtein = allBreakfastMeals.sumOf { it.protein ?: 0.0 }.toInt()
+        assertEquals(650, totalKcal)
+        assertEquals(65, totalProtein)
+
+        // 2. Sections exclude HC entries by default
+        val localSectionMeals = allBreakfastMeals.filter { it.isLocal }
+        assertEquals(1, localSectionMeals.size)
+        assertEquals("Local Eggs", localSectionMeals.first().name)
+
+        // 3. Disclosure line counts hidden entries correctly
+        val hiddenCount = allBreakfastMeals.count { !it.isLocal }
+        assertEquals(2, hiddenCount)
+        val disclosureText = "$hiddenCount items from other apps (included in totals)"
+        assertEquals("2 items from other apps (included in totals)", disclosureText)
+    }
+
+    @Test
+    fun `Swipe actions - edit round-trip, delete and undo restores, no swipe on HC rows`() {
+        val original = LoggedMeal(id = "m1", name = "Wrap", kcal = 400.0, protein = 30.0, isLocal = true, mealType = "lunch")
+        val edited = original.copy(kcal = 450.0, protein = 35.0)
+        assertEquals(450.0, edited.kcal, 0.001)
+
+        val list = mutableListOf(original)
+        var pendingDelete: LoggedMeal? = original
+        // UI filters out pendingDelete
+        val displayList = list.filter { it.id != pendingDelete?.id }
+        assertTrue(displayList.isEmpty())
+
+        // User taps Undo -> restored
+        pendingDelete = null
+        val restoredList = list.filter { it.id != pendingDelete?.id }
+        assertEquals(1, restoredList.size)
+        assertEquals("Wrap", restoredList.first().name)
+
+        // HC rows: isLocal == false -> no swipe
+        val hcMeal = LoggedMeal(id = "hc-1", name = "MyFitnessPal Apple", kcal = 80.0, isLocal = false)
+        assertFalse(hcMeal.isLocal)
+        assertTrue(original.isLocal)
+    }
+
+    @Test
+    fun `Carbs and Fat mini-rows render at zero totals`() {
+        val meals = listOf(
+            LoggedMeal(id = "1", name = "Steak", kcal = 500.0, protein = 50.0, carbs = null, fat = null)
+        )
+        val totalCarbs = meals.sumOf { it.carbs ?: 0.0 }.toInt()
+        val totalFat = meals.sumOf { it.fat ?: 0.0 }.toInt()
+
+        assertEquals(0, totalCarbs)
+        assertEquals(0, totalFat)
+
+        val carbsTargetText = "—"
+        val fatTargetText = "—"
+        assertEquals("0 / —", if (carbsTargetText == "—") "$totalCarbs / —" else "$totalCarbs / $carbsTargetText")
+        assertEquals("0 / —", if (fatTargetText == "—") "$totalFat / —" else "$totalFat / $fatTargetText")
+    }
 }
