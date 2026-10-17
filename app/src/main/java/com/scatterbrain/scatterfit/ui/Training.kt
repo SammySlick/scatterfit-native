@@ -21,6 +21,7 @@ data class PlannedSet(
     val repsMin: Int? = null,
     val repsMax: Int? = null,
     val timeSecondsMin: Int? = null,
+    val timeSecondsMax: Int? = null,
     val timeUnit: String = "sec", // sec | min | hour
     val note: String? = null,
     val difficulty: String? = null, // easy | medium | hard
@@ -47,12 +48,95 @@ fun formatClockTime(seconds: Int): String {
     }
 }
 
-fun displayTimeLabel(seconds: Int?): String {
-    if (seconds == null) return ""
-    return formatClockTime(seconds)
+fun displayTimeLabel(secondsMin: Int?, secondsMax: Int? = null): String {
+    if (secondsMin == null && secondsMax == null) return ""
+    return when {
+        secondsMin != null && secondsMax != null -> {
+            "${formatClockTime(secondsMin)} - ${formatClockTime(secondsMax)}"
+        }
+        secondsMin != null -> formatClockTime(secondsMin)
+        secondsMax != null -> formatClockTime(secondsMax)
+        else -> ""
+    }
 }
 
-fun timeLabel(s: PlannedSet): String = displayTimeLabel(s.timeSecondsMin)
+fun timeLabel(s: PlannedSet): String = displayTimeLabel(s.timeSecondsMin, s.timeSecondsMax)
+
+fun parseTargetField(text: String): Pair<Int?, Int?>? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return Pair(null, null)
+
+    // Clock strings like "1:30" contain ':' and must be rejected
+    if (!trimmed.all { it.isDigit() || it == '-' || it.isWhitespace() }) {
+        return null
+    }
+
+    val dashCount = trimmed.count { it == '-' }
+    if (dashCount > 1) return null
+
+    if (dashCount == 0) {
+        val num = trimmed.filterNot { it.isWhitespace() }.toIntOrNull() ?: return null
+        return Pair(num, null)
+    }
+
+    val parts = trimmed.split('-').map { it.trim() }
+    if (parts.size != 2) return null
+
+    val leftStr = parts[0]
+    val rightStr = parts[1]
+
+    val leftNum = if (leftStr.isEmpty()) null else leftStr.toIntOrNull() ?: return null
+    val rightNum = if (rightStr.isEmpty()) null else rightStr.toIntOrNull() ?: return null
+
+    if (leftNum == null && rightNum == null) return Pair(null, null)
+
+    return Pair(leftNum, rightNum)
+}
+
+fun parseTimeTargetField(text: String, unit: String): Pair<Int?, Int?>? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return Pair(null, null)
+
+    if (!trimmed.all { it.isDigit() || it == '-' || it == '.' || it.isWhitespace() }) {
+        return null
+    }
+
+    val dashCount = trimmed.count { it == '-' }
+    if (dashCount > 1) return null
+
+    if (dashCount == 0) {
+        val sec = timeEntryToSeconds(trimmed, unit) ?: return null
+        return Pair(sec, null)
+    }
+
+    val parts = trimmed.split('-').map { it.trim() }
+    if (parts.size != 2) return null
+
+    val leftSec = if (parts[0].isEmpty()) null else timeEntryToSeconds(parts[0], unit) ?: return null
+    val rightSec = if (parts[1].isEmpty()) null else timeEntryToSeconds(parts[1], unit) ?: return null
+
+    if (leftSec == null && rightSec == null) return Pair(null, null)
+
+    return Pair(leftSec, rightSec)
+}
+
+fun formatRepsTargetEntry(minReps: Int?, maxReps: Int?): String = when {
+    minReps != null && maxReps != null -> "$minReps-$maxReps"
+    minReps != null -> "$minReps"
+    maxReps != null -> "-$maxReps"
+    else -> ""
+}
+
+fun formatTimeTargetEntry(minSec: Int?, maxSec: Int?, unit: String): String {
+    val minText = timeEntryText(minSec, unit)
+    val maxText = timeEntryText(maxSec, unit)
+    return when {
+        minText.isNotEmpty() && maxText.isNotEmpty() -> "$minText-$maxText"
+        minText.isNotEmpty() -> minText
+        maxText.isNotEmpty() -> "-$maxText"
+        else -> ""
+    }
+}
 
 fun formatTimeUnitValue(seconds: Int, timeUnit: String): String {
     return when (timeUnit.lowercase()) {
@@ -77,8 +161,20 @@ fun timeUnitSuffix(timeUnit: String): String = when (timeUnit.lowercase()) {
 }
 
 fun timeLabelScaled(s: PlannedSet, timeUnit: String = "sec"): String {
-    val sec = s.timeSecondsMin ?: return ""
-    return "${formatTimeUnitValue(sec, timeUnit)}${timeUnitSuffix(timeUnit)}"
+    val minSec = s.timeSecondsMin
+    val maxSec = s.timeSecondsMax
+    if (minSec == null && maxSec == null) return ""
+    val suffix = timeUnitSuffix(timeUnit)
+    return when {
+        minSec != null && maxSec != null -> {
+            val minFormatted = formatTimeUnitValue(minSec, timeUnit)
+            val maxFormatted = formatTimeUnitValue(maxSec, timeUnit)
+            "$minFormatted-$maxFormatted$suffix"
+        }
+        minSec != null -> "${formatTimeUnitValue(minSec, timeUnit)}$suffix"
+        maxSec != null -> "${formatTimeUnitValue(maxSec, timeUnit)}$suffix"
+        else -> ""
+    }
 }
 
 fun timeEntryText(seconds: Int?, unit: String): String {
@@ -130,12 +226,16 @@ fun cycleTimeUnit(current: String): String = when (current.lowercase()) {
 }
 
 fun setTargetLabel(s: PlannedSet, isTimed: Boolean = false): String {
-    return if (isTimed || s.timeSecondsMin != null) displayTimeLabel(s.timeSecondsMin) else repsLabel(s)
+    return if (isTimed || s.timeSecondsMin != null || s.timeSecondsMax != null) {
+        displayTimeLabel(s.timeSecondsMin, s.timeSecondsMax)
+    } else {
+        repsLabel(s)
+    }
 }
 
 fun isSetEmpty(s: PlannedSet): Boolean {
     return s.weightKg == null && s.repsMin == null && s.repsMax == null &&
-           s.timeSecondsMin == null
+           s.timeSecondsMin == null && s.timeSecondsMax == null
 }
 
 fun formatSetLine(setNumber: Int, set: PlannedSet, isTimed: Boolean): String {
@@ -150,8 +250,8 @@ fun formatSetLine(setNumber: Int, set: PlannedSet, isTimed: Boolean): String {
         return "Set $setNumber$typePart: —$noteSuffix"
     }
 
-    val targetStr = if (isTimed || set.timeSecondsMin != null) {
-        displayTimeLabel(set.timeSecondsMin)
+    val targetStr = if (isTimed || set.timeSecondsMin != null || set.timeSecondsMax != null) {
+        displayTimeLabel(set.timeSecondsMin, set.timeSecondsMax)
     } else {
         repsLabel(set)
     }
@@ -162,7 +262,7 @@ fun formatSetLine(setNumber: Int, set: PlannedSet, isTimed: Boolean): String {
 
     val core = when {
         weightStr != null && targetStr.isNotBlank() -> {
-            if (isTimed || set.timeSecondsMin != null) "$targetStr @ $weightStr" else "$weightStr × $targetStr"
+            if (isTimed || set.timeSecondsMin != null || set.timeSecondsMax != null) "$targetStr @ $weightStr" else "$weightStr × $targetStr"
         }
         targetStr.isNotBlank() -> targetStr
         weightStr != null -> weightStr
@@ -184,13 +284,14 @@ fun formatExerciseSetsSummary(exercise: RoutineExercise): List<String> {
         it.repsMin == first.repsMin &&
         it.repsMax == first.repsMax &&
         it.timeSecondsMin == first.timeSecondsMin &&
+        it.timeSecondsMax == first.timeSecondsMax &&
         it.note.isNullOrBlank()
     }
 
     if (allIdentical && first.note.isNullOrBlank()) {
         val count = sets.size
-        val targetStr = if (exercise.isTimed || first.timeSecondsMin != null) {
-            displayTimeLabel(first.timeSecondsMin)
+        val targetStr = if (exercise.isTimed || first.timeSecondsMin != null || first.timeSecondsMax != null) {
+            displayTimeLabel(first.timeSecondsMin, first.timeSecondsMax)
         } else {
             repsLabel(first)
         }
@@ -289,7 +390,7 @@ private data class LegacyPlannedSet(
     val repsMin: Int? = null,
     val repsMax: Int? = null,
     val timeSecondsMin: Int? = null,
-    val timeSecondsMax: Int? = null, // legacy, decoded then collapsed into timeSecondsMin
+    val timeSecondsMax: Int? = null,
     val timeUnit: String = "sec",
     val note: String? = null,
     val difficulty: String? = null,
@@ -299,8 +400,8 @@ private data class LegacyPlannedSet(
         weightKg = weightKg,
         repsMin = repsMin ?: reps,
         repsMax = repsMax,
-        // Time is single-value now: an old max-only entry becomes the target, an old range keeps the min
-        timeSecondsMin = timeSecondsMin ?: timeSecondsMax,
+        timeSecondsMin = timeSecondsMin,
+        timeSecondsMax = timeSecondsMax,
         timeUnit = timeUnit,
         note = note,
         difficulty = difficulty,

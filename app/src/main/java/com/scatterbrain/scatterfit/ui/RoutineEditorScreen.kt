@@ -722,248 +722,40 @@ private fun HevyExerciseCard(
                 )
             }
 
-            // Sets rows (SET | KG | REPS (min/max) or TIME (single value))
+            // Sets rows: whole-row template swap
             exercise.sets.forEachIndexed { setIndex, set ->
-                var kgText by remember(set.weightKg) {
-                    mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "")
-                }
-                var repsMinText by remember(set.repsMin) {
-                    mutableStateOf(set.repsMin?.toString() ?: "")
-                }
-                var repsMaxText by remember(set.repsMax) {
-                    mutableStateOf(set.repsMax?.toString() ?: "")
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .combinedClickable(
-                            onClick = {},
-                            onLongClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                val updated = exercise.sets.toMutableList()
-                                updated.removeAt(setIndex)
-                                onUpdateExercise(exercise.copy(sets = updated))
-                            }
-                        )
-                        .padding(vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Set # column (tap cycles normal / warmup / failure)
-                    val setBadge = when (set.type) {
-                        "warmup" -> "W"
-                        "failure" -> "F"
-                        else -> "${setIndex + 1}"
-                    }
-                    Box(
-                        modifier = Modifier
-                            .width(36.dp)
-                            .clickable {
-                                val nextType = when (set.type) {
-                                    "normal" -> "warmup"
-                                    "warmup" -> "failure"
-                                    else -> "normal"
-                                }
-                                val updated = exercise.sets.toMutableList()
-                                updated[setIndex] = set.copy(type = nextType)
-                                onUpdateExercise(exercise.copy(sets = updated))
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = setBadge,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = when (set.type) {
-                                "warmup" -> AccentTeal
-                                "failure" -> StateBad
-                                else -> TextMuted
-                            }
-                        )
-                    }
-
-                    // KG Input
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 4.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(SecondaryFill)
-                            .border(BorderStroke(1.dp, BorderInput), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        BasicTextField(
-                            value = kgText,
-                            onValueChange = { input ->
-                                val clean = input.filter { ch -> ch.isDigit() || ch == '.' }
-                                kgText = clean
-                                val updated = exercise.sets.toMutableList()
-                                updated[setIndex] = set.copy(weightKg = clean.toDoubleOrNull())
-                                onUpdateExercise(exercise.copy(sets = updated))
-                            },
-                            singleLine = true,
-                            textStyle = LocalTextStyle.current.copy(
-                                color = TextForeground,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            ),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            cursorBrush = SolidColor(TealHighlight),
-                            decorationBox = { innerTextField ->
-                                if (kgText.isEmpty()) {
-                                    Text(
-                                        text = "No Weight",
-                                        color = TextFaint,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                                innerTextField()
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // REPS or TIME Range Inputs (min required, max optional)
-                    Box(
-                        modifier = Modifier
-                            .weight(1.5f)
-                            .padding(horizontal = 4.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(SecondaryFill)
-                            .border(BorderStroke(1.dp, BorderInput), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!exercise.isTimed) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                BasicTextField(
-                                    value = repsMinText,
-                                    onValueChange = { input ->
-                                        val clean = input.filter { it.isDigit() }
-                                        repsMinText = clean
-                                        val updated = exercise.sets.toMutableList()
-                                        updated[setIndex] = set.copy(repsMin = clean.toIntOrNull())
-                                        onUpdateExercise(exercise.copy(sets = updated))
-                                    },
-                                    singleLine = true,
-                                    textStyle = LocalTextStyle.current.copy(
-                                        color = TextForeground,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        textAlign = TextAlign.Center
-                                    ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    cursorBrush = SolidColor(TealHighlight),
-                                    decorationBox = { innerTextField ->
-                                        if (repsMinText.isEmpty()) {
-                                            Text("Min", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                                        }
-                                        innerTextField()
-                                    },
-                                    modifier = Modifier.width(36.dp)
-                                )
-                                Text("–", color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 2.dp))
-                                BasicTextField(
-                                    value = repsMaxText,
-                                    onValueChange = { input ->
-                                        val clean = input.filter { it.isDigit() }
-                                        repsMaxText = clean
-                                        val updated = exercise.sets.toMutableList()
-                                        updated[setIndex] = set.copy(repsMax = clean.toIntOrNull())
-                                        onUpdateExercise(exercise.copy(sets = updated))
-                                    },
-                                    singleLine = true,
-                                    textStyle = LocalTextStyle.current.copy(
-                                        color = if (repsMaxText.isNotBlank()) TextForeground else TextMuted,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        textAlign = TextAlign.Center
-                                    ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    cursorBrush = SolidColor(TealHighlight),
-                                    decorationBox = { innerTextField ->
-                                        if (repsMaxText.isEmpty()) {
-                                            Text("Max", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                                        }
-                                        innerTextField()
-                                    },
-                                    modifier = Modifier.width(36.dp)
-                                )
-                            }
-                        } else {
-                            val setUnit = set.timeUnit.ifBlank { "sec" }
-                            var timeText by remember(set.timeSecondsMin, setUnit) {
-                                mutableStateOf(set.timeSecondsMin?.let { timeEntryText(it, setUnit) } ?: "")
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                BasicTextField(
-                                    value = timeText,
-                                    onValueChange = { input ->
-                                        val clean = input.filter { it.isDigit() || it == '.' }
-                                        timeText = clean
-                                        val seconds = timeEntryToSeconds(clean, setUnit)
-                                        val updated = exercise.sets.toMutableList()
-                                        updated[setIndex] = set.copy(timeSecondsMin = seconds)
-                                        onUpdateExercise(exercise.copy(sets = updated))
-                                    },
-                                    singleLine = true,
-                                    textStyle = LocalTextStyle.current.copy(
-                                        color = TextForeground,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        textAlign = TextAlign.Center
-                                    ),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    cursorBrush = SolidColor(TealHighlight),
-                                    decorationBox = { innerTextField ->
-                                        if (timeText.isEmpty()) {
-                                            Text("Time", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                                        }
-                                        innerTextField()
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                Spacer(modifier = Modifier.width(4.dp))
-
-                                // Inline unit selector chip inside the time field: "sec" | "min" | "hrs"
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(Color.Transparent)
-                                        .clickable {
-                                            val nextUnit = cycleTimeUnit(setUnit)
-                                            val updated = exercise.sets.toMutableList()
-                                            updated[setIndex] = set.copy(timeUnit = nextUnit)
-                                            onUpdateExercise(exercise.copy(sets = updated))
-                                        }
-                                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = timeUnitPickerLabel(setUnit),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = TealHighlight,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                            }
+                if (exercise.isTimed) {
+                    TimeSetRow(
+                        setIndex = setIndex,
+                        set = set,
+                        onUpdateSet = { updatedSet ->
+                            val updated = exercise.sets.toMutableList()
+                            updated[setIndex] = updatedSet
+                            onUpdateExercise(exercise.copy(sets = updated))
+                        },
+                        onRemoveSet = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val updated = exercise.sets.toMutableList()
+                            updated.removeAt(setIndex)
+                            onUpdateExercise(exercise.copy(sets = updated))
                         }
-                    }
+                    )
+                } else {
+                    RepSetRow(
+                        setIndex = setIndex,
+                        set = set,
+                        onUpdateSet = { updatedSet ->
+                            val updated = exercise.sets.toMutableList()
+                            updated[setIndex] = updatedSet
+                            onUpdateExercise(exercise.copy(sets = updated))
+                        },
+                        onRemoveSet = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val updated = exercise.sets.toMutableList()
+                            updated.removeAt(setIndex)
+                            onUpdateExercise(exercise.copy(sets = updated))
+                        }
+                    )
                 }
             }
 
@@ -975,20 +767,371 @@ private fun HevyExerciseCard(
                     .background(SecondaryFill)
                     .clickable {
                         val lastSet = exercise.sets.lastOrNull()
-                        val newSet = PlannedSet(
-                            type = "normal",
-                            weightKg = lastSet?.weightKg,
-                            repsMin = lastSet?.repsMin,
-                            repsMax = lastSet?.repsMax,
-                            timeSecondsMin = lastSet?.timeSecondsMin,
-                            timeUnit = lastSet?.timeUnit ?: "sec"
-                        )
+                        val newSet = if (exercise.isTimed) {
+                            PlannedSet(
+                                type = "normal",
+                                weightKg = lastSet?.weightKg,
+                                timeSecondsMin = lastSet?.timeSecondsMin,
+                                timeSecondsMax = lastSet?.timeSecondsMax,
+                                timeUnit = lastSet?.timeUnit ?: "sec"
+                            )
+                        } else {
+                            PlannedSet(
+                                type = "normal",
+                                weightKg = lastSet?.weightKg,
+                                repsMin = lastSet?.repsMin,
+                                repsMax = lastSet?.repsMax
+                            )
+                        }
                         onUpdateExercise(exercise.copy(sets = exercise.sets + newSet))
                     }
                     .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text("+ Add Set", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TealHighlight)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun RepSetRow(
+    setIndex: Int,
+    set: PlannedSet,
+    onUpdateSet: (PlannedSet) -> Unit,
+    onRemoveSet: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var kgText by remember(set.weightKg) {
+        mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "")
+    }
+    var targetText by remember(set.repsMin, set.repsMax) {
+        mutableStateOf(formatRepsTargetEntry(set.repsMin, set.repsMax))
+    }
+    var isTargetError by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onRemoveSet
+            )
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Set # column (tap cycles normal / warmup / failure)
+        val setBadge = when (set.type) {
+            "warmup" -> "W"
+            "failure" -> "F"
+            else -> "${setIndex + 1}"
+        }
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .clickable {
+                    val nextType = when (set.type) {
+                        "normal" -> "warmup"
+                        "warmup" -> "failure"
+                        else -> "normal"
+                    }
+                    onUpdateSet(set.copy(type = nextType))
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = setBadge,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = when (set.type) {
+                    "warmup" -> AccentTeal
+                    "failure" -> StateBad
+                    else -> TextMuted
+                }
+            )
+        }
+
+        // KG Input
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 4.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(SecondaryFill)
+                .border(BorderStroke(1.dp, BorderInput), RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            BasicTextField(
+                value = kgText,
+                onValueChange = { input ->
+                    val clean = input.filter { ch -> ch.isDigit() || ch == '.' }
+                    kgText = clean
+                    onUpdateSet(set.copy(weightKg = clean.toDoubleOrNull()))
+                },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(
+                    color = TextForeground,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                cursorBrush = SolidColor(TealHighlight),
+                decorationBox = { innerTextField ->
+                    if (kgText.isEmpty()) {
+                        Text(
+                            text = "No Weight",
+                            color = TextFaint,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    innerTextField()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Single Reps Target Input (e.g. "8-12" or "8")
+        Box(
+            modifier = Modifier
+                .weight(1.5f)
+                .padding(horizontal = 4.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(SecondaryFill)
+                .border(
+                    BorderStroke(1.dp, if (isTargetError) StateBad else BorderInput),
+                    RoundedCornerShape(6.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            BasicTextField(
+                value = targetText,
+                onValueChange = { input ->
+                    targetText = input
+                    val parsed = parseTargetField(input)
+                    if (parsed != null) {
+                        isTargetError = false
+                        onUpdateSet(set.copy(repsMin = parsed.first, repsMax = parsed.second))
+                    } else {
+                        isTargetError = true
+                    }
+                },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(
+                    color = TextForeground,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                cursorBrush = SolidColor(TealHighlight),
+                decorationBox = { innerTextField ->
+                    if (targetText.isEmpty()) {
+                        Text(
+                            text = "8-12",
+                            color = TextFaint,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    innerTextField()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun TimeSetRow(
+    setIndex: Int,
+    set: PlannedSet,
+    onUpdateSet: (PlannedSet) -> Unit,
+    onRemoveSet: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val setUnit = set.timeUnit.ifBlank { "sec" }
+    var kgText by remember(set.weightKg) {
+        mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "")
+    }
+    var targetText by remember(set.timeSecondsMin, set.timeSecondsMax, setUnit) {
+        mutableStateOf(formatTimeTargetEntry(set.timeSecondsMin, set.timeSecondsMax, setUnit))
+    }
+    var isTargetError by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = {},
+                onLongClick = onRemoveSet
+            )
+            .padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Set # column (tap cycles normal / warmup / failure)
+        val setBadge = when (set.type) {
+            "warmup" -> "W"
+            "failure" -> "F"
+            else -> "${setIndex + 1}"
+        }
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .clickable {
+                    val nextType = when (set.type) {
+                        "normal" -> "warmup"
+                        "warmup" -> "failure"
+                        else -> "normal"
+                    }
+                    onUpdateSet(set.copy(type = nextType))
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = setBadge,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = when (set.type) {
+                    "warmup" -> AccentTeal
+                    "failure" -> StateBad
+                    else -> TextMuted
+                }
+            )
+        }
+
+        // KG Input
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 4.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(SecondaryFill)
+                .border(BorderStroke(1.dp, BorderInput), RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            BasicTextField(
+                value = kgText,
+                onValueChange = { input ->
+                    val clean = input.filter { ch -> ch.isDigit() || ch == '.' }
+                    kgText = clean
+                    onUpdateSet(set.copy(weightKg = clean.toDoubleOrNull()))
+                },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(
+                    color = TextForeground,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                cursorBrush = SolidColor(TealHighlight),
+                decorationBox = { innerTextField ->
+                    if (kgText.isEmpty()) {
+                        Text(
+                            text = "No Weight",
+                            color = TextFaint,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    innerTextField()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Single Time Target Input with inline unit selector
+        Box(
+            modifier = Modifier
+                .weight(1.5f)
+                .padding(horizontal = 4.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(SecondaryFill)
+                .border(
+                    BorderStroke(1.dp, if (isTargetError) StateBad else BorderInput),
+                    RoundedCornerShape(6.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                BasicTextField(
+                    value = targetText,
+                    onValueChange = { input ->
+                        targetText = input
+                        val parsed = parseTimeTargetField(input, setUnit)
+                        if (parsed != null) {
+                            isTargetError = false
+                            onUpdateSet(set.copy(timeSecondsMin = parsed.first, timeSecondsMax = parsed.second))
+                        } else {
+                            isTargetError = true
+                        }
+                    },
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(
+                        color = TextForeground,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    cursorBrush = SolidColor(TealHighlight),
+                    decorationBox = { innerTextField ->
+                        if (targetText.isEmpty()) {
+                            Text(
+                                text = "30-45",
+                                color = TextFaint,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Normal,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        innerTextField()
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Inline unit selector chip: "sec" | "min" | "hrs"
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.Transparent)
+                        .clickable {
+                            val nextUnit = cycleTimeUnit(setUnit)
+                            onUpdateSet(set.copy(timeUnit = nextUnit))
+                        }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = timeUnitPickerLabel(setUnit),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TealHighlight,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
             }
         }
     }
