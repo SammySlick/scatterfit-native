@@ -1608,7 +1608,8 @@ private fun LiveFoodSearchResults(
     modifier: Modifier = Modifier,
 ) {
     val q = query.trim().lowercase()
-    val genericFoodsList = OpenFoodFactsClient.GENERIC_FOODS
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val genericFoodsList = remember(context) { OpenFoodFactsClient.loadGenericFoods(context) }
 
     val matchedPresets = presets.filter { it.name.lowercase().contains(q) }
     val matchedFavourites = favourites.filter { it.name.lowercase().contains(q) }

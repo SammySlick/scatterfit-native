@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OpenFoodFactsTest {
@@ -317,5 +318,56 @@ class OpenFoodFactsTest {
         assertEquals(250.0, presets[2].amount, 0.001)
         assertEquals("2 slices (60g)", presets[3].label)
         assertEquals(60.0, presets[3].amount, 0.001)
+    }
+
+    @Test
+    fun `generic foods library has exactly 120 items and validates spot checks and search queries`() {
+        val list = OpenFoodFactsClient.loadGenericFoods()
+        assertEquals("Generic foods library must contain exactly 120 items", 120, list.size)
+
+        // All entries have brand "Generic"
+        assertTrue(list.all { it.brands == "Generic" })
+
+        // Search hits:
+        val chickenHits = list.filter { it.productName?.lowercase()?.contains("chicken") == true }
+        assertTrue("chicken hits >= 3 (was ${chickenHits.size})", chickenHits.size >= 3)
+
+        val milkHits = list.filter { it.productName?.lowercase()?.contains("milk") == true }
+        assertTrue("milk hits >= 5 (was ${milkHits.size})", milkHits.size >= 5)
+
+        val riceHits = list.filter { it.productName?.lowercase()?.contains("rice") == true }
+        assertTrue("rice hits >= 3 (was ${riceHits.size})", riceHits.size >= 3)
+
+        val breadHits = list.filter { it.productName?.lowercase()?.contains("bread") == true }
+        assertTrue("bread hits >= 3 (was ${breadHits.size})", breadHits.size >= 3)
+
+        // Spot-check values:
+        // 1. Chicken breast == 106 kcal / 23.1 P
+        val chickenBreast = list.first { it.productName.equals("Chicken breast", ignoreCase = true) }
+        assertEquals(106.0, chickenBreast.basePer100g.kcal, 0.001)
+        assertEquals(23.1, chickenBreast.basePer100g.protein, 0.001)
+        assertEquals("g", chickenBreast.inferredUnit)
+
+        // 2. Olive oil == 824 kcal
+        val oliveOil = list.first { it.productName.equals("Olive oil", ignoreCase = true) }
+        assertEquals(824.0, oliveOil.basePer100g.kcal, 0.001)
+        assertEquals("ml", oliveOil.inferredUnit)
+
+        // 3. Semi-skimmed milk == 47 / 3.6
+        val milk = list.first { it.productName.equals("Semi-skimmed milk", ignoreCase = true) }
+        assertEquals(47.0, milk.basePer100g.kcal, 0.001)
+        assertEquals(3.6, milk.basePer100g.protein, 0.001)
+        assertEquals("ml", milk.inferredUnit)
+
+        // 4. Whey protein powder == 380 / 80.0
+        val whey = list.first { it.productName.equals("Whey protein powder", ignoreCase = true) }
+        assertEquals(380.0, whey.basePer100g.kcal, 0.001)
+        assertEquals(80.0, whey.basePer100g.protein, 0.001)
+        assertEquals("g", whey.inferredUnit)
+
+        // Macro scaling maths on generic food item identical to OFF path (e.g. 200g of chicken breast -> 212 kcal, 46.2 P)
+        val scaledChicken = scaleNutriments(chickenBreast.basePer100g, 200.0)
+        assertEquals(212.0, scaledChicken.kcal, 0.001)
+        assertEquals(46.2, scaledChicken.protein, 0.001)
     }
 }

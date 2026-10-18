@@ -1,6 +1,8 @@
 package com.scatterbrain.scatterfit.data
 
+import android.content.Context
 import android.util.Log
+import com.scatterbrain.scatterfit.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -10,6 +12,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
@@ -104,6 +107,9 @@ fun inferPortionUnit(
         Regex("""\d+\s*l\b""").containsMatchIn(sizeText)
     ) {
         return "ml"
+    }
+    if (Regex("""\b(g|kg)\b""").containsMatchIn(sizeText)) {
+        return "g"
     }
 
     val textToSearch = listOfNotNull(name, category).joinToString(" ").lowercase()
@@ -240,6 +246,14 @@ fun derivePortionPresets(product: ProductResult): List<PortionPreset> {
     return list
 }
 
+private fun debugLog(tag: String, msg: String) {
+    try {
+        Log.d(tag, msg)
+    } catch (_: Throwable) {
+        println("[$tag] $msg")
+    }
+}
+
 @Serializable
 data class ProductResult(
     val code: String = "",
@@ -267,20 +281,20 @@ data class ProductResult(
         get() {
             val parsed = servingQuantityGrams
             if (parsed != null && parsed > 0.0) {
-                Log.d("OFF", "Serving size resolved from serving_quantity: $parsed")
+                debugLog("OFF", "Serving size resolved from serving_quantity: $parsed")
                 return parsed
             }
             val fromServingSize = parseServingSize(servingSize)?.amount
             if (fromServingSize != null && fromServingSize > 0.0) {
-                Log.d("OFF", "Serving size resolved from serving_size: $fromServingSize")
+                debugLog("OFF", "Serving size resolved from serving_size: $fromServingSize")
                 return fromServingSize
             }
             val fromQuantity = parseServingSize(quantity)?.amount
             if (fromQuantity != null && fromQuantity > 0.0) {
-                Log.d("OFF", "Serving size resolved from quantity: $fromQuantity")
+                debugLog("OFF", "Serving size resolved from quantity: $fromQuantity")
                 return fromQuantity
             }
-            Log.d("OFF", "Serving size resolved to fallback: 100.0")
+            debugLog("OFF", "Serving size resolved to fallback: 100.0")
             return 100.0
         }
 
@@ -353,57 +367,82 @@ data class BarcodeResponse(
 )
 
 
+@Serializable
+data class GenericFoodItem(
+    val name: String,
+    val unit: String,
+    val kcal: Double,
+    val protein: Double,
+    val carbs: Double,
+    val fat: Double,
+)
+
 object OpenFoodFactsClient {
-    val GENERIC_FOODS: List<ProductResult> = listOf(
-        ProductResult(
-            code = "generic_chicken_breast",
-            productName = "Chicken Breast",
-            brands = "Generic",
-            categories = "generic",
-            nutriments = OffNutriments(
-                energyKcal_100g = 165.0,
-                proteins_100g = 31.0,
-                carbohydrates_100g = 0.0,
-                fat_100g = 3.6
-            )
-        ),
-        ProductResult(
-            code = "generic_brown_rice",
-            productName = "Brown Rice",
-            brands = "Generic",
-            categories = "generic",
-            nutriments = OffNutriments(
-                energyKcal_100g = 111.0,
-                proteins_100g = 2.6,
-                carbohydrates_100g = 23.0,
-                fat_100g = 0.9
-            )
-        ),
-        ProductResult(
-            code = "generic_eggs",
-            productName = "Eggs",
-            brands = "Generic",
-            categories = "generic",
-            nutriments = OffNutriments(
-                energyKcal_100g = 143.0,
-                proteins_100g = 12.6,
-                carbohydrates_100g = 0.7,
-                fat_100g = 9.5
-            )
-        ),
-        ProductResult(
-            code = "generic_semi_skimmed_milk",
-            productName = "Semi-Skimmed Milk",
-            brands = "Generic",
-            categories = "generic",
-            nutriments = OffNutriments(
-                energyKcal_100g = 47.0,
-                proteins_100g = 3.4,
-                carbohydrates_100g = 4.8,
-                fat_100g = 1.5
-            )
-        )
-    )
+    private var cachedGenericFoods: List<ProductResult>? = null
+
+    val GENERIC_FOODS: List<ProductResult>
+        get() = loadGenericFoods()
+
+    fun parseGenericFoodsJson(jsonText: String): List<ProductResult> {
+        return try {
+            json.decodeFromString<List<GenericFoodItem>>(jsonText).map { item ->
+                val codeSafe = "generic_" + item.name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+                ProductResult(
+                    code = codeSafe,
+                    productName = item.name,
+                    brands = "Generic",
+                    categories = "generic",
+                    servingSize = "100 ${item.unit}",
+                    servingQuantity = JsonPrimitive(100.0),
+                    nutriments = OffNutriments(
+                        energyKcal_100g = item.kcal,
+                        proteins_100g = item.protein,
+                        carbohydrates_100g = item.carbs,
+                        fat_100g = item.fat,
+                    )
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun loadGenericFoods(context: Context? = null): List<ProductResult> {
+        val existing = cachedGenericFoods
+        if (existing != null) return existing
+
+        val text: String? = if (context != null) {
+            try {
+                context.resources.openRawResource(R.raw.generic_foods).bufferedReader().use { it.readText() }
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+
+        val resolvedText = text ?: run {
+            val file = File("src/main/res/raw/generic_foods.json")
+            val altFile = File("app/src/main/res/raw/generic_foods.json")
+            val target = if (file.exists()) file else altFile
+            if (target.exists()) {
+                try { target.readText() } catch (_: Exception) { null }
+            } else {
+                try {
+                    OpenFoodFactsClient::class.java.classLoader?.getResourceAsStream("raw/generic_foods.json")?.bufferedReader()?.use { it.readText() }
+                } catch (_: Exception) { null }
+            }
+        }
+
+        val items = if (resolvedText != null) {
+            parseGenericFoodsJson(resolvedText)
+        } else {
+            emptyList()
+        }
+
+        if (items.isNotEmpty()) {
+            cachedGenericFoods = items
+        }
+        return items
+    }
     private const val BASE_URL = "https://world.openfoodfacts.org"
     private const val FIELDS = "code,product_name,brands,quantity,nutriments,images_url,serving_size,serving_quantity,categories"
     private const val USER_AGENT = "ScatterFit - Android - Version 1.0"
