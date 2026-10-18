@@ -92,6 +92,28 @@ class FoodLoggerTest {
     }
 
     @Test
+    fun `undoing a meal deletion re-adds it correctly`() {
+        val viewModel = FoodTrackerViewModel()
+        val meal = LoggedMeal(
+            id = "meal-x",
+            name = "Test Meal",
+            kcal = 500.0,
+            timestamp = nowMs,
+            dayKey = today
+        )
+        viewModel.logCustomMeal(meal)
+        assertEquals(1, viewModel.mealsForDay.value.size)
+
+        viewModel.deleteMeal(meal.id)
+        assertTrue(viewModel.mealsForDay.value.isEmpty())
+
+        // undo re-logs the exact same meal
+        viewModel.logCustomMeal(meal)
+        assertEquals(1, viewModel.mealsForDay.value.size)
+        assertEquals("meal-x", viewModel.mealsForDay.value.first().id)
+    }
+
+    @Test
     fun `preset derivation duplicates dedupe, recency ordering, cap at 8`() {
         val list = mutableListOf<LoggedMeal>()
 

@@ -1,5 +1,6 @@
 package com.scatterbrain.scatterfit.data
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -182,49 +183,41 @@ fun formatAmount(value: Double): String {
 }
 
 fun derivePortionPresets(product: ProductResult): List<PortionPreset> {
-    val sq = product.servingQuantityOrFallback
     val unit = product.inferredUnit
     val list = mutableListOf<PortionPreset>()
 
-    // 1. Whole packet/bottle
-    val wholeLabel = "Whole (${formatAmount(sq)} $unit)"
-    val wholePortionLabel = "${formatAmount(sq)} $unit"
+    // 1. 50
     list.add(
         PortionPreset(
-            id = "whole",
-            label = wholeLabel,
-            amount = sq,
+            id = "50",
+            label = "50 $unit",
+            amount = 50.0,
             unit = unit,
-            portionLabel = wholePortionLabel
+            portionLabel = "50 $unit"
         )
     )
 
-    // 2. Half
-    val halfAmount = sq / 2.0
-    val halfLabel = "Half (${formatAmount(halfAmount)} $unit)"
-    val halfPortionLabel = "${formatAmount(halfAmount)} $unit"
+    // 2. 100
     list.add(
         PortionPreset(
-            id = "half",
-            label = halfLabel,
-            amount = halfAmount,
+            id = "100",
+            label = "100 $unit",
+            amount = 100.0,
             unit = unit,
-            portionLabel = halfPortionLabel
+            portionLabel = "100 $unit"
         )
     )
 
-    // 3. 100 g / 100 ml (if different from whole and half)
-    if (kotlin.math.abs(sq - 100.0) > 0.5 && kotlin.math.abs(halfAmount - 100.0) > 0.5) {
-        list.add(
-            PortionPreset(
-                id = "100",
-                label = "100 $unit",
-                amount = 100.0,
-                unit = unit,
-                portionLabel = "100 $unit"
-            )
+    // 3. 250
+    list.add(
+        PortionPreset(
+            id = "250",
+            label = "250 $unit",
+            amount = 250.0,
+            unit = unit,
+            portionLabel = "250 $unit"
         )
-    }
+    )
 
     // 4. Sane household serving from serving_size (e.g. "2 slices (60g)")
     val parsed = parseServingSize(product.servingSize)
@@ -273,9 +266,21 @@ data class ProductResult(
     val servingQuantityOrFallback: Double
         get() {
             val parsed = servingQuantityGrams
-            if (parsed != null && parsed > 0.0) return parsed
+            if (parsed != null && parsed > 0.0) {
+                Log.d("OFF", "Serving size resolved from serving_quantity: $parsed")
+                return parsed
+            }
             val fromServingSize = parseServingSize(servingSize)?.amount
-            if (fromServingSize != null && fromServingSize > 0.0) return fromServingSize
+            if (fromServingSize != null && fromServingSize > 0.0) {
+                Log.d("OFF", "Serving size resolved from serving_size: $fromServingSize")
+                return fromServingSize
+            }
+            val fromQuantity = parseServingSize(quantity)?.amount
+            if (fromQuantity != null && fromQuantity > 0.0) {
+                Log.d("OFF", "Serving size resolved from quantity: $fromQuantity")
+                return fromQuantity
+            }
+            Log.d("OFF", "Serving size resolved to fallback: 100.0")
             return 100.0
         }
 
@@ -347,7 +352,58 @@ data class BarcodeResponse(
     val status: Int = 0,
 )
 
+
 object OpenFoodFactsClient {
+    val GENERIC_FOODS: List<ProductResult> = listOf(
+        ProductResult(
+            code = "generic_chicken_breast",
+            productName = "Chicken Breast",
+            brands = "Generic",
+            categories = "generic",
+            nutriments = OffNutriments(
+                energyKcal_100g = 165.0,
+                proteins_100g = 31.0,
+                carbohydrates_100g = 0.0,
+                fat_100g = 3.6
+            )
+        ),
+        ProductResult(
+            code = "generic_brown_rice",
+            productName = "Brown Rice",
+            brands = "Generic",
+            categories = "generic",
+            nutriments = OffNutriments(
+                energyKcal_100g = 111.0,
+                proteins_100g = 2.6,
+                carbohydrates_100g = 23.0,
+                fat_100g = 0.9
+            )
+        ),
+        ProductResult(
+            code = "generic_eggs",
+            productName = "Eggs",
+            brands = "Generic",
+            categories = "generic",
+            nutriments = OffNutriments(
+                energyKcal_100g = 143.0,
+                proteins_100g = 12.6,
+                carbohydrates_100g = 0.7,
+                fat_100g = 9.5
+            )
+        ),
+        ProductResult(
+            code = "generic_semi_skimmed_milk",
+            productName = "Semi-Skimmed Milk",
+            brands = "Generic",
+            categories = "generic",
+            nutriments = OffNutriments(
+                energyKcal_100g = 47.0,
+                proteins_100g = 3.4,
+                carbohydrates_100g = 4.8,
+                fat_100g = 1.5
+            )
+        )
+    )
     private const val BASE_URL = "https://world.openfoodfacts.org"
     private const val FIELDS = "code,product_name,brands,quantity,nutriments,images_url,serving_size,serving_quantity,categories"
     private const val USER_AGENT = "ScatterFit - Android - Version 1.0"

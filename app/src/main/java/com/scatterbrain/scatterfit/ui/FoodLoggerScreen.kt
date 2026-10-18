@@ -142,6 +142,7 @@ fun FoodLoggerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .padding(bottom = 16.dp)
         ) {
             // Top Bar
             Row(

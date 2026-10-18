@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.input.KeyboardType
 import com.scatterbrain.scatterfit.data.DailyRepository
+import com.scatterbrain.scatterfit.data.OffNutriments
 import com.scatterbrain.scatterfit.data.OpenFoodFactsClient
 import com.scatterbrain.scatterfit.data.ProductResult
 import com.scatterbrain.scatterfit.data.derivePortionPresets
@@ -99,7 +100,7 @@ import kotlin.math.roundToInt
 
 enum class MacroCardMode { CONSUMED, REMAINING }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun FoodHomeScreen(
     viewModel: FoodTrackerViewModel,
@@ -144,21 +145,15 @@ fun FoodHomeScreen(
                 delay(1000L)
                 undoSecondsRemaining--
             }
-            val toDelete = pendingDeletedMeal
-            if (toDelete != null) {
-                viewModel.deleteMeal(toDelete.id)
+            if (pendingDeletedMeal != null) {
                 pendingDeletedMeal = null
             }
         }
     }
 
-    // Display meals excludes pending delete
-    val displayMeals = remember(allCombinedMeals, pendingDeletedMeal) {
-        if (pendingDeletedMeal != null) {
-            allCombinedMeals.filter { it.id != pendingDeletedMeal!!.id }
-        } else {
-            allCombinedMeals
-        }
+    // Display meals
+    val displayMeals = remember(allCombinedMeals) {
+        allCombinedMeals
     }
 
     var macroMode by remember { mutableStateOf(MacroCardMode.CONSUMED) }
@@ -169,16 +164,20 @@ fun FoodHomeScreen(
     }
 
     // Inline logging / entry mode
-    var isLoggerOpen by remember { mutableStateOf(false) }
     var editingMealId by remember { mutableStateOf<String?>(null) }
 
     // Search bar & OFF states
     var searchQuery by remember { mutableStateOf("") }
     var showBarcodeScanner by remember { mutableStateOf(false) }
+    var barcodeNotFound by remember { mutableStateOf(false) }
     var pendingConfirmProduct by remember { mutableStateOf<ProductResult?>(null) }
     var offResults by remember { mutableStateOf<List<ProductResult>>(emptyList()) }
     var isSearchingOff by remember { mutableStateOf(false) }
     var searchHasExecuted by remember { mutableStateOf(false) }
+
+    // Bottom sheet state for the "+" button
+    var activeBottomSheetMealType by remember { mutableStateOf<String?>(null) }
+    val isBottomSheetOpen = activeBottomSheetMealType != null
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -208,9 +207,11 @@ fun FoodHomeScreen(
                     val product = OpenFoodFactsClient.lookupBarcode(barcode)
                     if (product != null) {
                         pendingConfirmProduct = product
+                        barcodeNotFound = false
                     } else {
-                        searchQuery = barcode
+                        barcodeNotFound = true
                     }
+                    searchQuery = "" // Clear the query field in both cases
                 }
             },
             onDismiss = { showBarcodeScanner = false }
@@ -257,6 +258,7 @@ fun FoodHomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .padding(bottom = 16.dp)
         ) {
             // Top Bar
             Row(
@@ -519,6 +521,7 @@ fun FoodHomeScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             TextButton(onClick = {
+                                pendingDeletedMeal?.let { viewModel.logCustomMeal(it) }
                                 pendingDeletedMeal = null
                             }) {
                                 Text("Undo", color = TealHighlight, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -527,127 +530,7 @@ fun FoodHomeScreen(
                     }
                 }
 
-                // If Logger is toggled open -> show the full manual entry form inline
-                if (isLoggerOpen) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = SecondaryFill),
-                        border = BorderStroke(1.dp, BorderDefault)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (editingMealId != null) "EDIT MEAL" else "LOG MEAL (${viewModel.mealTypeInput.uppercase()})",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TealHighlight
-                                )
-                                TextButton(onClick = {
-                                    isLoggerOpen = false
-                                    editingMealId = null
-                                }) {
-                                    Text("✕ Close", color = TextMuted, fontSize = 12.sp)
-                                }
-                            }
-
-                            // Presets chips if any
-                            if (presets.isNotEmpty() && editingMealId == null) {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    presets.take(4).forEach { p ->
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(DarkCardSurface)
-                                                .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
-                                                .clickable { viewModel.applyPreset(p) }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) {
-                                            Text("${p.name} · ${p.kcal.toInt()} kcal", fontSize = 10.sp, color = TextForeground)
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Manual input fields
-                            OutlinedTextField(
-                                value = viewModel.mealName,
-                                onValueChange = { viewModel.mealName = it },
-                                label = { Text("Meal name (optional)", color = TextMuted) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = TextForeground,
-                                    unfocusedTextColor = TextForeground,
-                                    focusedBorderColor = TealHighlight,
-                                    unfocusedBorderColor = BorderInput
-                                )
-                            )
-
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = viewModel.kcalInput,
-                                    onValueChange = { input -> viewModel.kcalInput = input.filter { it.isDigit() || it == '.' } },
-                                    label = { Text("Calories *", color = TextMuted) },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = TextForeground,
-                                        unfocusedTextColor = TextForeground,
-                                        focusedBorderColor = TealHighlight,
-                                        unfocusedBorderColor = BorderInput
-                                    )
-                                )
-
-                                OutlinedTextField(
-                                    value = viewModel.proteinInput,
-                                    onValueChange = { input -> viewModel.proteinInput = input.filter { it.isDigit() || it == '.' } },
-                                    label = { Text("Protein (g)", color = TextMuted) },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = TextForeground,
-                                        unfocusedTextColor = TextForeground,
-                                        focusedBorderColor = TealHighlight,
-                                        unfocusedBorderColor = BorderInput
-                                    )
-                                )
-                            }
-
-                            Button(
-                                onClick = {
-                                    val priorId = editingMealId
-                                    if (priorId != null) {
-                                        viewModel.deleteMeal(priorId)
-                                        editingMealId = null
-                                    }
-                                    if (viewModel.saveCurrentMeal()) {
-                                        isLoggerOpen = false
-                                    }
-                                },
-                                enabled = viewModel.kcalInput.isNotBlank(),
-                                colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black),
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text(if (editingMealId != null) "Update Meal" else "Save Meal", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
+                // Remove the old Logger UI block completely.
                 // 3. "FOOD LOG" section header (Bold, 20sp)
                 Text(
                     text = "FOOD LOG",
@@ -657,13 +540,16 @@ fun FoodHomeScreen(
                     letterSpacing = 1.sp
                 )
 
-                // 4. SEARCH BAR POSITION: Moved directly between "FOOD LOG" header and the Breakfast section card
-                SearchBarField(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    onCameraClick = { showBarcodeScanner = true },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // 4. SEARCH BAR POSITION: Moved to bottom sheet
+
+                if (barcodeNotFound) {
+                    Text(
+                        text = "Barcode not found",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+                    )
+                }
 
                 // In-place Confirm Sheet for Scanned or Selected OFF Product
                 if (pendingConfirmProduct != null) {
@@ -679,34 +565,7 @@ fun FoodHomeScreen(
                     )
                 }
 
-                // Live search results (local favourites/presets/recipes + Open Food Facts products)
-                if (searchQuery.isNotBlank() && pendingConfirmProduct == null) {
-                    LiveFoodSearchResults(
-                        query = searchQuery,
-                        presets = presets,
-                        favourites = favourites,
-                        recipes = recipes,
-                        offResults = offResults,
-                        isSearchingOff = isSearchingOff,
-                        searchHasExecuted = searchHasExecuted,
-                        onSelectPreset = { preset ->
-                            viewModel.applyPreset(preset)
-                            isLoggerOpen = true
-                            searchQuery = ""
-                        },
-                        onSelectFavourite = { fav ->
-                            viewModel.logFavourite(fav)
-                            searchQuery = ""
-                        },
-                        onSelectRecipe = { recipe ->
-                            viewModel.logRecipePortion(recipe)
-                            searchQuery = ""
-                        },
-                        onSelectOffProduct = { product ->
-                            pendingConfirmProduct = product
-                        }
-                    )
-                }
+                // Live search results (local favourites/presets/recipes + Open Food Facts products) moved to bottom sheet
 
                 // Meal Sections: BREAKFAST / LUNCH / DINNER / SNACKS
                 val sections = listOf("breakfast", "lunch", "dinner", "snacks")
@@ -738,25 +597,175 @@ fun FoodHomeScreen(
                         onAddClick = {
                             viewModel.mealTypeInput = sectionKey
                             editingMealId = null
-                            isLoggerOpen = true
+                            searchQuery = "" // Reset search for new sheet
+                            activeBottomSheetMealType = sectionKey
                         },
                         onEditMeal = { mealToEdit ->
-                            viewModel.mealName = mealToEdit.name
-                            viewModel.kcalInput = if (mealToEdit.kcal % 1.0 == 0.0) "${mealToEdit.kcal.toInt()}" else "${mealToEdit.kcal}"
-                            viewModel.proteinInput = mealToEdit.protein?.let { if (it % 1.0 == 0.0) "${it.toInt()}" else "$it" } ?: ""
-                            viewModel.carbsInput = mealToEdit.carbs?.let { if (it % 1.0 == 0.0) "${it.toInt()}" else "$it" } ?: ""
-                            viewModel.fatInput = mealToEdit.fat?.let { if (it % 1.0 == 0.0) "${it.toInt()}" else "$it" } ?: ""
                             viewModel.mealTypeInput = mealToEdit.mealType
                             editingMealId = mealToEdit.id
-                            isLoggerOpen = true
+                            
+                            val portion = mealToEdit.portionGrams ?: 100.0
+                            val ratio = if (portion > 0) 100.0 / portion else 1.0
+
+                            val derivedNutriments = OffNutriments(
+                                energyKcal_100g = mealToEdit.kcal * ratio,
+                                proteins_100g = mealToEdit.protein?.let { it * ratio },
+                                carbohydrates_100g = mealToEdit.carbs?.let { it * ratio },
+                                fat_100g = mealToEdit.fat?.let { it * ratio }
+                            )
+
+                            pendingConfirmProduct = ProductResult(
+                                code = mealToEdit.id,
+                                productName = mealToEdit.name,
+                                nutriments = derivedNutriments,
+                                servingQuantity = kotlinx.serialization.json.JsonPrimitive(portion)
+                            )
                         },
                         onDeleteMeal = { mealToDelete ->
+                            viewModel.deleteMeal(mealToDelete.id)
                             pendingDeletedMeal = mealToDelete
                         }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(80.dp))
+            }
+        }
+    }
+
+    if (isBottomSheetOpen) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { activeBottomSheetMealType = null },
+            containerColor = DarkCardSurface,
+            dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(color = BorderDefault) }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                val mealTypeDisplay = activeBottomSheetMealType?.replaceFirstChar { it.uppercase() } ?: "Meal"
+                Text(
+                    text = "Log $mealTypeDisplay",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextForeground
+                )
+
+                SearchBarField(
+                    query = searchQuery,
+                    onQueryChange = {
+                        searchQuery = it
+                        barcodeNotFound = false
+                    },
+                    onCameraClick = {
+                        activeBottomSheetMealType = null
+                        showBarcodeScanner = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Button(
+                    onClick = { /* Quick Log logic to come */ },
+                    enabled = false,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SecondaryFill,
+                        contentColor = TextMuted,
+                        disabledContainerColor = SecondaryFill,
+                        disabledContentColor = TextMuted.copy(alpha = 0.5f)
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Quick Log (Coming Soon)", fontWeight = FontWeight.SemiBold)
+                }
+
+                if (searchQuery.isNotBlank()) {
+                    LiveFoodSearchResults(
+                        query = searchQuery,
+                        presets = presets,
+                        favourites = favourites,
+                        recipes = recipes,
+                        offResults = offResults,
+                        isSearchingOff = isSearchingOff,
+                        searchHasExecuted = searchHasExecuted,
+                        onSelectPreset = { preset ->
+                            val derivedNutriments = OffNutriments(
+                                energyKcal_100g = preset.kcal,
+                                proteins_100g = preset.protein,
+                                carbohydrates_100g = preset.carbs,
+                                fat_100g = preset.fat
+                            )
+                            pendingConfirmProduct = ProductResult(
+                                code = "preset_${preset.name}",
+                                productName = preset.name,
+                                nutriments = derivedNutriments,
+                                servingQuantity = kotlinx.serialization.json.JsonPrimitive(100.0)
+                            )
+                            activeBottomSheetMealType = null
+                            searchQuery = ""
+                        },
+                        onSelectFavourite = { fav ->
+                            viewModel.logFavourite(fav)
+                            activeBottomSheetMealType = null
+                            searchQuery = ""
+                        },
+                        onSelectRecipe = { recipe ->
+                            viewModel.logRecipePortion(recipe)
+                            activeBottomSheetMealType = null
+                            searchQuery = ""
+                        },
+                        onSelectOffProduct = { product ->
+                            pendingConfirmProduct = product
+                            activeBottomSheetMealType = null
+                        }
+                    )
+                } else {
+                    // "Recents"
+                    Text("Recents", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextForeground)
+                    val recents = presets.filter { it.kcal > 0 } // Very simple fallback to presets for recents
+                    if (recents.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            recents.take(5).forEach { p ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(SecondaryFill)
+                                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            val derivedNutriments = OffNutriments(
+                                                energyKcal_100g = p.kcal,
+                                                proteins_100g = p.protein,
+                                                carbohydrates_100g = p.carbs,
+                                                fat_100g = p.fat
+                                            )
+                                            pendingConfirmProduct = ProductResult(
+                                                code = "preset_${p.name}",
+                                                productName = p.name,
+                                                nutriments = derivedNutriments,
+                                                servingQuantity = kotlinx.serialization.json.JsonPrimitive(100.0)
+                                            )
+                                            activeBottomSheetMealType = null
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text("${p.name} · ${p.kcal.toInt()} kcal", fontSize = 11.sp, color = TextForeground)
+                                }
+                            }
+                        }
+                    } else {
+                        Text("No recent foods", fontSize = 12.sp, color = TextMuted)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Generic Foods", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextForeground)
+                    Text("Coming next...", fontSize = 12.sp, color = TextMuted)
+                }
             }
         }
     }
@@ -1197,6 +1206,13 @@ fun ConfirmProductCard(
         scaleNutriments(product.basePer100g, resolvedGramsOrMl)
     }
 
+    val isManualEntry = product.code == "manual_entry" || (product.nutriments.energyKcal_100g == null && product.nutriments.energyKcal == null && product.nutriments.energy_100g == null)
+    var manualName by remember(product) { mutableStateOf(product.productName ?: "") }
+    var manualKcal by remember(product) { mutableStateOf(if (scaled.kcal > 0) scaled.kcal.roundToInt().toString() else "") }
+    var manualProtein by remember(product) { mutableStateOf(if ((scaled.protein ?: 0.0) > 0) scaled.protein?.roundToInt()?.toString() ?: "" else "") }
+    var manualCarbs by remember(product) { mutableStateOf(if ((scaled.carbs ?: 0.0) > 0) scaled.carbs?.roundToInt()?.toString() ?: "" else "") }
+    var manualFat by remember(product) { mutableStateOf(if ((scaled.fat ?: 0.0) > 0) scaled.fat?.roundToInt()?.toString() ?: "" else "") }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -1209,120 +1225,13 @@ fun ConfirmProductCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = product.productName ?: "Product",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextForeground
-                    )
-                    product.brands?.takeIf { it.isNotBlank() }?.let {
-                        Text(text = it, fontSize = 12.sp, color = TextMuted)
-                    }
-                    val servingInfo = product.servingSize ?: product.servingQuantityGrams?.let { "${it.toInt()}g" }
-                    if (servingInfo != null) {
-                        Text(text = "Serving: $servingInfo", fontSize = 11.sp, color = TealHighlight)
-                    }
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "${scaled.kcal.roundToInt()} kcal",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TealHighlight
-                    )
-                    Text(
-                        text = "${scaled.protein.roundToInt()}g protein",
-                        fontSize = 12.sp,
-                        color = TextMuted
-                    )
-                }
-            }
-
-            // Macros row (scaled live, rounded to ints)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SecondaryFill)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                Text("C: ${scaled.carbs.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
-                Text("F: ${scaled.fat.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
-                Text("P: ${scaled.protein.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
-            }
-
-            // PORTION UI: 1. Quick Presets Row
-            if (presets.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    presets.forEach { preset ->
-                        val isPresetActive = (selectedUnit.equals(preset.unit, ignoreCase = true) ||
-                                (selectedUnit.equals("servings", ignoreCase = true) && abs(resolvedGramsOrMl - preset.amount) < 0.1)) &&
-                                abs(resolvedGramsOrMl - preset.amount) < 0.1
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isPresetActive) TealHighlight else SecondaryFill)
-                                .border(
-                                    BorderStroke(1.dp, if (isPresetActive) TealHighlight else BorderDefault),
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable {
-                                    amountText = formatAmount(preset.amount)
-                                    selectedUnit = preset.unit
-                                    activePortionLabel = preset.portionLabel
-                                }
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = preset.label,
-                                fontSize = 11.sp,
-                                fontWeight = if (isPresetActive) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isPresetActive) Color.Black else TextForeground
-                            )
-                        }
-                    }
-                }
-            }
-
-            // PORTION UI: 2. Free Entry Row [ amount ] [ g | ml | servings ]
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            if (isManualEntry) {
+                // Direct Entry Mode
                 OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { newText ->
-                        if (newText.isEmpty() || newText.matches(Regex("""^\d*\.?\d*$"""))) {
-                            amountText = newText
-                            val amt = newText.toDoubleOrNull() ?: 0.0
-                            activePortionLabel = if (selectedUnit.equals("servings", ignoreCase = true)) {
-                                val resolved = amt * servingQuantity
-                                if (amt == 1.0) "${formatAmount(servingQuantity)} $defaultUnit"
-                                else "${formatAmount(amt)} servings (${formatAmount(resolved)} $defaultUnit)"
-                            } else {
-                                "${formatAmount(amt)} $selectedUnit"
-                            }
-                        }
-                    },
-                    placeholder = { Text("Portion", color = TextMuted, fontSize = 13.sp) },
+                    value = manualName,
+                    onValueChange = { manualName = it },
+                    label = { Text("Name", color = TextMuted) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextForeground,
                         unfocusedTextColor = TextForeground,
@@ -1331,54 +1240,256 @@ fun ConfirmProductCard(
                         focusedContainerColor = SecondaryFill,
                         unfocusedContainerColor = SecondaryFill
                     ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                // Compact unit selector: [ g | ml | servings ]
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = manualKcal,
+                        onValueChange = { if (it.isEmpty() || it.matches(Regex("""^\d*$"""))) manualKcal = it },
+                        label = { Text("Kcal", color = TextMuted) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextForeground,
+                            unfocusedTextColor = TextForeground,
+                            focusedBorderColor = TealHighlight,
+                            unfocusedBorderColor = BorderDefault,
+                            focusedContainerColor = SecondaryFill,
+                            unfocusedContainerColor = SecondaryFill
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = manualProtein,
+                        onValueChange = { if (it.isEmpty() || it.matches(Regex("""^\d*$"""))) manualProtein = it },
+                        label = { Text("Protein (g)", color = TextMuted) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextForeground,
+                            unfocusedTextColor = TextForeground,
+                            focusedBorderColor = TealHighlight,
+                            unfocusedBorderColor = BorderDefault,
+                            focusedContainerColor = SecondaryFill,
+                            unfocusedContainerColor = SecondaryFill
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = manualCarbs,
+                        onValueChange = { if (it.isEmpty() || it.matches(Regex("""^\d*$"""))) manualCarbs = it },
+                        label = { Text("Carbs (g)", color = TextMuted) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextForeground,
+                            unfocusedTextColor = TextForeground,
+                            focusedBorderColor = TealHighlight,
+                            unfocusedBorderColor = BorderDefault,
+                            focusedContainerColor = SecondaryFill,
+                            unfocusedContainerColor = SecondaryFill
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = manualFat,
+                        onValueChange = { if (it.isEmpty() || it.matches(Regex("""^\d*$"""))) manualFat = it },
+                        label = { Text("Fat (g)", color = TextMuted) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextForeground,
+                            unfocusedTextColor = TextForeground,
+                            focusedBorderColor = TealHighlight,
+                            unfocusedBorderColor = BorderDefault,
+                            focusedContainerColor = SecondaryFill,
+                            unfocusedContainerColor = SecondaryFill
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else {
+                // Header (Name, Brand, Serving)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = product.productName ?: "Product",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextForeground
+                        )
+                        product.brands?.takeIf { it.isNotBlank() }?.let {
+                            Text(text = it, fontSize = 12.sp, color = TextMuted)
+                        }
+                        val servingInfo = product.servingSize ?: product.servingQuantityGrams?.let { "${it.toInt()}g" }
+                        if (servingInfo != null) {
+                            Text(text = "Serving: $servingInfo", fontSize = 11.sp, color = TealHighlight)
+                        }
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "${scaled.kcal.roundToInt()} kcal",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TealHighlight
+                        )
+                        Text(
+                            text = "${scaled.protein.roundToInt()}g protein",
+                            fontSize = 12.sp,
+                            color = TextMuted
+                        )
+                    }
+                }
+
+                // Macros row (scaled live, rounded to ints)
                 Row(
                     modifier = Modifier
+                        .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(SecondaryFill)
-                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
-                        .padding(2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceAround
                 ) {
-                    listOf("g", "ml", "servings").forEach { u ->
-                        val isSelected = selectedUnit.equals(u, ignoreCase = true)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) TealHighlight else Color.Transparent)
-                                .clickable {
-                                    if (!selectedUnit.equals(u, ignoreCase = true)) {
-                                        if (u == "servings") {
-                                            val currentAmt = amountText.toDoubleOrNull() ?: servingQuantity
-                                            val s = if (servingQuantity > 0.0) currentAmt / servingQuantity else 1.0
-                                            amountText = formatAmount(s)
-                                        } else if (selectedUnit.equals("servings", ignoreCase = true)) {
-                                            val s = amountText.toDoubleOrNull() ?: 1.0
-                                            amountText = formatAmount(s * servingQuantity)
-                                        }
-                                        selectedUnit = u
-                                        val amt = amountText.toDoubleOrNull() ?: 0.0
-                                        val resolved = if (u == "servings") amt * servingQuantity else amt
-                                        activePortionLabel = if (u == "servings") {
-                                            if (amt == 1.0) "${formatAmount(servingQuantity)} $defaultUnit"
-                                            else "${formatAmount(amt)} servings (${formatAmount(resolved)} $defaultUnit)"
-                                        } else {
-                                            "${formatAmount(amt)} $u"
+                    Text("C: ${scaled.carbs.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
+                    Text("F: ${scaled.fat.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
+                    Text("P: ${scaled.protein.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
+                }
+
+                // PORTION UI: 1. Quick Presets Row
+                if (presets.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        presets.forEach { preset ->
+                            val isPresetActive = (selectedUnit.equals(preset.unit, ignoreCase = true) ||
+                                    (selectedUnit.equals("servings", ignoreCase = true) && abs(resolvedGramsOrMl - preset.amount) < 0.1)) &&
+                                    abs(resolvedGramsOrMl - preset.amount) < 0.1
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isPresetActive) TealHighlight else SecondaryFill)
+                                    .border(
+                                        BorderStroke(1.dp, if (isPresetActive) TealHighlight else BorderDefault),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable {
+                                        amountText = formatAmount(preset.amount)
+                                        selectedUnit = preset.unit
+                                        activePortionLabel = preset.portionLabel
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = preset.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isPresetActive) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isPresetActive) Color.Black else TextForeground
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // PORTION UI: 2. Free Entry Row [ amount ] [ g | ml | servings ]
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { newText ->
+                            if (newText.isEmpty() || newText.matches(Regex("""^\d*\.?\d*$"""))) {
+                                amountText = newText
+                                val amt = newText.toDoubleOrNull() ?: 0.0
+                                activePortionLabel = if (selectedUnit.equals("servings", ignoreCase = true)) {
+                                    val resolved = amt * servingQuantity
+                                    if (amt == 1.0) "${formatAmount(servingQuantity)} $defaultUnit"
+                                    else "${formatAmount(amt)} servings (${formatAmount(resolved)} $defaultUnit)"
+                                } else {
+                                    "${formatAmount(amt)} $selectedUnit"
+                                }
+                            }
+                        },
+                        placeholder = { Text("Portion", color = TextMuted, fontSize = 13.sp) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextForeground,
+                            unfocusedTextColor = TextForeground,
+                            focusedBorderColor = TealHighlight,
+                            unfocusedBorderColor = BorderDefault,
+                            focusedContainerColor = SecondaryFill,
+                            unfocusedContainerColor = SecondaryFill
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Compact unit selector: [ g | ml | servings ]
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SecondaryFill)
+                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        listOf("g", "ml", "servings").forEach { u ->
+                            val isSelected = selectedUnit.equals(u, ignoreCase = true)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSelected) TealHighlight else Color.Transparent)
+                                    .clickable {
+                                        if (!selectedUnit.equals(u, ignoreCase = true)) {
+                                            if (u == "servings") {
+                                                val currentAmt = amountText.toDoubleOrNull() ?: servingQuantity
+                                                val s = if (servingQuantity > 0.0) currentAmt / servingQuantity else 1.0
+                                                amountText = formatAmount(s)
+                                            } else if (selectedUnit.equals("servings", ignoreCase = true)) {
+                                                val s = amountText.toDoubleOrNull() ?: 1.0
+                                                amountText = formatAmount(s * servingQuantity)
+                                            }
+                                            selectedUnit = u
+                                            val amt = amountText.toDoubleOrNull() ?: 0.0
+                                            val resolved = if (u == "servings") amt * servingQuantity else amt
+                                            activePortionLabel = if (u == "servings") {
+                                                if (amt == 1.0) "${formatAmount(servingQuantity)} $defaultUnit"
+                                                else "${formatAmount(amt)} servings (${formatAmount(resolved)} $defaultUnit)"
+                                            } else {
+                                                "${formatAmount(amt)} $u"
+                                            }
                                         }
                                     }
-                                }
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = u,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.Black else TextForeground
-                            )
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = u,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.Black else TextForeground
+                                )
+                            }
                         }
                     }
                 }
@@ -1429,32 +1540,46 @@ fun ConfirmProductCard(
 
                 Button(
                     onClick = {
-                        val matchedPreset = presets.firstOrNull {
-                            abs(it.amount - resolvedGramsOrMl) < 0.1 && selectedUnit.equals(it.unit, ignoreCase = true)
-                        }
-                        val resolvedLabel = when {
-                            selectedUnit.equals("servings", ignoreCase = true) -> {
-                                if (enteredAmount == 1.0) "${formatAmount(servingQuantity)} $defaultUnit"
-                                else "${formatAmount(enteredAmount)} servings (${formatAmount(resolvedGramsOrMl)} $defaultUnit)"
+                        val meal = if (isManualEntry) {
+                            LoggedMeal(
+                                name = manualName.ifBlank { "Custom Meal" },
+                                kcal = manualKcal.toDoubleOrNull() ?: 0.0,
+                                protein = manualProtein.toDoubleOrNull(),
+                                carbs = manualCarbs.toDoubleOrNull(),
+                                fat = manualFat.toDoubleOrNull(),
+                                mealType = selectedMealType,
+                                isLocal = true,
+                                portionGrams = null,
+                                portionLabel = null
+                            )
+                        } else {
+                            val matchedPreset = presets.firstOrNull {
+                                abs(it.amount - resolvedGramsOrMl) < 0.1 && selectedUnit.equals(it.unit, ignoreCase = true)
                             }
-                            matchedPreset != null -> matchedPreset.portionLabel
-                            else -> "${formatAmount(enteredAmount)} $selectedUnit"
-                        }
+                            val resolvedLabel = when {
+                                selectedUnit.equals("servings", ignoreCase = true) -> {
+                                    if (enteredAmount == 1.0) "${formatAmount(servingQuantity)} $defaultUnit"
+                                    else "${formatAmount(enteredAmount)} servings (${formatAmount(resolvedGramsOrMl)} $defaultUnit)"
+                                }
+                                matchedPreset != null -> matchedPreset.portionLabel
+                                else -> "${formatAmount(enteredAmount)} $selectedUnit"
+                            }
 
-                        val meal = LoggedMeal(
-                            name = product.displayName,
-                            kcal = scaled.kcal,
-                            protein = scaled.protein,
-                            carbs = scaled.carbs,
-                            fat = scaled.fat,
-                            mealType = selectedMealType,
-                            isLocal = true,
-                            portionGrams = resolvedGramsOrMl,
-                            portionLabel = resolvedLabel
-                        )
+                            LoggedMeal(
+                                name = product.displayName,
+                                kcal = scaled.kcal,
+                                protein = scaled.protein,
+                                carbs = scaled.carbs,
+                                fat = scaled.fat,
+                                mealType = selectedMealType,
+                                isLocal = true,
+                                portionGrams = resolvedGramsOrMl,
+                                portionLabel = resolvedLabel
+                            )
+                        }
                         onConfirm(meal)
                     },
-                    enabled = resolvedGramsOrMl > 0.0,
+                    enabled = if (isManualEntry) manualName.isNotBlank() && (manualKcal.toDoubleOrNull() ?: -1.0) >= 0 else resolvedGramsOrMl > 0.0,
                     colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black),
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp)
@@ -1483,10 +1608,15 @@ private fun LiveFoodSearchResults(
     modifier: Modifier = Modifier,
 ) {
     val q = query.trim().lowercase()
+    val genericFoodsList = OpenFoodFactsClient.GENERIC_FOODS
 
     val matchedPresets = presets.filter { it.name.lowercase().contains(q) }
     val matchedFavourites = favourites.filter { it.name.lowercase().contains(q) }
     val matchedRecipes = recipes.filter { it.name.lowercase().contains(q) }
+    
+    val genericSearchResults = genericFoodsList.filter { productResult: ProductResult ->
+        productResult.productName?.lowercase()?.contains(q) == true
+    }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -1504,6 +1634,7 @@ private fun LiveFoodSearchResults(
 
             // Local curated items
             if (matchedFavourites.isNotEmpty() || matchedPresets.isNotEmpty() || matchedRecipes.isNotEmpty()) {
+                Text("LOCAL FOODS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -1544,6 +1675,62 @@ private fun LiveFoodSearchResults(
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Text("${r.name} · ${r.perPortionKcal} kcal", fontSize = 11.sp, color = TealHighlight)
+                        }
+                    }
+                }
+            }
+
+            if (genericSearchResults.isNotEmpty()) {
+                Text("GENERIC FOODS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    genericSearchResults.forEach { product: ProductResult ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectOffProduct(product) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                            border = BorderStroke(1.dp, BorderDefault)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = product.productName ?: "Product",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextForeground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    val subtitle = listOfNotNull(
+                                        product.brands?.takeIf { it.isNotBlank() },
+                                        product.servingSize ?: product.servingQuantityGrams?.let { "${it.toInt()}g" }
+                                    ).joinToString(" · ")
+                                    if (subtitle.isNotBlank()) {
+                                        Text(text = subtitle, fontSize = 11.sp, color = TextMuted, maxLines = 1)
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "${product.kcalPerServing} kcal",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TealHighlight
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", product.proteinPerServing)}g P",
+                                        fontSize = 10.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                            }
                         }
                     }
                 }

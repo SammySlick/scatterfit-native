@@ -300,7 +300,7 @@ class OpenFoodFactsTest {
     }
 
     @Test
-    fun `derivePortionPresets includes Whole, Half, 100g, and sane household serving`() {
+    fun `derivePortionPresets includes 50, 100, 250, and sane household serving`() {
         val bread = ProductResult(
             code = "bread1",
             productName = "Wholemeal Bread",
@@ -309,12 +309,12 @@ class OpenFoodFactsTest {
         )
         val presets = derivePortionPresets(bread)
         assertEquals(4, presets.size)
-        assertEquals("Whole (400 g)", presets[0].label)
-        assertEquals(400.0, presets[0].amount, 0.001)
-        assertEquals("Half (200 g)", presets[1].label)
-        assertEquals(200.0, presets[1].amount, 0.001)
-        assertEquals("100 g", presets[2].label)
-        assertEquals(100.0, presets[2].amount, 0.001)
+        assertEquals("50 g", presets[0].label)
+        assertEquals(50.0, presets[0].amount, 0.001)
+        assertEquals("100 g", presets[1].label)
+        assertEquals(100.0, presets[1].amount, 0.001)
+        assertEquals("250 g", presets[2].label)
+        assertEquals(250.0, presets[2].amount, 0.001)
         assertEquals("2 slices (60g)", presets[3].label)
         assertEquals(60.0, presets[3].amount, 0.001)
     }
