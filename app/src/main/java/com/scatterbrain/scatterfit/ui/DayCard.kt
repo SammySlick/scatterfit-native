@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,8 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,7 +58,7 @@ import com.scatterbrain.scatterfit.ui.theme.StateLocked
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
-import java.time.LocalDate
+import com.scatterbrain.scatterfit.ui.theme.Track
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -190,120 +190,130 @@ fun DayCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
-        border = BorderStroke(1.dp, BorderDefault)
+        border = BorderStroke(0.dp, Color.Transparent)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // PART 1 — HERO BLOCK
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                // Left: Big kcal number + caption
-                Column {
-                    Text(
-                        text = heroNumberText,
-                        fontSize = 56.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = heroNumberColor,
-                        lineHeight = 60.sp
-                    )
-                    Text(
-                        text = heroCaptionText,
-                        fontSize = 13.sp,
-                        color = TextMuted
-                    )
-                }
-
-                // Right: Ticked fraction + Back to today if past/future
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+        Column {
+            // HERO TOP: Remaining / Over Calories + Ticked counter
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    if (!isCurrentToday && onResetToToday != null) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(SecondaryFill)
-                                .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
-                                .clickable(onClick = onResetToToday)
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "Back to today",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextForeground
-                            )
-                        }
+                    // Left: Big kcal number + caption
+                    Column {
+                        Text(
+                            text = heroNumberText,
+                            fontSize = 56.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = heroNumberColor,
+                            lineHeight = 56.sp
+                        )
+                        Text(
+                            text = heroCaptionText,
+                            fontSize = 12.sp,
+                            color = TextMuted
+                        )
                     }
 
-                    Text(
-                        text = ticks.counterText,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TealHighlight
+                    // Right: Ticked fraction + Back to today if past/future
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (!isCurrentToday && onResetToToday != null) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(SecondaryFill)
+                                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                                    .clickable(onClick = onResetToToday)
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "Back to today",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextForeground
+                                )
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = "${ticks.completedCount}",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StateLocked
+                            )
+                            Text(
+                                text = " / ${ticks.totalTarget}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextMuted
+                            )
+                        }
+                        Text(
+                            text = "ticked",
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // CONTINUOUS METRIC ROWS (Calories, Steps, Protein)
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // 1. Calories row
+                    val calRaw = daily?.caloriesEaten?.get(dayKey)
+                    val calFraction = if (calRaw != null && kcalTarget > 0) (calRaw.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
+                    val calColor = getBarColor(computeCaloriesBarColor(calRaw, kcalTarget, settings.tolerances.kcalGreen))
+                    DayCardBarRow(
+                        icon = { UtensilsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
+                        label = "Calories",
+                        currentText = String.format(Locale.US, "%,d", calRaw?.roundToInt() ?: 0),
+                        targetText = "of %,d kcal".format(Locale.US, kcalTarget),
+                        progressFraction = calFraction,
+                        fillColor = calColor,
+                        onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
                     )
-                    Text(
-                        text = "ticked",
-                        fontSize = 11.sp,
-                        color = TextMuted
+
+                    // 2. Steps row
+                    val stepRaw = daily?.steps?.get(dayKey)
+                    val stepTarget = settings.stepTarget
+                    val stepFraction = if (stepRaw != null && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
+                    val stepColor = getBarColor(computeStepsBarColor(stepRaw, stepTarget))
+                    DayCardBarRow(
+                        icon = { FootstepsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
+                        label = "Steps",
+                        currentText = String.format(Locale.US, "%,d", stepRaw?.roundToInt() ?: 0),
+                        targetText = "of %,d".format(Locale.US, stepTarget),
+                        progressFraction = stepFraction,
+                        fillColor = stepColor,
+                        onClick = { onMetricClick(MetricId.STEPS) }
+                    )
+
+                    // 3. Protein row
+                    val protRaw = daily?.protein?.get(dayKey)
+                    val protTarget = settings.proteinTarget
+                    val protFraction = if (protRaw != null && protTarget > 0) (protRaw.toFloat() / protTarget.toFloat()).coerceIn(0f, 1f) else 0f
+                    val protColor = getBarColor(computeProteinBarColor(protRaw, protTarget))
+                    DayCardBarRow(
+                        icon = { BeefIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
+                        label = "Protein",
+                        currentText = "${protRaw?.roundToInt() ?: 0}g",
+                        targetText = "of %,dg".format(Locale.US, protTarget),
+                        progressFraction = protFraction,
+                        fillColor = protColor,
+                        onClick = { onMetricClick(MetricId.PROTEIN) }
                     )
                 }
             }
 
-            // PART 2 — BARS REPLACE RINGS (Calories, Steps, Protein rows)
-
-            // 1. Calories row
-            val calRaw = daily?.caloriesEaten?.get(dayKey)
-            val calFraction = if (calRaw != null && kcalTarget > 0) (calRaw.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
-            val calColor = getBarColor(computeCaloriesBarColor(calRaw, kcalTarget, settings.tolerances.kcalGreen))
-            DayCardBarRow(
-                icon = { FlameIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
-                label = "Calories",
-                currentText = String.format(Locale.US, "%,d", calRaw?.roundToInt() ?: 0),
-                targetText = " of %,d kcal".format(Locale.US, kcalTarget),
-                progressFraction = calFraction,
-                fillColor = calColor,
-                onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
-            )
-
-            // 2. Steps row
-            val stepRaw = daily?.steps?.get(dayKey)
-            val stepTarget = settings.stepTarget
-            val stepFraction = if (stepRaw != null && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
-            val stepColor = getBarColor(computeStepsBarColor(stepRaw, stepTarget))
-            DayCardBarRow(
-                icon = { FootstepsIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
-                label = "Steps",
-                currentText = String.format(Locale.US, "%,d", stepRaw?.roundToInt() ?: 0),
-                targetText = " of %,d steps".format(Locale.US, stepTarget),
-                progressFraction = stepFraction,
-                fillColor = stepColor,
-                onClick = { onMetricClick(MetricId.STEPS) }
-            )
-
-            // 3. Protein row
-            val protRaw = daily?.protein?.get(dayKey)
-            val protTarget = settings.proteinTarget
-            val protFraction = if (protRaw != null && protTarget > 0) (protRaw.toFloat() / protTarget.toFloat()).coerceIn(0f, 1f) else 0f
-            val protColor = getBarColor(computeProteinBarColor(protRaw, protTarget))
-            DayCardBarRow(
-                icon = { ProteinIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
-                label = "Protein",
-                currentText = String.format(Locale.US, "%,d", protRaw?.roundToInt() ?: 0),
-                targetText = " of %,d g".format(Locale.US, protTarget),
-                progressFraction = protFraction,
-                fillColor = protColor,
-                onClick = { onMetricClick(MetricId.PROTEIN) }
-            )
+            HorizontalDivider(color = BorderDefault, thickness = 1.dp)
 
             // PART 3 — TRAINING ROW
             DayCardTrainingRow(
@@ -312,9 +322,13 @@ fun DayCard(
                 onClick = onPlanEditorClick
             )
 
+            HorizontalDivider(color = BorderDefault, thickness = 1.dp)
+
             // PART 4 — CONTEXT CARDS (two side-by-side)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Sleep Card
@@ -330,10 +344,10 @@ fun DayCard(
 
                 DayCardContextCard(
                     modifier = Modifier.weight(1f),
-                    icon = { MoonIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
+                    icon = { MoonIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
                     primaryText = sleepPrimary,
                     secondaryText = sleepSecondary,
-                    showDot = false,
+                    showDot = hasSleepData,
                     onClick = { onMetricClick(MetricId.SLEEP) }
                 )
 
@@ -353,7 +367,7 @@ fun DayCard(
 
                 DayCardContextCard(
                     modifier = Modifier.weight(1f),
-                    icon = { ScaleIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
+                    icon = { ScaleIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
                     primaryText = weightPrimary,
                     secondaryText = weightSecondary,
                     showDot = hasWeightToday,
@@ -367,20 +381,26 @@ fun DayCard(
             val todayDrinksCount = drinksCount ?: if (todayUnits > 0.0) kotlin.math.ceil(todayUnits).toInt() else 0
 
             if (isDrinksSectionVisible(todayDrinksCount, todayUnits)) {
+                HorizontalDivider(color = BorderDefault, thickness = 1.dp)
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onMetricClick(MetricId.ALCOHOL_UNITS) }
-                        .padding(top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "DRINKS TODAY",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextMuted,
-                        letterSpacing = 1.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        WineIcon(modifier = Modifier.size(16.dp), tint = TextMuted)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "DRINKS TODAY",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextMuted,
+                            letterSpacing = 1.5.sp
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -436,8 +456,6 @@ private fun DayCardBarRow(
                 indication = null,
                 onClick = onClick
             )
-            .padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -453,37 +471,44 @@ private fun DayCardBarRow(
                     text = label,
                     fontSize = 13.sp,
                     color = TextForeground,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = TextForeground, fontWeight = FontWeight.Bold, fontSize = 16.sp)) {
-                        append(currentText)
-                    }
-                    withStyle(SpanStyle(color = TextMuted, fontWeight = FontWeight.Normal, fontSize = 13.sp)) {
-                        append(targetText)
-                    }
-                },
-                textAlign = TextAlign.End
-            )
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = currentText,
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextForeground
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = targetText,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    color = TextMuted
+                )
+            }
         }
 
-        // 6dp Progress Bar with 8% white track and minimum 2dp visible fill
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 6dp Progress Bar with Track token and minimum 2dp visible fill
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(Color.White.copy(alpha = 0.08f))
+                .clip(CircleShape)
+                .background(Track)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(fraction = progressFraction.coerceIn(0f, 1f))
                     .widthIn(min = 2.dp)
                     .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
+                    .clip(CircleShape)
                     .background(fillColor)
             )
         }
@@ -518,32 +543,54 @@ private fun DayCardTrainingRow(
                         onClick = onClick
                     )
                 } else Modifier
-            ),
+            )
+            .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
             modifier = Modifier.weight(1f, fill = false),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (isTrainingDay) {
-                DashedCircleIcon(
-                    modifier = Modifier.size(20.dp),
-                    tint = AccentTeal
-                )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(SecondaryFill),
+                    contentAlignment = Alignment.Center
+                ) {
+                    DashedCircleIcon(
+                        modifier = Modifier.size(40.dp),
+                        tint = TextMuted.copy(alpha = 0.5f)
+                    )
+                    DumbbellIcon(
+                        modifier = Modifier.size(16.dp),
+                        tint = TextMuted
+                    )
+                }
             } else {
-                BedIcon(
-                    modifier = Modifier.size(20.dp),
-                    tint = TextMuted
-                )
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(SecondaryFill),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BedIcon(
+                        modifier = Modifier.size(16.dp),
+                        tint = TextMuted
+                    )
+                }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 Text(
                     text = if (isTrainingDay) (planName ?: "Training") else "Rest day",
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = TextForeground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -551,6 +598,7 @@ private fun DayCardTrainingRow(
                 Text(
                     text = if (isTrainingDay) "Tap to log your session" else "No session planned",
                     fontSize = 11.sp,
+                    lineHeight = 14.sp,
                     color = TextMuted
                 )
             }
@@ -558,8 +606,8 @@ private fun DayCardTrainingRow(
 
         if (isTrainingDay) {
             ChevronRightIcon(
-                modifier = Modifier.size(14.dp),
-                tint = TextMuted
+                modifier = Modifier.size(16.dp),
+                tint = TextMuted.copy(alpha = 0.6f)
             )
         }
     }
@@ -594,9 +642,9 @@ private fun DayCardContextCard(
                     )
                 } else Modifier
             ),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SecondaryFill),
-        border = BorderStroke(1.dp, BorderDefault)
+        border = BorderStroke(0.dp, Color.Transparent)
     ) {
         Box(
             modifier = Modifier
@@ -613,23 +661,23 @@ private fun DayCardContextCard(
                 )
             }
 
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Column {
                 icon()
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = primaryText,
-                    fontSize = if (primaryText.length > 8) 14.sp else 16.sp,
+                    fontSize = if (primaryText.length > 8) 14.sp else 15.sp,
+                    lineHeight = 19.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextForeground,
                     maxLines = 1,
                     overflow = TextOverflow.Clip
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = secondaryText,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
                     color = TextMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -647,28 +695,28 @@ private fun DrinksStatChip(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(SecondaryFill)
-            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(8.dp))
-            .padding(vertical = 10.dp),
+            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+            .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = value,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
                 color = TextForeground
             )
             Text(
-                text = label,
+                text = label.uppercase(),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextMuted,
-                letterSpacing = 0.5.sp
+                letterSpacing = 1.sp
             )
         }
     }

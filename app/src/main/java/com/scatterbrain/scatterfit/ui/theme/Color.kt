@@ -9,20 +9,21 @@ val JudgementBad = Color(0xFFF14D4C)         // bad (off track)
 val JudgementDestructive = Color(0xFFE64343) // destructive
 val AccentHot = Color(0xFFF86111)            // hot / activity
 
-// Neutrals
-val AppBackground = Color(0xFF0A0A0A)
-val AppCardSurface = Color(0xFF0E0E0E)
-val SecondaryFill = Color(0xFF202225)
-val MutedFill = Color(0xFF1C1D1F)
-val AccentFill = Color(0xFF232426)
+// Neutrals (matching Lovable approved export: #0A0D0F / #13181C / #1C2227)
+val AppBackground = Color(0xFF0A0D0F)
+val AppCardSurface = Color(0xFF13181C)
+val SecondaryFill = Color(0xFF1C2227)
+val MutedFill = Color(0xFF1C2227)
+val AccentFill = Color(0xFF1C2227)
 
-val TextForeground = Color(0xFFF4F4F4)
-val TextMuted = Color(0xFF9499A0)
+val TextForeground = Color(0xFFF1F5F9)
+val TextMuted = Color(0xFF8E9BAE)
 val TextFaint = Color(0xFF979FAB)
 val TextFaintDark = Color(0xFF79818D)
 
 val BorderDefault = Color.White.copy(alpha = 0.10f)
 val BorderInput = Color.White.copy(alpha = 0.14f)
+val Track = Color(0xFF263037)
 val AccentTeal   = Color(0xFF15B6A4)
 val RingFocus = AccentTeal.copy(alpha = 0.60f)
 

@@ -43,7 +43,7 @@ fun CalendarIcon(
     tint: Color = TextForeground
 ) {
     Icon(
-        painter = painterResource(id = R.drawable.ic_calendar),
+        painter = painterResource(id = R.drawable.ic_calendar_days),
         contentDescription = "Calendar",
         tint = tint,
         modifier = modifier
@@ -56,7 +56,7 @@ fun StreakIcon(
     tint: Color = AccentTeal
 ) {
     Icon(
-        painter = painterResource(id = R.drawable.ic_streak),
+        painter = painterResource(id = R.drawable.ic_flame),
         contentDescription = "Streak",
         tint = tint,
         modifier = modifier
@@ -176,54 +176,12 @@ fun DumbbellIcon(
     tint: Color = TextForeground,
     strokeWidthDp: Dp = 2.dp
 ) {
-    Canvas(modifier = modifier) {
-        val strokeWidth = strokeWidthDp.toPx()
-        val w = size.width
-        val h = size.height
-
-        // Center barbell line
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.15f, h * 0.5f),
-            end = Offset(w * 0.85f, h * 0.5f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-
-        // Left outer plate
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.22f, h * 0.30f),
-            end = Offset(w * 0.22f, h * 0.70f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-        // Left inner plate
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.32f, h * 0.20f),
-            end = Offset(w * 0.32f, h * 0.80f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-
-        // Right inner plate
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.68f, h * 0.20f),
-            end = Offset(w * 0.68f, h * 0.80f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-        // Right outer plate
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.78f, h * 0.30f),
-            end = Offset(w * 0.78f, h * 0.70f),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
-        )
-    }
+    Icon(
+        painter = painterResource(id = R.drawable.ic_dumbbell),
+        contentDescription = "Dumbbell",
+        tint = tint,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -232,21 +190,12 @@ fun FlameIcon(
     tint: Color = TextForeground,
     strokeWidthDp: Dp = 1.8.dp
 ) {
-    Canvas(modifier = modifier) {
-        val sw = strokeWidthDp.toPx()
-        val w = size.width
-        val h = size.height
-
-        val path = Path().apply {
-            moveTo(w * 0.5f, h * 0.12f)
-            cubicTo(w * 0.65f, h * 0.35f, w * 0.85f, h * 0.52f, w * 0.85f, h * 0.72f)
-            cubicTo(w * 0.85f, h * 0.90f, w * 0.70f, h * 0.95f, w * 0.5f, h * 0.95f)
-            cubicTo(w * 0.30f, h * 0.95f, w * 0.15f, h * 0.90f, w * 0.15f, h * 0.72f)
-            cubicTo(w * 0.15f, h * 0.52f, w * 0.35f, h * 0.35f, w * 0.5f, h * 0.12f)
-            close()
-        }
-        drawPath(path = path, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    }
+    Icon(
+        painter = painterResource(id = R.drawable.ic_flame),
+        contentDescription = "Flame",
+        tint = tint,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -255,28 +204,38 @@ fun FootstepsIcon(
     tint: Color = TextForeground,
     strokeWidthDp: Dp = 1.8.dp
 ) {
-    Canvas(modifier = modifier) {
-        val sw = strokeWidthDp.toPx()
-        val w = size.width
-        val h = size.height
+    Icon(
+        painter = painterResource(id = R.drawable.ic_footprints),
+        contentDescription = "Footprints",
+        tint = tint,
+        modifier = modifier
+    )
+}
 
-        // Left footprint outline
-        val leftPath = Path().apply {
-            moveTo(w * 0.30f, h * 0.30f)
-            cubicTo(w * 0.40f, h * 0.30f, w * 0.42f, h * 0.65f, w * 0.30f, h * 0.75f)
-            cubicTo(w * 0.18f, h * 0.65f, w * 0.20f, h * 0.30f, w * 0.30f, h * 0.30f)
-            close()
-        }
-        // Right footprint outline (higher)
-        val rightPath = Path().apply {
-            moveTo(w * 0.70f, h * 0.18f)
-            cubicTo(w * 0.80f, h * 0.18f, w * 0.82f, h * 0.53f, w * 0.70f, h * 0.63f)
-            cubicTo(w * 0.58f, h * 0.53f, w * 0.60f, h * 0.18f, w * 0.70f, h * 0.18f)
-            close()
-        }
-        drawPath(path = leftPath, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round))
-        drawPath(path = rightPath, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round))
-    }
+@Composable
+fun UtensilsIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_utensils),
+        contentDescription = "Utensils",
+        tint = tint,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun BeefIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_beef),
+        contentDescription = "Beef",
+        tint = tint,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -285,29 +244,12 @@ fun ProteinIcon(
     tint: Color = TextForeground,
     strokeWidthDp: Dp = 1.8.dp
 ) {
-    Canvas(modifier = modifier) {
-        val sw = strokeWidthDp.toPx()
-        val w = size.width
-        val h = size.height
-
-        // Shaker / jar outline
-        val path = Path().apply {
-            moveTo(w * 0.30f, h * 0.22f)
-            lineTo(w * 0.70f, h * 0.22f)
-            lineTo(w * 0.65f, h * 0.88f)
-            lineTo(w * 0.35f, h * 0.88f)
-            close()
-        }
-        drawPath(path = path, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        // Cap line
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.25f, h * 0.22f),
-            end = Offset(w * 0.75f, h * 0.22f),
-            strokeWidth = sw,
-            cap = StrokeCap.Round
-        )
-    }
+    Icon(
+        painter = painterResource(id = R.drawable.ic_beef),
+        contentDescription = "Protein",
+        tint = tint,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -316,20 +258,12 @@ fun MoonIcon(
     tint: Color = TextForeground,
     strokeWidthDp: Dp = 1.8.dp
 ) {
-    Canvas(modifier = modifier) {
-        val sw = strokeWidthDp.toPx()
-        val w = size.width
-        val h = size.height
-
-        val path = Path().apply {
-            moveTo(w * 0.75f, h * 0.15f)
-            cubicTo(w * 0.35f, h * 0.15f, w * 0.15f, h * 0.45f, w * 0.22f, h * 0.80f)
-            cubicTo(w * 0.25f, h * 0.95f, w * 0.40f, h * 0.98f, w * 0.50f, h * 0.95f)
-            cubicTo(w * 0.28f, h * 0.75f, w * 0.35f, h * 0.35f, w * 0.75f, h * 0.15f)
-            close()
-        }
-        drawPath(path = path, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    }
+    Icon(
+        painter = painterResource(id = R.drawable.ic_moon),
+        contentDescription = "Moon",
+        tint = tint,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -338,29 +272,12 @@ fun ScaleIcon(
     tint: Color = TextForeground,
     strokeWidthDp: Dp = 1.8.dp
 ) {
-    Canvas(modifier = modifier) {
-        val sw = strokeWidthDp.toPx()
-        val w = size.width
-        val h = size.height
-
-        // Square platform with rounded corners
-        val rect = Rect(w * 0.15f, h * 0.18f, w * 0.85f, h * 0.88f)
-        val path = Path().apply {
-            addRoundRect(androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(w * 0.12f, h * 0.12f)))
-        }
-        drawPath(path = path, color = tint, style = Stroke(width = sw))
-
-        // Center dial top
-        drawArc(
-            color = tint,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = false,
-            topLeft = Offset(w * 0.38f, h * 0.26f),
-            size = Size(w * 0.24f, h * 0.24f),
-            style = Stroke(width = sw)
-        )
-    }
+    Icon(
+        painter = painterResource(id = R.drawable.ic_scale),
+        contentDescription = "Scale",
+        tint = tint,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -369,45 +286,77 @@ fun BedIcon(
     tint: Color = TextForeground,
     strokeWidthDp: Dp = 1.8.dp
 ) {
-    Canvas(modifier = modifier) {
-        val sw = strokeWidthDp.toPx()
-        val w = size.width
-        val h = size.height
+    Icon(
+        painter = painterResource(id = R.drawable.ic_bed_double),
+        contentDescription = "Bed",
+        tint = tint,
+        modifier = modifier
+    )
+}
 
-        // Headboard (left vertical post)
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.15f, h * 0.25f),
-            end = Offset(w * 0.15f, h * 0.85f),
-            strokeWidth = sw,
-            cap = StrokeCap.Round
-        )
+@Composable
+fun WineIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_wine),
+        contentDescription = "Wine",
+        tint = tint,
+        modifier = modifier
+    )
+}
 
-        // Footboard (right vertical post)
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.85f, h * 0.50f),
-            end = Offset(w * 0.85f, h * 0.85f),
-            strokeWidth = sw,
-            cap = StrokeCap.Round
-        )
+@Composable
+fun GlassWaterIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_glass_water),
+        contentDescription = "Glass Water",
+        tint = tint,
+        modifier = modifier
+    )
+}
 
-        // Mattress base line
-        drawLine(
-            color = tint,
-            start = Offset(w * 0.15f, h * 0.65f),
-            end = Offset(w * 0.85f, h * 0.65f),
-            strokeWidth = sw,
-            cap = StrokeCap.Round
-        )
+@Composable
+fun RefreshIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_refresh_cw),
+        contentDescription = "Sync",
+        tint = tint,
+        modifier = modifier
+    )
+}
 
-        // Pillow / headrest curve
-        val path = Path().apply {
-            moveTo(w * 0.18f, h * 0.62f)
-            cubicTo(w * 0.22f, h * 0.48f, w * 0.38f, h * 0.48f, w * 0.42f, h * 0.62f)
-        }
-        drawPath(path = path, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round))
-    }
+@Composable
+fun CheckIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_check),
+        contentDescription = "Check",
+        tint = tint,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun CloseXIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_x),
+        contentDescription = "Close",
+        tint = tint,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -442,7 +391,6 @@ fun AppleIcon(
         val w = size.width
         val h = size.height
 
-        // Apple body
         val applePath = Path().apply {
             moveTo(w * 0.5f, h * 0.32f)
             cubicTo(w * 0.65f, h * 0.18f, w * 0.90f, h * 0.30f, w * 0.90f, h * 0.58f)
@@ -453,7 +401,6 @@ fun AppleIcon(
         }
         drawPath(path = applePath, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round))
 
-        // Apple stem / leaf
         val leafPath = Path().apply {
             moveTo(w * 0.5f, h * 0.30f)
             cubicTo(w * 0.55f, h * 0.15f, w * 0.70f, h * 0.12f, w * 0.75f, h * 0.12f)
@@ -474,14 +421,12 @@ fun CameraIcon(
         val w = size.width
         val h = size.height
 
-        // Camera body
         val bodyRect = Rect(w * 0.12f, h * 0.30f, w * 0.88f, h * 0.88f)
         val bodyPath = Path().apply {
             addRoundRect(androidx.compose.ui.geometry.RoundRect(bodyRect, androidx.compose.ui.geometry.CornerRadius(w * 0.08f, h * 0.08f)))
         }
         drawPath(path = bodyPath, color = tint, style = Stroke(width = sw))
 
-        // Top flash / lens bump
         val bumpPath = Path().apply {
             moveTo(w * 0.35f, h * 0.30f)
             lineTo(w * 0.40f, h * 0.18f)
@@ -490,7 +435,6 @@ fun CameraIcon(
         }
         drawPath(path = bumpPath, color = tint, style = Stroke(width = sw, cap = StrokeCap.Round))
 
-        // Center lens circle
         drawCircle(
             color = tint,
             radius = w * 0.18f,

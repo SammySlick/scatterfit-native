@@ -26,7 +26,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -34,12 +36,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.res.painterResource
+import com.scatterbrain.scatterfit.R
+import com.scatterbrain.scatterfit.ui.theme.AccentHot
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -272,26 +278,26 @@ fun MyDayScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // LEFT: streak chip — flame icon + "N", SecondaryFill pill, 12sp Bold
+            // LEFT: streak chip — flame icon + "N", SecondaryFill pill, 14sp Bold
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(CircleShape)
                     .background(SecondaryFill)
-                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .border(BorderStroke(1.dp, BorderDefault), CircleShape)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     StreakIcon(
-                        modifier = Modifier.size(14.dp),
-                        tint = TealHighlight
+                        modifier = Modifier.size(16.dp),
+                        tint = AccentHot
                     )
                     Text(
                         text = "$streak",
-                        fontSize = 12.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextForeground
                     )
@@ -308,33 +314,41 @@ fun MyDayScreen(
             }
             Text(
                 text = centerTitle,
-                fontSize = 16.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextForeground,
                 textAlign = TextAlign.Center
             )
 
-            // RIGHT: Calendar icon button + Settings gear button (calendar then gear, 8dp gap; 24dp icon with 40dp tap target)
+            // RIGHT: Calendar icon button + Settings gear button (18dp icons in 36dp circular targets, 8dp gap)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                IconButton(
-                    onClick = { showCalendarSheet = true },
-                    modifier = Modifier.size(40.dp)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(SecondaryFill)
+                        .clickable { showCalendarSheet = true },
+                    contentAlignment = Alignment.Center
                 ) {
                     CalendarIcon(
-                        modifier = Modifier.size(24.dp),
-                        tint = TextForeground
+                        modifier = Modifier.size(18.dp),
+                        tint = TextMuted
                     )
                 }
-                IconButton(
-                    onClick = onSettingsClick,
-                    modifier = Modifier.size(40.dp)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(SecondaryFill)
+                        .clickable { onSettingsClick() },
+                    contentAlignment = Alignment.Center
                 ) {
                     SettingsIcon(
-                        modifier = Modifier.size(24.dp),
-                        tint = AccentTeal
+                        modifier = Modifier.size(18.dp),
+                        tint = TextMuted
                     )
                 }
             }
@@ -373,8 +387,9 @@ fun MyDayScreen(
         )
 
         // Tomorrow Card (shown only when viewing today and 19:00–07:59; hidden in past mode)
+        var isTomorrowDismissed by remember { mutableStateOf(false) }
         val currentHour = remember(selectedDay) { LocalTime.now().hour }
-        val tomorrowVisible = isToday && isTomorrowCardVisible(currentHour)
+        val tomorrowVisible = isToday && isTomorrowCardVisible(currentHour) && !isTomorrowDismissed
 
         if (tomorrowVisible) {
             val tomorrowDate = remember(selectedDay) {
@@ -391,47 +406,50 @@ fun MyDayScreen(
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
-                border = BorderStroke(1.dp, BorderDefault)
+                border = BorderStroke(0.dp, Color.Transparent)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        painter = painterResource(id = if (tomorrowPlan != null) R.drawable.ic_dumbbell else R.drawable.ic_bed_double),
+                        contentDescription = null,
+                        tint = if (tomorrowPlan != null) AccentTeal else TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Tomorrow",
+                            text = "Tomorrow · ",
+                            color = TextMuted,
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextForeground
+                            lineHeight = 18.sp
                         )
                         Text(
-                            text = tomorrowDateText,
-                            fontSize = 11.sp,
-                            color = TextMuted
+                            text = tomorrowPlan ?: "Rest day",
+                            color = TextForeground,
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
-
-                    if (tomorrowPlan != null) {
-                        Text(
-                            text = tomorrowPlan,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TealHighlight
-                        )
-                    } else {
-                        Text(
-                            text = "Rest day",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = TextMuted
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable { isTomorrowDismissed = true }
+                            .padding(4.dp)
+                    ) {
+                        CloseXIcon(
+                            modifier = Modifier.size(16.dp),
+                            tint = TextMuted
                         )
                     }
                 }
@@ -440,15 +458,24 @@ fun MyDayScreen(
 
         // Syncing indicator
         if (isSyncing) {
-            Text(
-                text = "Syncing…",
-                fontSize = 10.sp,
-                color = TextMuted,
-                textAlign = TextAlign.Center,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp)
-            )
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RefreshIcon(
+                    modifier = Modifier.size(12.dp),
+                    tint = TextMuted
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Syncing…",
+                    fontSize = 11.sp,
+                    color = TextMuted
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(100.dp))
@@ -622,18 +649,21 @@ fun QuickActionsStrip(
     ) {
         QuickActionButton(
             label = "Log food",
+            icon = { UtensilsIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
             onClick = onLogFoodClick,
             modifier = Modifier.weight(1f)
         )
 
         QuickActionButton(
             label = "Log drink",
+            icon = { GlassWaterIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
             onClick = onLogDrinkClick,
             modifier = Modifier.weight(1f)
         )
 
         QuickActionButton(
             label = "Log weight",
+            icon = { ScaleIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
             onClick = onLogWeightClick,
             modifier = Modifier.weight(1f)
         )
@@ -643,6 +673,7 @@ fun QuickActionsStrip(
 @Composable
 private fun QuickActionButton(
     label: String,
+    icon: @Composable () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -654,52 +685,53 @@ private fun QuickActionButton(
         label = "qaAlpha"
     )
     val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
-        animationSpec = if (isPressed) tween(80) else spring(stiffness = Spring.StiffnessHigh),
+        targetValue = if (isPressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "qaScale"
     )
-    val bounceScale = remember { Animatable(1f) }
-    val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
     Card(
         modifier = modifier
-            .heightIn(min = 48.dp)
             .graphicsLayer {
-                val totalScale = pressScale * bounceScale.value
                 this.alpha = alpha
-                this.scaleX = totalScale
-                this.scaleY = totalScale
+                this.scaleX = pressScale
+                this.scaleY = pressScale
             }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    scope.launch {
-                        bounceScale.snapTo(1f)
-                        bounceScale.animateTo(1.06f, tween(100))
-                        bounceScale.animateTo(1f, spring(stiffness = Spring.StiffnessHigh))
-                    }
                     onClick()
                 }
             ),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
-        border = BorderStroke(1.dp, BorderDefault)
+        border = BorderStroke(0.dp, Color.Transparent)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
-                .padding(horizontal = 8.dp, vertical = 12.dp),
-            contentAlignment = Alignment.Center
+                .padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(AccentTeal.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                icon()
+            }
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = label,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextForeground,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextMuted,
                 textAlign = TextAlign.Center,
                 maxLines = 1
             )
