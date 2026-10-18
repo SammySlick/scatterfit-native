@@ -31,6 +31,8 @@ data class LoggedMeal(
     val dayKey: String = "",
     val mealType: String = "snacks", // breakfast | lunch | dinner | snacks
     val isLocal: Boolean = true,
+    val portionGrams: Double? = null,
+    val portionLabel: String? = null,
 ) {
     fun toHealthRecord(): HealthRecord {
         val startIso = Instant.ofEpochMilli(timestamp).toString()
@@ -42,6 +44,8 @@ data class LoggedMeal(
             carbs?.let { put("carbs", JsonPrimitive(it)) }
             fat?.let { put("fat", JsonPrimitive(it)) }
             put("mealType", JsonPrimitive(mealType))
+            portionGrams?.let { put("portionGrams", JsonPrimitive(it)) }
+            portionLabel?.let { put("portionLabel", JsonPrimitive(it)) }
         }
         return HealthRecord(
             app = "app",
@@ -94,6 +98,8 @@ data class MealPreset(
     val carbs: Double?,
     val fat: Double?,
     val lastUsedTimestamp: Long,
+    val portionGrams: Double? = null,
+    val portionLabel: String? = null,
 )
 
 fun deriveMealPresets(meals: List<LoggedMeal>, limit: Int = 8): List<MealPreset> {
@@ -108,7 +114,9 @@ fun deriveMealPresets(meals: List<LoggedMeal>, limit: Int = 8): List<MealPreset>
                 protein = it.protein,
                 carbs = it.carbs,
                 fat = it.fat,
-                lastUsedTimestamp = it.timestamp
+                lastUsedTimestamp = it.timestamp,
+                portionGrams = it.portionGrams,
+                portionLabel = it.portionLabel
             )
         }
 }
@@ -195,6 +203,8 @@ class FoodTrackerViewModel(
     var proteinInput by mutableStateOf("")
     var carbsInput by mutableStateOf("")
     var fatInput by mutableStateOf("")
+    var portionGramsInput by mutableStateOf<Double?>(null)
+    var portionLabelInput by mutableStateOf<String?>(null)
     var mealTypeInput by mutableStateOf(guessMealType(java.time.LocalTime.now().hour))
 
     private val _mealsForDay = MutableStateFlow<List<LoggedMeal>>(emptyList())
@@ -312,6 +322,8 @@ class FoodTrackerViewModel(
         proteinInput = preset.protein?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: ""
         carbsInput = preset.carbs?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: ""
         fatInput = preset.fat?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: ""
+        portionGramsInput = preset.portionGrams
+        portionLabelInput = preset.portionLabel
     }
 
     fun saveCurrentMeal(saveAsFavourite: Boolean = false): Boolean {
@@ -333,7 +345,9 @@ class FoodTrackerViewModel(
             fat = fatInput.toDoubleOrNull(),
             timestamp = timestamp,
             dayKey = activeDayKey,
-            mealType = mealTypeInput
+            mealType = mealTypeInput,
+            portionGrams = portionGramsInput,
+            portionLabel = portionLabelInput
         )
         if (storage != null) {
             storage.saveMeal(meal)
@@ -359,6 +373,8 @@ class FoodTrackerViewModel(
         proteinInput = ""
         carbsInput = ""
         fatInput = ""
+        portionGramsInput = null
+        portionLabelInput = null
 
         setDayKey(activeDayKey)
         refreshPresets()

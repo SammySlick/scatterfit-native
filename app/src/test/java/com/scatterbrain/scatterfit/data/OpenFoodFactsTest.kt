@@ -159,4 +159,163 @@ class OpenFoodFactsTest {
         assertNull(OpenFoodFactsClient.parseBarcodeJson("invalid string"))
         assertNull(OpenFoodFactsClient.parseSearchJson(""))
     }
+
+    @Test
+    fun `portion parsing from serving_size strings extracts first number and unit`() {
+        val p1 = parseServingSize("250g")
+        assertNotNull(p1)
+        assertEquals(250.0, p1!!.amount, 0.001)
+        assertEquals("g", p1.unit)
+
+        val p2 = parseServingSize("500 ml")
+        assertNotNull(p2)
+        assertEquals(500.0, p2!!.amount, 0.001)
+        assertEquals("ml", p2.unit)
+
+        val p3 = parseServingSize("2 slices (60g)")
+        assertNotNull(p3)
+        assertEquals(60.0, p3!!.amount, 0.001)
+        assertEquals("g", p3.unit)
+
+        // Additional edge cases
+        val p4 = parseServingSize("1.5 l")
+        assertNotNull(p4)
+        assertEquals(1500.0, p4!!.amount, 0.001)
+        assertEquals("ml", p4.unit)
+
+        val p5 = parseServingSize("33 cl")
+        assertNotNull(p5)
+        assertEquals(330.0, p5!!.amount, 0.001)
+        assertEquals("ml", p5.unit)
+
+        assertNull(parseServingSize(null))
+        assertNull(parseServingSize(""))
+    }
+
+    @Test
+    fun `liquid inference identifies drinks and beverages as ml and solid foods as g`() {
+        assertEquals("ml", inferPortionUnit("Vieve Protein Water"))
+        assertEquals("ml", inferPortionUnit("Fresh Orange Juice"))
+        assertEquals("ml", inferPortionUnit("Semi-Skimmed Milk"))
+        assertEquals("ml", inferPortionUnit("Sparkling Energy Drink"))
+        assertEquals("ml", inferPortionUnit("Iced Green Tea"))
+        assertEquals("ml", inferPortionUnit("Cold Brew Coffee"))
+        assertEquals("ml", inferPortionUnit("Berry Smoothie"))
+        assertEquals("ml", inferPortionUnit("Protein Shake"))
+        assertEquals("ml", inferPortionUnit("Cola Zero"))
+        assertEquals("ml", inferPortionUnit("Craft Beer"))
+        assertEquals("ml", inferPortionUnit("Red Wine"))
+        assertEquals("ml", inferPortionUnit("Apple Cider"))
+        assertEquals("ml", inferPortionUnit(name = "Plant Drink", category = "beverages"))
+        assertEquals("ml", inferPortionUnit(name = "Unknown Liquid", category = "Fruit juices"))
+
+        assertEquals("g", inferPortionUnit("Peanut Butter"))
+        assertEquals("g", inferPortionUnit("Protein Bar"))
+        assertEquals("g", inferPortionUnit("Rolled Oats"))
+        assertEquals("g", inferPortionUnit("Chicken Breast"))
+        assertEquals("g", inferPortionUnit(name = "Greek Yogurt", category = "dairy"))
+    }
+
+    @Test
+    fun `scaling maths computes per100g times portion divided by 100 for all macros and handles servings and half preset`() {
+        val base = BaseNutrimentsPer100g(
+            kcal = 400.0,
+            protein = 25.0,
+            carbs = 40.0,
+            fat = 15.0
+        )
+
+        // 1. per100g * portion / 100
+        val scaled200 = scaleNutriments(base, 200.0)
+        assertEquals(800.0, scaled200.kcal, 0.001)
+        assertEquals(50.0, scaled200.protein, 0.001)
+        assertEquals(80.0, scaled200.carbs, 0.001)
+        assertEquals(30.0, scaled200.fat, 0.001)
+
+        val scaled50 = scaleNutriments(base, 50.0)
+        assertEquals(200.0, scaled50.kcal, 0.001)
+        assertEquals(12.5, scaled50.protein, 0.001)
+        assertEquals(20.0, scaled50.carbs, 0.001)
+        assertEquals(7.5, scaled50.fat, 0.001)
+
+        // 2. "servings" unit multiplies servingQuantity: "1.5 servings" of a 500ml bottle = 750ml
+        val servingQty = 500.0
+        val resolvedPortion = resolvePortionAmount(1.5, "servings", servingQty)
+        assertEquals(750.0, resolvedPortion, 0.001)
+        val scaledServings = scaleNutriments(base, resolvedPortion)
+        assertEquals(3000.0, scaledServings.kcal, 0.001) // 400 * 7.5
+        assertEquals(187.5, scaledServings.protein, 0.001)
+
+        // 3. Half preset = 0.5x
+        val halfAmount = servingQty / 2.0
+        assertEquals(250.0, halfAmount, 0.001)
+        val halfResolved = resolvePortionAmount(halfAmount, "ml", servingQty)
+        assertEquals(250.0, halfResolved, 0.001)
+        val scaledHalf = scaleNutriments(base, halfResolved)
+        assertEquals(1000.0, scaledHalf.kcal, 0.001) // 400 * 2.5
+    }
+
+    @Test
+    fun `LoggedMeal round-trip preserves portionGrams and portionLabel`() {
+        val meal = com.scatterbrain.scatterfit.ui.LoggedMeal(
+            id = "test-123",
+            name = "Vieve Protein Water",
+            kcal = 17.0,
+            protein = 20.0,
+            carbs = 0.0,
+            fat = 0.0,
+            mealType = "lunch",
+            portionGrams = 500.0,
+            portionLabel = "500 ml"
+        )
+
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val encoded = json.encodeToString(com.scatterbrain.scatterfit.ui.LoggedMeal.serializer(), meal)
+        val decoded = json.decodeFromString<com.scatterbrain.scatterfit.ui.LoggedMeal>(encoded)
+
+        assertEquals("test-123", decoded.id)
+        assertEquals("Vieve Protein Water", decoded.name)
+        assertEquals(17.0, decoded.kcal, 0.001)
+        assertEquals(500.0, decoded.portionGrams!!, 0.001)
+        assertEquals("500 ml", decoded.portionLabel)
+    }
+
+    @Test
+    fun `legacy LoggedMeal without portion fields decodes with null portion fields`() {
+        val legacyJson = """
+            {
+              "id": "legacy-1",
+              "name": "Classic Oats",
+              "kcal": 300.0,
+              "protein": 10.0
+            }
+        """.trimIndent()
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val decoded = json.decodeFromString<com.scatterbrain.scatterfit.ui.LoggedMeal>(legacyJson)
+
+        assertEquals("legacy-1", decoded.id)
+        assertEquals("Classic Oats", decoded.name)
+        assertNull(decoded.portionGrams)
+        assertNull(decoded.portionLabel)
+    }
+
+    @Test
+    fun `derivePortionPresets includes Whole, Half, 100g, and sane household serving`() {
+        val bread = ProductResult(
+            code = "bread1",
+            productName = "Wholemeal Bread",
+            servingSize = "2 slices (60g)",
+            servingQuantity = JsonPrimitive(400.0)
+        )
+        val presets = derivePortionPresets(bread)
+        assertEquals(4, presets.size)
+        assertEquals("Whole (400 g)", presets[0].label)
+        assertEquals(400.0, presets[0].amount, 0.001)
+        assertEquals("Half (200 g)", presets[1].label)
+        assertEquals(200.0, presets[1].amount, 0.001)
+        assertEquals("100 g", presets[2].label)
+        assertEquals(100.0, presets[2].amount, 0.001)
+        assertEquals("2 slices (60g)", presets[3].label)
+        assertEquals(60.0, presets[3].amount, 0.001)
+    }
 }

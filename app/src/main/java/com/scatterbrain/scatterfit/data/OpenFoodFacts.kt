@@ -37,6 +37,217 @@ data class OffNutriments(
 )
 
 @Serializable
+data class BaseNutrimentsPer100g(
+    val kcal: Double = 0.0,
+    val protein: Double = 0.0,
+    val carbs: Double = 0.0,
+    val fat: Double = 0.0,
+)
+
+data class ParsedPortion(
+    val amount: Double,
+    val unit: String,
+)
+
+data class ScaledNutriments(
+    val kcal: Double,
+    val protein: Double,
+    val carbs: Double,
+    val fat: Double,
+)
+
+data class PortionPreset(
+    val id: String,
+    val label: String,
+    val amount: Double,
+    val unit: String,
+    val portionLabel: String,
+)
+
+private val LIQUID_KEYWORDS = listOf(
+    "water", "drink", "juice", "milk", "beverage",
+    "tea", "coffee", "soda", "cola", "smoothie",
+    "shake", "beer", "wine", "cider"
+)
+
+fun parseServingSize(servingSize: String?): ParsedPortion? {
+    if (servingSize.isNullOrBlank()) return null
+    val match = Regex("""(?i)(\d+(?:\.\d+)?)\s*(g|ml|cl|dl|l|kg|oz)\b""").find(servingSize)
+    if (match != null) {
+        val rawNum = match.groupValues[1].toDoubleOrNull() ?: return null
+        val rawUnit = match.groupValues[2].lowercase()
+        return when (rawUnit) {
+            "kg" -> ParsedPortion(rawNum * 1000.0, "g")
+            "l" -> ParsedPortion(rawNum * 1000.0, "ml")
+            "cl" -> ParsedPortion(rawNum * 10.0, "ml")
+            "dl" -> ParsedPortion(rawNum * 100.0, "ml")
+            else -> ParsedPortion(rawNum, rawUnit)
+        }
+    }
+    val numMatch = Regex("""(\d+(?:\.\d+)?)""").find(servingSize)
+    if (numMatch != null) {
+        val num = numMatch.value.toDoubleOrNull() ?: return null
+        return ParsedPortion(num, "g")
+    }
+    return null
+}
+
+fun inferPortionUnit(
+    name: String?,
+    category: String? = null,
+    servingSize: String? = null,
+    quantity: String? = null
+): String {
+    val sizeText = listOfNotNull(servingSize, quantity).joinToString(" ").lowercase()
+    if (Regex("""\b(ml|cl|dl|fl\s*oz)\b""").containsMatchIn(sizeText) ||
+        Regex("""\d+\s*l\b""").containsMatchIn(sizeText)
+    ) {
+        return "ml"
+    }
+
+    val textToSearch = listOfNotNull(name, category).joinToString(" ").lowercase()
+    val isLiquid = LIQUID_KEYWORDS.any { keyword ->
+        textToSearch.contains(keyword)
+    }
+
+    return if (isLiquid) "ml" else "g"
+}
+
+fun computeBasePer100g(
+    nutriments: OffNutriments,
+    servingQuantity: Double? = null
+): BaseNutrimentsPer100g {
+    val sq = if (servingQuantity != null && servingQuantity > 0.0) servingQuantity else 100.0
+    val scale = sq / 100.0
+
+    val kcal100 = when {
+        nutriments.energyKcal_100g != null && nutriments.energyKcal_100g > 0.0 -> nutriments.energyKcal_100g
+        nutriments.energyKcal != null && nutriments.energyKcal > 0.0 -> nutriments.energyKcal
+        nutriments.energy_100g != null && nutriments.energy_100g > 0.0 -> nutriments.energy_100g / 4.184
+        nutriments.energyKcal_serving != null && nutriments.energyKcal_serving > 0.0 -> nutriments.energyKcal_serving / scale
+        nutriments.energy_serving != null && nutriments.energy_serving > 0.0 -> (nutriments.energy_serving / 4.184) / scale
+        else -> 0.0
+    }
+
+    val prot100 = when {
+        nutriments.proteins_100g != null -> nutriments.proteins_100g
+        nutriments.proteins_serving != null -> nutriments.proteins_serving / scale
+        else -> 0.0
+    }
+
+    val carbs100 = when {
+        nutriments.carbohydrates_100g != null -> nutriments.carbohydrates_100g
+        nutriments.carbohydrates_serving != null -> nutriments.carbohydrates_serving / scale
+        else -> 0.0
+    }
+
+    val fat100 = when {
+        nutriments.fat_100g != null -> nutriments.fat_100g
+        nutriments.fat_serving != null -> nutriments.fat_serving / scale
+        else -> 0.0
+    }
+
+    return BaseNutrimentsPer100g(
+        kcal = kcal100,
+        protein = prot100,
+        carbs = carbs100,
+        fat = fat100
+    )
+}
+
+fun scaleNutriments(base: BaseNutrimentsPer100g, portionGramsOrMl: Double): ScaledNutriments {
+    val factor = portionGramsOrMl / 100.0
+    return ScaledNutriments(
+        kcal = base.kcal * factor,
+        protein = base.protein * factor,
+        carbs = base.carbs * factor,
+        fat = base.fat * factor
+    )
+}
+
+fun resolvePortionAmount(enteredAmount: Double, unit: String, servingQuantity: Double): Double {
+    return if (unit.equals("servings", ignoreCase = true)) {
+        enteredAmount * servingQuantity
+    } else {
+        enteredAmount
+    }
+}
+
+fun formatAmount(value: Double): String {
+    return if (value % 1.0 == 0.0) {
+        value.toInt().toString()
+    } else {
+        String.format(java.util.Locale.US, "%.1f", value)
+    }
+}
+
+fun derivePortionPresets(product: ProductResult): List<PortionPreset> {
+    val sq = product.servingQuantityOrFallback
+    val unit = product.inferredUnit
+    val list = mutableListOf<PortionPreset>()
+
+    // 1. Whole packet/bottle
+    val wholeLabel = "Whole (${formatAmount(sq)} $unit)"
+    val wholePortionLabel = "${formatAmount(sq)} $unit"
+    list.add(
+        PortionPreset(
+            id = "whole",
+            label = wholeLabel,
+            amount = sq,
+            unit = unit,
+            portionLabel = wholePortionLabel
+        )
+    )
+
+    // 2. Half
+    val halfAmount = sq / 2.0
+    val halfLabel = "Half (${formatAmount(halfAmount)} $unit)"
+    val halfPortionLabel = "${formatAmount(halfAmount)} $unit"
+    list.add(
+        PortionPreset(
+            id = "half",
+            label = halfLabel,
+            amount = halfAmount,
+            unit = unit,
+            portionLabel = halfPortionLabel
+        )
+    )
+
+    // 3. 100 g / 100 ml (if different from whole and half)
+    if (kotlin.math.abs(sq - 100.0) > 0.5 && kotlin.math.abs(halfAmount - 100.0) > 0.5) {
+        list.add(
+            PortionPreset(
+                id = "100",
+                label = "100 $unit",
+                amount = 100.0,
+                unit = unit,
+                portionLabel = "100 $unit"
+            )
+        )
+    }
+
+    // 4. Sane household serving from serving_size (e.g. "2 slices (60g)")
+    val parsed = parseServingSize(product.servingSize)
+    if (parsed != null && parsed.amount > 0.0) {
+        val raw = product.servingSize?.trim() ?: "${formatAmount(parsed.amount)} ${parsed.unit}"
+        val alreadyCovered = list.any { kotlin.math.abs(it.amount - parsed.amount) < 0.5 }
+        if (!alreadyCovered) {
+            list.add(
+                PortionPreset(
+                    id = "household",
+                    label = raw,
+                    amount = parsed.amount,
+                    unit = parsed.unit,
+                    portionLabel = raw
+                )
+            )
+        }
+    }
+
+    return list
+}
+
+@Serializable
 data class ProductResult(
     val code: String = "",
     @SerialName("product_name")
@@ -48,12 +259,31 @@ data class ProductResult(
     val servingSize: String? = null,
     @SerialName("serving_quantity")
     val servingQuantity: JsonElement? = null,
+    @SerialName("categories")
+    val categories: String? = null,
 ) {
     val servingQuantityGrams: Double?
         get() {
             val prim = servingQuantity as? JsonPrimitive ?: return null
-            return prim.doubleOrNull ?: prim.content.toDoubleOrNull()
+            prim.doubleOrNull?.let { return it }
+            prim.content.toDoubleOrNull()?.let { return it }
+            return parseServingSize(prim.content)?.amount
         }
+
+    val servingQuantityOrFallback: Double
+        get() {
+            val parsed = servingQuantityGrams
+            if (parsed != null && parsed > 0.0) return parsed
+            val fromServingSize = parseServingSize(servingSize)?.amount
+            if (fromServingSize != null && fromServingSize > 0.0) return fromServingSize
+            return 100.0
+        }
+
+    val inferredUnit: String
+        get() = inferPortionUnit(productName, categories, servingSize, quantity)
+
+    val basePer100g: BaseNutrimentsPer100g
+        get() = computeBasePer100g(nutriments, servingQuantityOrFallback)
 
     val kcalPerServing: Int
         get() {
@@ -119,7 +349,7 @@ data class BarcodeResponse(
 
 object OpenFoodFactsClient {
     private const val BASE_URL = "https://world.openfoodfacts.org"
-    private const val FIELDS = "code,product_name,brands,quantity,nutriments,images_url,serving_size,serving_quantity"
+    private const val FIELDS = "code,product_name,brands,quantity,nutriments,images_url,serving_size,serving_quantity,categories"
     private const val USER_AGENT = "ScatterFit - Android - Version 1.0"
 
     val json = Json {

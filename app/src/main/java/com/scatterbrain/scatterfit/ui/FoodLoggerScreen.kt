@@ -762,6 +762,14 @@ fun FoodLoggerScreen(
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
+                                                if (!meal.portionLabel.isNullOrBlank()) {
+                                                    Text(
+                                                        text = "· ${meal.portionLabel}",
+                                                        fontSize = 12.sp,
+                                                        color = TextMuted,
+                                                        maxLines = 1
+                                                    )
+                                                }
                                                 Text(
                                                     text = timeStr,
                                                     fontSize = 11.sp,
