@@ -141,11 +141,11 @@ class GoalCalculatorTest {
     }
 
     @Test
-    fun `floor - tiny elderly body where TDEE minus 500 is less than BMR clamps to BMR`() {
+    fun `floor - tiny elderly body where TDEE minus 500 is less than BMR returns raw value and sets belowBmr`() {
         // Female, 75y, 145cm, 40kg, SEDENTARY (factor 1.2)
         // BMR = 10*40 + 6.25*145 - 5*75 - 161 = 400 + 906.25 - 375 - 161 = 770.25
         // TDEE = 770.25 * 1.2 = 924.3
-        // TDEE - 500 = 424.3, which is far below BMR (770.25)
+        // TDEE - 500 = 424.3, raw rounded to nearest 10 = 420
         val bmr = MifflinStJeor.calculateBmr(
             weightKg = 40.0,
             heightCm = 145.0,
@@ -163,9 +163,41 @@ class GoalCalculatorTest {
             sex = MifflinStJeor.Sex.FEMALE
         )
 
-        // Clamped to at least BMR
-        assertTrue("kcalTarget (${goal.kcalTarget}) must be >= BMR (${bmr.toInt()})", goal.kcalTarget >= bmr.toInt())
-        assertEquals(770, goal.kcalTarget)
+        // Raw un-clamped value returned with belowBmr warning flag
+        assertEquals(420, goal.kcalTarget)
+        assertTrue("belowBmr must be true for 420 kcal vs 770 BMR", goal.belowBmr)
+    }
+
+    @Test
+    fun `manual override split recomputes carbs and fat from custom kcal and protein`() {
+        // Custom 2000 kcal, 150g protein on FAT_LOSS (40% carbs / 60% fat):
+        // protein kcal = 150 * 4 = 600
+        // remaining = 2000 - 600 = 1400 kcal
+        // carbs = 1400 * 0.40 / 4 = 140 g
+        // fat = 1400 * 0.60 / 9 = 93.33 -> 93 g
+        val manualGoal = computeManualGoal(
+            preset = GoalPreset.FAT_LOSS,
+            activityLevel = ActivityLevel.MODERATE,
+            customKcal = 2000,
+            customProteinG = 150,
+            bmr = 1780.0
+        )
+        assertEquals(2000, manualGoal.kcalTarget)
+        assertEquals(150, manualGoal.proteinTargetG)
+        assertEquals(140, manualGoal.carbTargetG)
+        assertEquals(93, manualGoal.fatTargetG)
+        assertEquals(false, manualGoal.belowBmr)
+
+        // If manual kcal is below BMR, belowBmr flag is raised
+        val lowManual = computeManualGoal(
+            preset = GoalPreset.FAT_LOSS,
+            activityLevel = ActivityLevel.MODERATE,
+            customKcal = 1500,
+            customProteinG = 150,
+            bmr = 1780.0
+        )
+        assertEquals(1500, lowManual.kcalTarget)
+        assertTrue(lowManual.belowBmr)
     }
 
     @Test

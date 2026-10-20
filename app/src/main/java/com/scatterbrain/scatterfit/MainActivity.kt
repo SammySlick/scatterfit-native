@@ -16,6 +16,7 @@ import com.scatterbrain.scatterfit.data.HcPermissions
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.sync.SyncService
 import com.scatterbrain.scatterfit.ui.DebugScreen
+import com.scatterbrain.scatterfit.ui.GoalSetScreen
 import com.scatterbrain.scatterfit.ui.MainAppScreen
 import com.scatterbrain.scatterfit.ui.SettingsScreen
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
@@ -100,12 +101,16 @@ class MainActivity : ComponentActivity() {
             ScatterFitTheme {
                 var showSettings by remember { mutableStateOf(false) }
                 var showDebug by remember { mutableStateOf(false) }
+                var showGoalSet by remember { mutableStateOf(false) }
                 if (showDebug) {
                     DebugScreen(onBack = { showDebug = false })
+                } else if (showGoalSet) {
+                    GoalSetScreen(onBack = { showGoalSet = false })
                 } else if (showSettings) {
                     SettingsScreen(
                         onBack = { showSettings = false },
-                        onOpenDebug = { showDebug = true }
+                        onOpenDebug = { showDebug = true },
+                        onOpenGoalSet = { showGoalSet = true }
                     )
                 } else {
                     MainAppScreen(onSettingsClick = { showSettings = true })

@@ -22,26 +22,50 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scatterbrain.scatterfit.core.goalLabel
+import com.scatterbrain.scatterfit.data.GoalHistoryStorage
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenDebug: () -> Unit,
+    onOpenGoalSet: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
+
+    val context = LocalContext.current
+    val goalHistoryStorage = remember(context) { GoalHistoryStorage(context) }
+    val activeGoal = remember(goalHistoryStorage) { goalHistoryStorage.activeGoal() }
+
+    val goalValueText = if (activeGoal != null) {
+        val label = goalLabel[activeGoal.preset] ?: activeGoal.preset.name
+        val formattedDate = try {
+            LocalDate.parse(activeGoal.date).format(DateTimeFormatter.ofPattern("d MMM", Locale.US))
+        } catch (_: Exception) {
+            activeGoal.date
+        }
+        "$label · since $formattedDate"
+    } else {
+        "Not set"
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -83,6 +107,37 @@ fun SettingsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // SECTION: Goal (TOP of Settings)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "GOAL",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.2.sp
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                        border = BorderStroke(1.dp, BorderDefault)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            SettingRow(
+                                label = "Goal",
+                                value = goalValueText,
+                                isClickable = true,
+                                onClick = onOpenGoalSet
+                            )
+                        }
+                    }
+                }
+
                 // SECTION: Targets
                 // TODO: bind to ScoringSettings + settings UI
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
