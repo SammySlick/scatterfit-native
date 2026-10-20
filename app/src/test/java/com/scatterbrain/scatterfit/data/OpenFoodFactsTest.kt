@@ -1,5 +1,6 @@
 package com.scatterbrain.scatterfit.data
 
+import com.scatterbrain.scatterfit.ui.toProductResult
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -369,5 +370,148 @@ class OpenFoodFactsTest {
         val scaledChicken = scaleNutriments(chickenBreast.basePer100g, 200.0)
         assertEquals(212.0, scaledChicken.kcal, 0.001)
         assertEquals(46.2, scaledChicken.protein, 0.001)
+    }
+
+    @Test
+    fun `fuzzy search matches typos and case variants and rejects noise`() {
+        val list = OpenFoodFactsClient.loadGenericFoods()
+
+        // 1. "cicken" hits chicken breast
+        val cickenHits = filterFuzzy(list, "cicken") { it.productName }
+        assertTrue("cicken should hit at least one item", cickenHits.isNotEmpty())
+        assertTrue("cicken should hit chicken breast", cickenHits.any { it.productName.equals("Chicken breast", ignoreCase = true) })
+
+        // 2. "miLk" hits milks
+        val milkHits = filterFuzzy(list, "miLk") { it.productName }
+        assertTrue("miLk should hit multiple milks", milkHits.size >= 5)
+        assertTrue("miLk should hit Semi-skimmed milk", milkHits.any { it.productName.equals("Semi-skimmed milk", ignoreCase = true) })
+
+        // 3. "cheese toasty" hits cheese
+        val cheeseHits = filterFuzzy(list, "cheese toasty") { it.productName }
+        assertTrue("cheese toasty should hit cheese items", cheeseHits.isNotEmpty())
+        assertTrue("cheese toasty should hit Cheddar cheese", cheeseHits.any { it.productName.equals("Cheddar cheese", ignoreCase = true) })
+
+        // 4. Random noise returns empty list (noise stays out)
+        val noiseHits = filterFuzzy(list, "xyzqwe123456789") { it.productName }
+        assertTrue("Random noise should return no hits", noiseHits.isEmpty())
+
+        // 5. Capped at top 8 results
+        val broadHits = filterFuzzy(list, "e", limit = 8) { it.productName }
+        assertTrue("Broad hits capped at 8", broadHits.size <= 8)
+    }
+
+    @Test
+    fun `product with nutrition only per-serving normalises to per-100ml and scales correctly`() {
+        val product = ProductResult(
+            code = "vieve1",
+            productName = "Vieve Protein Water",
+            servingSize = "500 ml",
+            servingQuantity = JsonPrimitive(500.0),
+            nutriments = OffNutriments(
+                energyKcal_serving = 85.0,
+                proteins_serving = 20.0
+            )
+        )
+
+        // 1. Per-100ml values normalised: 85 / 5 = 17 kcal, 20 / 5 = 4g protein
+        assertEquals(17.0, product.basePer100g.kcal, 0.001)
+        assertEquals(4.0, product.basePer100g.protein, 0.001)
+        assertEquals("ml", product.inferredUnit)
+
+        // 2. Correct scaling at 100 ml: 17 kcal, 4.0g protein
+        val scaled100 = scaleNutriments(product.basePer100g, 100.0)
+        assertEquals(17.0, scaled100.kcal, 0.001)
+        assertEquals(4.0, scaled100.protein, 0.001)
+
+        // 3. Correct scaling at 250 ml: 42.5 kcal, 10.0g protein
+        val scaled250 = scaleNutriments(product.basePer100g, 250.0)
+        assertEquals(42.5, scaled250.kcal, 0.001)
+        assertEquals(10.0, scaled250.protein, 0.001)
+
+        // 4. Correct scaling at 500 ml: 85 kcal, 20.0g protein
+        val scaled500 = scaleNutriments(product.basePer100g, 500.0)
+        assertEquals(85.0, scaled500.kcal, 0.001)
+        assertEquals(20.0, scaled500.protein, 0.001)
+    }
+
+    @Test
+    fun `product with proper 100g fields is unaffected by serving normalization`() {
+        val product = ProductResult(
+            code = "bar1",
+            productName = "Protein Bar",
+            servingSize = "50g",
+            servingQuantity = JsonPrimitive(50.0),
+            nutriments = OffNutriments(
+                energyKcal_100g = 400.0,
+                proteins_100g = 30.0,
+                carbohydrates_100g = 40.0,
+                fat_100g = 10.0,
+                energyKcal_serving = 200.0,
+                proteins_serving = 15.0
+            )
+        )
+
+        assertEquals(400.0, product.basePer100g.kcal, 0.001)
+        assertEquals(30.0, product.basePer100g.protein, 0.001)
+        assertEquals("g", product.inferredUnit)
+
+        val scaled50 = scaleNutriments(product.basePer100g, 50.0)
+        assertEquals(200.0, scaled50.kcal, 0.001)
+        assertEquals(15.0, scaled50.protein, 0.001)
+    }
+
+    @Test
+    fun `unit label infers ml for liquid products and g for solid products`() {
+        val drink = ProductResult(
+            code = "drink1",
+            productName = "Vieve Protein Water",
+            servingSize = "500 ml",
+            servingQuantity = JsonPrimitive(500.0)
+        )
+        assertEquals("ml", drink.inferredUnit)
+        val drinkServingLabel = drink.servingSize ?: "${formatAmount(drink.servingQuantityOrFallback)} ${drink.inferredUnit}"
+        assertTrue(drinkServingLabel.contains("ml"))
+
+        val solid = ProductResult(
+            code = "oats1",
+            productName = "Rolled Oats",
+            servingSize = "40g",
+            servingQuantity = JsonPrimitive(40.0)
+        )
+        assertEquals("g", solid.inferredUnit)
+        val solidServingLabel = solid.servingSize ?: "${formatAmount(solid.servingQuantityOrFallback)} ${solid.inferredUnit}"
+        assertTrue(solidServingLabel.contains("g"))
+    }
+
+    @Test
+    fun `preset derived from meal logged at 250ml re-applies 250ml not 100g`() {
+        val meal = com.scatterbrain.scatterfit.ui.LoggedMeal(
+            name = "Vieve Protein Water",
+            kcal = 42.5,
+            protein = 10.0,
+            portionGrams = 250.0,
+            portionLabel = "250 ml",
+            dayKey = "2026-10-18"
+        )
+        val presets = com.scatterbrain.scatterfit.ui.deriveMealPresets(listOf(meal))
+        assertEquals(1, presets.size)
+        val preset = presets.first()
+        assertEquals(250.0, preset.portionGrams!!, 0.001)
+        assertEquals("250 ml", preset.portionLabel)
+
+        // Convert to ProductResult for ConfirmProductCard re-application
+        val product = preset.toProductResult()
+        assertEquals(250.0, product.servingQuantityOrFallback, 0.001)
+        assertEquals("ml", product.inferredUnit)
+        assertEquals("250 ml", product.servingSize)
+
+        // Normalised per-100ml: 42.5 * (100 / 250) = 17 kcal, 10.0 * (100 / 250) = 4g P
+        assertEquals(17.0, product.basePer100g.kcal, 0.001)
+        assertEquals(4.0, product.basePer100g.protein, 0.001)
+
+        // Scaled at 250ml re-applies the original 42.5 kcal and 10g protein
+        val scaled = scaleNutriments(product.basePer100g, product.servingQuantityOrFallback)
+        assertEquals(42.5, scaled.kcal, 0.001)
+        assertEquals(10.0, scaled.protein, 0.001)
     }
 }

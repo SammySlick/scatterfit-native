@@ -121,6 +121,29 @@ fun deriveMealPresets(meals: List<LoggedMeal>, limit: Int = 8): List<MealPreset>
         }
 }
 
+fun MealPreset.toProductResult(): com.scatterbrain.scatterfit.data.ProductResult {
+    val portion = portionGrams?.takeIf { it > 0.0 } ?: 100.0
+    val unit = portionLabel?.let { com.scatterbrain.scatterfit.data.parseServingSize(it)?.unit }
+        ?: com.scatterbrain.scatterfit.data.inferPortionUnit(name, servingSize = portionLabel)
+    val ratio = 100.0 / portion
+    val nutriments = com.scatterbrain.scatterfit.data.OffNutriments(
+        energyKcal_100g = kcal * ratio,
+        proteins_100g = protein?.let { it * ratio },
+        carbohydrates_100g = carbs?.let { it * ratio },
+        fat_100g = fat?.let { it * ratio }
+    )
+    val sSize = portionLabel ?: "${com.scatterbrain.scatterfit.data.formatAmount(portion)} $unit"
+    return com.scatterbrain.scatterfit.data.ProductResult(
+        code = "preset_${name.trim().lowercase().replace(Regex("[^a-z0-9]+"), "_")}",
+        productName = name,
+        brands = "Preset",
+        categories = if (unit == "ml") "beverage" else null,
+        servingSize = sSize,
+        servingQuantity = kotlinx.serialization.json.JsonPrimitive(portion),
+        nutriments = nutriments
+    )
+}
+
 class FoodStorage(private val context: Context) {
     private val prefs = context.getSharedPreferences("scatterfit_food_prefs", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
@@ -294,12 +317,15 @@ class FoodTrackerViewModel(
     }
 
     fun logCustomMeal(meal: LoggedMeal) {
+        val targetDay = if (meal.dayKey.isNotBlank()) meal.dayKey else activeDayKey
+        val mealWithDay = meal.copy(dayKey = targetDay)
         if (storage != null) {
-            storage.saveMeal(meal)
+            storage.saveMeal(mealWithDay)
             syncStorageToPipeline()
         } else {
-            val list = inMemoryStorage.getOrPut(activeDayKey) { mutableListOf() }
-            list.add(meal)
+            val list = inMemoryStorage.getOrPut(targetDay) { mutableListOf() }
+            list.removeAll { it.id == mealWithDay.id }
+            list.add(mealWithDay)
         }
         setDayKey(activeDayKey)
         refreshPresets()

@@ -122,35 +122,90 @@ fun inferPortionUnit(
 
 fun computeBasePer100g(
     nutriments: OffNutriments,
-    servingQuantity: Double? = null
+    servingQuantity: Double? = null,
+    isLiquid: Boolean = false,
 ): BaseNutrimentsPer100g {
     val sq = if (servingQuantity != null && servingQuantity > 0.0) servingQuantity else 100.0
     val scale = sq / 100.0
 
-    val kcal100 = when {
+    // 1. Serving values
+    val kcalServing = when {
+        nutriments.energyKcal_serving != null && nutriments.energyKcal_serving > 0.0 -> nutriments.energyKcal_serving
+        nutriments.energy_serving != null && nutriments.energy_serving > 0.0 -> nutriments.energy_serving / 4.184
+        else -> null
+    }
+    val protServing = nutriments.proteins_serving?.takeIf { it >= 0.0 }
+    val carbsServing = nutriments.carbohydrates_serving?.takeIf { it >= 0.0 }
+    val fatServing = nutriments.fat_serving?.takeIf { it >= 0.0 }
+
+    // 2. Raw 100g values
+    val rawKcal100 = when {
         nutriments.energyKcal_100g != null && nutriments.energyKcal_100g > 0.0 -> nutriments.energyKcal_100g
-        nutriments.energyKcal != null && nutriments.energyKcal > 0.0 -> nutriments.energyKcal
         nutriments.energy_100g != null && nutriments.energy_100g > 0.0 -> nutriments.energy_100g / 4.184
-        nutriments.energyKcal_serving != null && nutriments.energyKcal_serving > 0.0 -> nutriments.energyKcal_serving / scale
-        nutriments.energy_serving != null && nutriments.energy_serving > 0.0 -> (nutriments.energy_serving / 4.184) / scale
+        else -> null
+    }
+    val rawProt100 = nutriments.proteins_100g?.takeIf { it >= 0.0 }
+    val rawCarbs100 = nutriments.carbohydrates_100g?.takeIf { it >= 0.0 }
+    val rawFat100 = nutriments.fat_100g?.takeIf { it >= 0.0 }
+
+    // Resolve Kcal (sanity check: liquid cannot have per-100ml > per-serving when serving > 100ml)
+    val kcal100 = when {
+        rawKcal100 != null && kcalServing != null -> {
+            if (sq > 100.0 && isLiquid && rawKcal100 > kcalServing * 1.05) {
+                debugLog("OFF", "Sanity fallback: per-100ml ($rawKcal100) > per-serving ($kcalServing) for liquid of $sq ml")
+                kcalServing / scale
+            } else {
+                rawKcal100
+            }
+        }
+        rawKcal100 != null -> rawKcal100
+        kcalServing != null -> kcalServing / scale
+        nutriments.energyKcal != null && nutriments.energyKcal > 0.0 -> {
+            if (sq > 100.0 && isLiquid) nutriments.energyKcal / scale else nutriments.energyKcal
+        }
         else -> 0.0
     }
 
+    // Resolve Protein
     val prot100 = when {
-        nutriments.proteins_100g != null -> nutriments.proteins_100g
-        nutriments.proteins_serving != null -> nutriments.proteins_serving / scale
+        rawProt100 != null && protServing != null -> {
+            if (sq > 100.0 && isLiquid && rawProt100 > protServing * 1.05) {
+                debugLog("OFF", "Sanity fallback: per-100ml protein ($rawProt100) > per-serving ($protServing)")
+                protServing / scale
+            } else {
+                rawProt100
+            }
+        }
+        rawProt100 != null -> rawProt100
+        protServing != null -> protServing / scale
         else -> 0.0
     }
 
+    // Resolve Carbs
     val carbs100 = when {
-        nutriments.carbohydrates_100g != null -> nutriments.carbohydrates_100g
-        nutriments.carbohydrates_serving != null -> nutriments.carbohydrates_serving / scale
+        rawCarbs100 != null && carbsServing != null -> {
+            if (sq > 100.0 && isLiquid && rawCarbs100 > carbsServing * 1.05) {
+                carbsServing / scale
+            } else {
+                rawCarbs100
+            }
+        }
+        rawCarbs100 != null -> rawCarbs100
+        carbsServing != null -> carbsServing / scale
         else -> 0.0
     }
 
+    // Resolve Fat
     val fat100 = when {
-        nutriments.fat_100g != null -> nutriments.fat_100g
-        nutriments.fat_serving != null -> nutriments.fat_serving / scale
+        rawFat100 != null && fatServing != null -> {
+            if (sq > 100.0 && isLiquid && rawFat100 > fatServing * 1.05) {
+                fatServing / scale
+            } else {
+                rawFat100
+            }
+        }
+        rawFat100 != null -> rawFat100
+        fatServing != null -> fatServing / scale
         else -> 0.0
     }
 
@@ -254,6 +309,99 @@ private fun debugLog(tag: String, msg: String) {
     }
 }
 
+fun levenshteinDistance(s1: String, s2: String): Int {
+    val m = s1.length
+    val n = s2.length
+    val dp = IntArray(n + 1) { it }
+    for (i in 1..m) {
+        var prev = dp[0]
+        dp[0] = i
+        for (j in 1..n) {
+            val temp = dp[j]
+            dp[j] = if (s1[i - 1] == s2[j - 1]) {
+                prev
+            } else {
+                minOf(prev + 1, minOf(dp[j] + 1, dp[j - 1] + 1))
+            }
+            prev = temp
+        }
+    }
+    return dp[n]
+}
+
+fun fuzzyScore(query: String, target: String): Double {
+    val qClean = query.trim().lowercase()
+    val tClean = target.trim().lowercase()
+    if (qClean.isEmpty() || tClean.isEmpty()) return 0.0
+
+    if (tClean.contains(qClean)) {
+        return 1.0 + if (tClean.startsWith(qClean)) 0.2 else 0.0
+    }
+
+    val qTokens = qClean.split(Regex("\\s+")).filter { it.isNotBlank() }
+    val tTokens = tClean.split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }
+    if (qTokens.isEmpty() || tTokens.isEmpty()) return 0.0
+
+    var matchedTokensCount = 0
+    var totalTokenScore = 0.0
+
+    for (qTok in qTokens) {
+        var bestTokenScore = 0.0
+        for (tTok in tTokens) {
+            if (tTok == qTok) {
+                bestTokenScore = maxOf(bestTokenScore, 1.0)
+                continue
+            }
+            if (tTok.contains(qTok) && qTok.length >= 2) {
+                bestTokenScore = maxOf(bestTokenScore, 0.85)
+                continue
+            }
+            val maxD = when {
+                qTok.length <= 3 -> 1
+                qTok.length <= 6 -> 2
+                else -> 3
+            }
+            if (kotlin.math.abs(qTok.length - tTok.length) <= maxD) {
+                val d = levenshteinDistance(qTok, tTok)
+                if (d <= maxD) {
+                    val sim = 1.0 - (d.toDouble() / maxOf(qTok.length, tTok.length))
+                    if (sim >= 0.65) {
+                        bestTokenScore = maxOf(bestTokenScore, sim)
+                    }
+                }
+            }
+        }
+        if (bestTokenScore >= 0.65) {
+            matchedTokensCount++
+            totalTokenScore += bestTokenScore
+        }
+    }
+
+    if (matchedTokensCount == 0) return 0.0
+
+    return (totalTokenScore / qTokens.size.toDouble()) * (matchedTokensCount.toDouble() / qTokens.size.toDouble()) +
+            (0.5 * totalTokenScore / matchedTokensCount)
+}
+
+fun <T> filterFuzzy(
+    items: List<T>,
+    query: String,
+    limit: Int = 8,
+    nameSelector: (T) -> String?
+): List<T> {
+    val q = query.trim()
+    if (q.isBlank()) return emptyList()
+    return items
+        .mapNotNull { item ->
+            val name = nameSelector(item) ?: return@mapNotNull null
+            val score = fuzzyScore(q, name)
+            if (score >= 0.6) item to score else null
+        }
+        .sortedByDescending { it.second }
+        .take(limit)
+        .map { it.first }
+}
+
 @Serializable
 data class ProductResult(
     val code: String = "",
@@ -302,7 +450,7 @@ data class ProductResult(
         get() = inferPortionUnit(productName, categories, servingSize, quantity)
 
     val basePer100g: BaseNutrimentsPer100g
-        get() = computeBasePer100g(nutriments, servingQuantityOrFallback)
+        get() = computeBasePer100g(nutriments, servingQuantityOrFallback, isLiquid = inferredUnit == "ml")
 
     val kcalPerServing: Int
         get() {
@@ -312,38 +460,29 @@ data class ProductResult(
             if (nutriments.energy_serving != null && nutriments.energy_serving > 0.0) {
                 return kotlin.math.round(nutriments.energy_serving / 4.184).toInt()
             }
-            val scale = (servingQuantityGrams ?: 100.0) / 100.0
-            if (nutriments.energyKcal_100g != null && nutriments.energyKcal_100g > 0.0) {
-                return kotlin.math.round(nutriments.energyKcal_100g * scale).toInt()
-            }
-            if (nutriments.energyKcal != null && nutriments.energyKcal > 0.0) {
-                return kotlin.math.round(nutriments.energyKcal * scale).toInt()
-            }
-            if (nutriments.energy_100g != null && nutriments.energy_100g > 0.0) {
-                return kotlin.math.round((nutriments.energy_100g / 4.184) * scale).toInt()
-            }
-            return 0
+            val scale = servingQuantityOrFallback / 100.0
+            return kotlin.math.round(basePer100g.kcal * scale).toInt()
         }
 
     val proteinPerServing: Double
         get() {
             if (nutriments.proteins_serving != null) return nutriments.proteins_serving
-            val scale = (servingQuantityGrams ?: 100.0) / 100.0
-            return (nutriments.proteins_100g ?: 0.0) * scale
+            val scale = servingQuantityOrFallback / 100.0
+            return basePer100g.protein * scale
         }
 
     val carbsPerServing: Double
         get() {
             if (nutriments.carbohydrates_serving != null) return nutriments.carbohydrates_serving
-            val scale = (servingQuantityGrams ?: 100.0) / 100.0
-            return (nutriments.carbohydrates_100g ?: 0.0) * scale
+            val scale = servingQuantityOrFallback / 100.0
+            return basePer100g.carbs * scale
         }
 
     val fatPerServing: Double
         get() {
             if (nutriments.fat_serving != null) return nutriments.fat_serving
-            val scale = (servingQuantityGrams ?: 100.0) / 100.0
-            return (nutriments.fat_100g ?: 0.0) * scale
+            val scale = servingQuantityOrFallback / 100.0
+            return basePer100g.fat * scale
         }
 
     val displayName: String

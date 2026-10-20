@@ -265,15 +265,13 @@ fun MyDayScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(bottom = 16.dp)
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // TOP BAR: statusBarsPadding (Streak chip, My Day title, Calendar + Settings icons)
+        // TOP BAR: (Streak chip, My Day title, Calendar + Settings icons)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween

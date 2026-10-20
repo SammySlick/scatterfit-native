@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scatterbrain.scatterfit.sync.SyncHub
+import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
@@ -66,6 +67,7 @@ fun MainAppScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = AppBackground,
         bottomBar = {
             BottomNavBar(
                 selectedTab = selectedTab,

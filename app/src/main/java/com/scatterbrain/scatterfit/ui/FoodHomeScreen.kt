@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -49,6 +51,7 @@ import com.scatterbrain.scatterfit.data.OffNutriments
 import com.scatterbrain.scatterfit.data.OpenFoodFactsClient
 import com.scatterbrain.scatterfit.data.ProductResult
 import com.scatterbrain.scatterfit.data.derivePortionPresets
+import com.scatterbrain.scatterfit.data.filterFuzzy
 import com.scatterbrain.scatterfit.data.formatAmount
 import com.scatterbrain.scatterfit.data.resolvePortionAmount
 import com.scatterbrain.scatterfit.data.scaleNutriments
@@ -121,17 +124,19 @@ fun FoodHomeScreen(
 
     val pipelineMeals = repoDaily?.meals?.get(activeDay) ?: emptyList()
 
-    // Full meals set: stored meals + pipeline meals not already represented
-    val allCombinedMeals = remember(storedMeals, pipelineMeals, activeDay) {
-        if (storedMeals.isEmpty()) {
-            pipelineMeals.map { it.toLoggedMeal(activeDay) }
-        } else {
-            val storedKeys = storedMeals.map { it.name.trim().lowercase() to it.kcal.roundToInt() }.toSet()
-            val extra = pipelineMeals
-                .filterNot { (it.name.trim().lowercase() to it.kcal.roundToInt()) in storedKeys }
-                .map { it.toLoggedMeal(activeDay) }
-            storedMeals + extra
-        }
+    // External third-party HC meals (e.g. MyFitnessPal) that are NOT local to ScatterFit:
+    val externalHcMeals = remember(pipelineMeals, activeDay) {
+        pipelineMeals
+            .filterNot { entry ->
+                val src = entry.source.lowercase()
+                src == "local" || src == "app" || src.contains("scatterfit")
+            }
+            .map { it.toLoggedMeal(activeDay) }
+    }
+
+    // Single source of truth: every food list on Food home derives from storedMeals (+ external entries)
+    val displayMeals = remember(storedMeals, externalHcMeals) {
+        storedMeals + externalHcMeals
     }
 
     // Pending delete + undo state (5 second timeout)
@@ -149,11 +154,6 @@ fun FoodHomeScreen(
                 pendingDeletedMeal = null
             }
         }
-    }
-
-    // Display meals
-    val displayMeals = remember(allCombinedMeals) {
-        allCombinedMeals
     }
 
     var macroMode by remember { mutableStateOf(MacroCardMode.CONSUMED) }
@@ -234,31 +234,24 @@ fun FoodHomeScreen(
         }.getOrDefault(activeDay)
     }
 
-    // Totals for active day matching DailyRepository & Day Card parity (includes ALL meals, including hidden)
-    val calFromDaily = repoDaily?.caloriesEaten?.get(activeDay)
-    val totalKcal = (calFromDaily ?: displayMeals.sumOf { it.kcal }).roundToInt()
-
-    val protFromDaily = repoDaily?.protein?.get(activeDay)
-    val totalProtein = (protFromDaily ?: displayMeals.sumOf { it.protein ?: 0.0 }).roundToInt()
-
-    val carbsFromDaily = repoDaily?.carbs?.get(activeDay)
-    val totalCarbs = (carbsFromDaily ?: displayMeals.sumOf { it.carbs ?: 0.0 }).roundToInt()
-
-    val fatFromDaily = repoDaily?.fat?.get(activeDay)
-    val totalFat = (fatFromDaily ?: displayMeals.sumOf { it.fat ?: 0.0 }).roundToInt()
+    // Totals for active day derived directly from displayMeals for immediate 0ms updates
+    val totalKcal = displayMeals.sumOf { it.kcal }.roundToInt()
+    val totalProtein = displayMeals.sumOf { it.protein ?: 0.0 }.roundToInt()
+    val totalCarbs = displayMeals.sumOf { it.carbs ?: 0.0 }.roundToInt()
+    val totalFat = displayMeals.sumOf { it.fat ?: 0.0 }.roundToInt()
 
     val kcalTarget = settings.kcalTarget
     val proteinTarget = settings.proteinTarget
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = AppBackground
+        containerColor = AppBackground,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(bottom = 16.dp)
         ) {
             // Top Bar
             Row(
@@ -515,7 +508,7 @@ fun FoodHomeScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Meal removed (${undoSecondsRemaining}s)",
+                                text = "Item deleted (${undoSecondsRemaining}s)",
                                 color = TextForeground,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -556,6 +549,7 @@ fun FoodHomeScreen(
                     ConfirmProductCard(
                         product = pendingConfirmProduct!!,
                         defaultMealType = viewModel.mealTypeInput,
+                        dayKey = activeDay,
                         onConfirm = { mealToLog ->
                             viewModel.logCustomMeal(mealToLog)
                             pendingConfirmProduct = null
@@ -692,18 +686,7 @@ fun FoodHomeScreen(
                         isSearchingOff = isSearchingOff,
                         searchHasExecuted = searchHasExecuted,
                         onSelectPreset = { preset ->
-                            val derivedNutriments = OffNutriments(
-                                energyKcal_100g = preset.kcal,
-                                proteins_100g = preset.protein,
-                                carbohydrates_100g = preset.carbs,
-                                fat_100g = preset.fat
-                            )
-                            pendingConfirmProduct = ProductResult(
-                                code = "preset_${preset.name}",
-                                productName = preset.name,
-                                nutriments = derivedNutriments,
-                                servingQuantity = kotlinx.serialization.json.JsonPrimitive(100.0)
-                            )
+                            pendingConfirmProduct = preset.toProductResult()
                             activeBottomSheetMealType = null
                             searchQuery = ""
                         },
@@ -738,18 +721,7 @@ fun FoodHomeScreen(
                                         .background(SecondaryFill)
                                         .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
                                         .clickable {
-                                            val derivedNutriments = OffNutriments(
-                                                energyKcal_100g = p.kcal,
-                                                proteins_100g = p.protein,
-                                                carbohydrates_100g = p.carbs,
-                                                fat_100g = p.fat
-                                            )
-                                            pendingConfirmProduct = ProductResult(
-                                                code = "preset_${p.name}",
-                                                productName = p.name,
-                                                nutriments = derivedNutriments,
-                                                servingQuantity = kotlinx.serialization.json.JsonPrimitive(100.0)
-                                            )
+                                            pendingConfirmProduct = p.toProductResult()
                                             activeBottomSheetMealType = null
                                         }
                                         .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -764,7 +736,30 @@ fun FoodHomeScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Generic Foods", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextForeground)
-                    Text("Coming next...", fontSize = 12.sp, color = TextMuted)
+                    val genericContext = androidx.compose.ui.platform.LocalContext.current
+                    val sampleGeneric = remember(genericContext) {
+                        OpenFoodFactsClient.loadGenericFoods(genericContext).take(6)
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        sampleGeneric.forEach { g ->
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(SecondaryFill)
+                                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        pendingConfirmProduct = g
+                                        activeBottomSheetMealType = null
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text("${g.productName} · ${g.kcalPerServing} kcal", fontSize = 11.sp, color = TextForeground)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1183,6 +1178,7 @@ fun ConfirmProductCard(
     onConfirm: (LoggedMeal) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    dayKey: String = remember { todayKey() },
 ) {
     val defaultUnit = remember(product) { product.inferredUnit }
     val servingQuantity = remember(product) { product.servingQuantityOrFallback }
@@ -1334,10 +1330,16 @@ fun ConfirmProductCard(
                         product.brands?.takeIf { it.isNotBlank() }?.let {
                             Text(text = it, fontSize = 12.sp, color = TextMuted)
                         }
-                        val servingInfo = product.servingSize ?: product.servingQuantityGrams?.let { "${it.toInt()}g" }
-                        if (servingInfo != null) {
-                            Text(text = "Serving: $servingInfo", fontSize = 11.sp, color = TealHighlight)
+                        val servingInfo = remember(product, defaultUnit, servingQuantity) {
+                            product.servingSize?.takeIf { it.isNotBlank() }?.let { raw ->
+                                if (raw.contains("g", ignoreCase = true) || raw.contains("ml", ignoreCase = true)) {
+                                    raw
+                                } else {
+                                    "$raw $defaultUnit"
+                                }
+                            } ?: "${formatAmount(servingQuantity)} $defaultUnit"
                         }
+                        Text(text = "Serving: $servingInfo", fontSize = 11.sp, color = TealHighlight)
                     }
 
                     Column(horizontalAlignment = Alignment.End) {
@@ -1549,6 +1551,7 @@ fun ConfirmProductCard(
                                 fat = manualFat.toDoubleOrNull(),
                                 mealType = selectedMealType,
                                 isLocal = true,
+                                dayKey = dayKey,
                                 portionGrams = null,
                                 portionLabel = null
                             )
@@ -1573,6 +1576,7 @@ fun ConfirmProductCard(
                                 fat = scaled.fat,
                                 mealType = selectedMealType,
                                 isLocal = true,
+                                dayKey = dayKey,
                                 portionGrams = resolvedGramsOrMl,
                                 portionLabel = resolvedLabel
                             )
@@ -1611,16 +1615,17 @@ private fun LiveFoodSearchResults(
     val context = androidx.compose.ui.platform.LocalContext.current
     val genericFoodsList = remember(context) { OpenFoodFactsClient.loadGenericFoods(context) }
 
-    val matchedPresets = presets.filter { it.name.lowercase().contains(q) }
-    val matchedFavourites = favourites.filter { it.name.lowercase().contains(q) }
-    val matchedRecipes = recipes.filter { it.name.lowercase().contains(q) }
-    
-    val genericSearchResults = genericFoodsList.filter { productResult: ProductResult ->
-        productResult.productName?.lowercase()?.contains(q) == true
-    }
+    val matchedPresets = filterFuzzy(presets, q, limit = 8) { it.name }
+    val matchedFavourites = filterFuzzy(favourites, q, limit = 8) { it.name }
+    val matchedRecipes = filterFuzzy(recipes, q, limit = 8) { it.name }
+    val genericSearchResults = filterFuzzy(genericFoodsList, q, limit = 8) { it.productName }
+
+    val searchScrollState = rememberScrollState()
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(max = 400.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SecondaryFill),
         border = BorderStroke(1.dp, TealHighlight.copy(alpha = 0.4f))
@@ -1628,6 +1633,7 @@ private fun LiveFoodSearchResults(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(searchScrollState)
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {

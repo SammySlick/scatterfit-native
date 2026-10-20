@@ -92,8 +92,10 @@ class FoodLoggerTest {
     }
 
     @Test
-    fun `undoing a meal deletion re-adds it correctly`() {
+    fun `delete immediately removes meal from mealsForDay flow and undo immediately restores it with original id and timestamp`() {
         val viewModel = FoodTrackerViewModel()
+        viewModel.setDayKey(today)
+
         val meal = LoggedMeal(
             id = "meal-x",
             name = "Test Meal",
@@ -104,13 +106,32 @@ class FoodLoggerTest {
         viewModel.logCustomMeal(meal)
         assertEquals(1, viewModel.mealsForDay.value.size)
 
+        // Delete immediately removes from storage flow
         viewModel.deleteMeal(meal.id)
         assertTrue(viewModel.mealsForDay.value.isEmpty())
 
-        // undo re-logs the exact same meal
+        // Undo re-inserts exact same meal with original id and timestamp
         viewModel.logCustomMeal(meal)
         assertEquals(1, viewModel.mealsForDay.value.size)
-        assertEquals("meal-x", viewModel.mealsForDay.value.first().id)
+        val restored = viewModel.mealsForDay.value.first()
+        assertEquals("meal-x", restored.id)
+        assertEquals(nowMs, restored.timestamp)
+    }
+
+    @Test
+    fun `logCustomMeal without explicit dayKey adopts viewModel activeDayKey without delay`() {
+        val viewModel = FoodTrackerViewModel()
+        viewModel.setDayKey(today)
+
+        val meal = LoggedMeal(
+            id = "meal-no-day",
+            name = "Snack Bar",
+            kcal = 200.0,
+            dayKey = ""
+        )
+        viewModel.logCustomMeal(meal)
+        assertEquals(1, viewModel.mealsForDay.value.size)
+        assertEquals(today, viewModel.mealsForDay.value.first().dayKey)
     }
 
     @Test
