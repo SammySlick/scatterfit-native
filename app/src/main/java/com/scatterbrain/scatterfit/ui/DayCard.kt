@@ -65,8 +65,7 @@ import kotlin.math.roundToInt
 
 data class DayCardTicks(
     val completedCount: Int,
-    val totalTarget: Int, // 4 on training days, 3 on rest days
-    val hasWeightBonus: Boolean,
+    val totalTarget: Int, // 5 on training days, 4 on rest days
 ) {
     val counterText: String = "$completedCount / $totalTarget"
 }
@@ -77,35 +76,35 @@ fun computeDayCardTicks(
     todayKey: String,
     isTrainingDay: Boolean,
 ): DayCardTicks {
-    val totalM = if (isTrainingDay) 4 else 3
+    val totalM = if (isTrainingDay) 5 else 4
     if (daily == null) {
-        return DayCardTicks(completedCount = 0, totalTarget = totalM, hasWeightBonus = false)
+        return DayCardTicks(completedCount = 0, totalTarget = totalM)
     }
 
     val calVal = daily.caloriesEaten[todayKey] ?: 0.0
     // Ticked if calories in band (or logged within goal)
-    val calTicked = calVal > 0.0 && calVal <= (settings.kcalTarget + settings.tolerances.kcalGreen)
+    val calCompleted = calVal > 0.0 && calVal <= (settings.kcalTarget + settings.tolerances.kcalGreen)
 
     val stepVal = daily.steps[todayKey] ?: 0.0
-    val stepTicked = stepVal >= settings.stepTarget
+    val stepCompleted = stepVal >= settings.stepTarget
 
     val protVal = daily.protein[todayKey] ?: 0.0
-    val protTicked = protVal >= settings.proteinTarget
+    val protCompleted = protVal >= settings.proteinTarget
+
+    val weightVal = daily.weight[todayKey]
+    val weightCompleted = weightVal != null && weightVal > 0.0
 
     val trainMins = daily.trainingMinutes[todayKey] ?: 0.0
     // Training days only! Rest days never auto-tick training.
-    val trainTicked = isTrainingDay && trainMins > 0.0
+    val trainCompleted = isTrainingDay && trainMins > 0.0
 
-    val weightVal = daily.weight[todayKey]
-    val hasWeightToday = weightVal != null && weightVal > 0.0
-
-    val baseCount = listOf(calTicked, stepTicked, protTicked).count { it } + if (trainTicked) 1 else 0
-    val completedCount = (baseCount + if (hasWeightToday) 1 else 0).coerceAtLeast(0)
+    val baseCount = listOf(calCompleted, stepCompleted, protCompleted, weightCompleted).count { it }
+    val totalCount = baseCount + if (trainCompleted) 1 else 0
+    val completedCount = totalCount.coerceIn(0, totalM)
 
     return DayCardTicks(
         completedCount = completedCount,
-        totalTarget = totalM,
-        hasWeightBonus = hasWeightToday
+        totalTarget = totalM
     )
 }
 
@@ -256,7 +255,7 @@ fun DayCard(
                             )
                         }
                         Text(
-                            text = "ticked",
+                            text = "completed",
                             fontSize = 11.sp,
                             color = TextMuted
                         )

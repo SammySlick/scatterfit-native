@@ -24,11 +24,12 @@ class DayCardTest {
     private val defaultBounds = ZoneBounds(130, 145, 160, 175)
 
     @Test
-    fun `tick count maths - training day has M equal 4 and counts all passing`() {
+    fun `tick count maths - training day has M equal 5 and counts all passing including weigh-in`() {
         val daily = AssembledDaily(
             caloriesEaten = mapOf(today to 2000.0), // within goal tolerance -> ticked
             steps = mapOf(today to 10500.0),        // >= 10k -> ticked
             protein = mapOf(today to 160.0),        // >= 160g -> ticked
+            weight = mapOf(today to 82.4),          // weigh-in -> ticked
             sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")), // sleep is context, never ticks
             trainingMinutes = mapOf(today to 30.0), // training day with logged work -> ticked
             zoneBounds = defaultBounds,
@@ -36,17 +37,25 @@ class DayCardTest {
         )
 
         val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = true)
-        assertEquals(4, ticks.totalTarget)
-        assertEquals(4, ticks.completedCount)
-        assertEquals("4 / 4", ticks.counterText)
+        assertEquals(5, ticks.totalTarget)
+        assertEquals(5, ticks.completedCount)
+        assertEquals("5 / 5", ticks.counterText)
+
+        // Without weigh-in -> 4 / 5
+        val dailyNoWeight = daily.copy(weight = emptyMap())
+        val ticksNoWeight = computeDayCardTicks(dailyNoWeight, defaultSettings, today, isTrainingDay = true)
+        assertEquals(5, ticksNoWeight.totalTarget)
+        assertEquals(4, ticksNoWeight.completedCount)
+        assertEquals("4 / 5", ticksNoWeight.counterText)
     }
 
     @Test
-    fun `tick count maths - rest day has M equal 3 and never auto-ticks training`() {
+    fun `tick count maths - rest day has M equal 4 and never auto-ticks training`() {
         val daily = AssembledDaily(
             caloriesEaten = mapOf(today to 2000.0), // ticked
             steps = mapOf(today to 10500.0),        // ticked
             protein = mapOf(today to 160.0),        // ticked
+            weight = mapOf(today to 82.4),          // ticked (base item)
             sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")),
             trainingMinutes = mapOf(today to 0.0),  // rest day
             zoneBounds = defaultBounds,
@@ -54,32 +63,40 @@ class DayCardTest {
         )
 
         val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = false)
-        assertEquals(3, ticks.totalTarget)
-        assertEquals(3, ticks.completedCount)
-        assertEquals("3 / 3", ticks.counterText)
+        assertEquals(4, ticks.totalTarget)
+        assertEquals(4, ticks.completedCount)
+        assertEquals("4 / 4", ticks.counterText)
+
+        // Without weigh-in -> 3 / 4
+        val dailyNoWeight = daily.copy(weight = emptyMap())
+        val ticksNoWeight = computeDayCardTicks(dailyNoWeight, defaultSettings, today, isTrainingDay = false)
+        assertEquals(4, ticksNoWeight.totalTarget)
+        assertEquals(3, ticksNoWeight.completedCount)
+        assertEquals("3 / 4", ticksNoWeight.counterText)
     }
 
     @Test
-    fun `tick count maths - rest day with training minutes still has M equal 3 and does not award training tick`() {
+    fun `tick count maths - rest day with training minutes still has M equal 4 and does not award training tick`() {
         val daily = AssembledDaily(
             caloriesEaten = mapOf(today to 2000.0),
             steps = mapOf(today to 10500.0),
             protein = mapOf(today to 160.0),
+            weight = mapOf(today to 82.4),
             trainingMinutes = mapOf(today to 45.0),
             zoneBounds = defaultBounds,
             zone = defaultZone
         )
 
         val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = false)
-        assertEquals(3, ticks.totalTarget)
-        assertEquals(3, ticks.completedCount)
-        assertEquals("3 / 3", ticks.counterText)
+        assertEquals(4, ticks.totalTarget)
+        assertEquals(4, ticks.completedCount)
+        assertEquals("4 / 4", ticks.counterText)
     }
 
     @Test
-    fun `tick count maths - weigh-in bonus adds 1 without increasing M and can exceed M`() {
-        // Training day: 4/4 passing + weigh-in bonus -> 5 / 4
-        val dailyTrainingBonus = AssembledDaily(
+    fun `tick count maths - weigh-in is counted as a base item and completedCount never exceeds totalTarget`() {
+        // Training day: all 4 base items passing + training -> 5 / 5 (never exceeds 5)
+        val dailyTraining = AssembledDaily(
             caloriesEaten = mapOf(today to 2000.0),
             steps = mapOf(today to 10500.0),
             protein = mapOf(today to 160.0),
@@ -88,14 +105,13 @@ class DayCardTest {
             zoneBounds = defaultBounds,
             zone = defaultZone
         )
-        val ticksTraining = computeDayCardTicks(dailyTrainingBonus, defaultSettings, today, isTrainingDay = true)
-        assertEquals(4, ticksTraining.totalTarget)
+        val ticksTraining = computeDayCardTicks(dailyTraining, defaultSettings, today, isTrainingDay = true)
+        assertEquals(5, ticksTraining.totalTarget)
         assertEquals(5, ticksTraining.completedCount)
-        assertTrue(ticksTraining.hasWeightBonus)
-        assertEquals("5 / 4", ticksTraining.counterText)
+        assertEquals("5 / 5", ticksTraining.counterText)
 
-        // Rest day: 3/3 passing + weigh-in bonus -> 4 / 3
-        val dailyRestBonus = AssembledDaily(
+        // Rest day: all 4 base items passing -> 4 / 4 (never exceeds 4)
+        val dailyRest = AssembledDaily(
             caloriesEaten = mapOf(today to 2000.0),
             steps = mapOf(today to 10500.0),
             protein = mapOf(today to 160.0),
@@ -103,24 +119,23 @@ class DayCardTest {
             zoneBounds = defaultBounds,
             zone = defaultZone
         )
-        val ticksRest = computeDayCardTicks(dailyRestBonus, defaultSettings, today, isTrainingDay = false)
-        assertEquals(3, ticksRest.totalTarget)
+        val ticksRest = computeDayCardTicks(dailyRest, defaultSettings, today, isTrainingDay = false)
+        assertEquals(4, ticksRest.totalTarget)
         assertEquals(4, ticksRest.completedCount)
-        assertTrue(ticksRest.hasWeightBonus)
-        assertEquals("4 / 3", ticksRest.counterText)
+        assertEquals("4 / 4", ticksRest.counterText)
     }
 
     @Test
     fun `tick count maths - null daily reports 0 and counter is never negative`() {
         val ticksTraining = computeDayCardTicks(null, defaultSettings, today, isTrainingDay = true)
-        assertEquals(4, ticksTraining.totalTarget)
+        assertEquals(5, ticksTraining.totalTarget)
         assertEquals(0, ticksTraining.completedCount)
-        assertEquals("0 / 4", ticksTraining.counterText)
+        assertEquals("0 / 5", ticksTraining.counterText)
 
         val ticksRest = computeDayCardTicks(null, defaultSettings, today, isTrainingDay = false)
-        assertEquals(3, ticksRest.totalTarget)
+        assertEquals(4, ticksRest.totalTarget)
         assertEquals(0, ticksRest.completedCount)
-        assertEquals("0 / 3", ticksRest.counterText)
+        assertEquals("0 / 4", ticksRest.counterText)
     }
 
     @Test

@@ -15,6 +15,18 @@ object MifflinStJeor {
         else -> bmrFormula
     }
 
+    fun calculateBmr(
+        weightKg: Double,
+        heightCm: Double,
+        ageYears: Int,
+        sex: Sex = Sex.MALE,
+        bmrFormula: BmrFormula = BmrFormula.MALE
+    ): Double {
+        val formula = bmrSex(sex, bmrFormula)
+        val offset = if (formula == BmrFormula.MALE) 5.0 else -161.0
+        return 10.0 * weightKg + 6.25 * heightCm - 5.0 * ageYears + offset
+    }
+
     fun bmrBase(s: ScoringSettings): Int {
         val formula = bmrSex(s.sex, s.bmrFormula)
         val offset = if (formula == BmrFormula.MALE) 5 else -161

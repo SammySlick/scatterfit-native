@@ -154,7 +154,7 @@ fun BottomNavBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             BottomNavItem(
-                label = "Today",
+                label = "My Day",
                 isSelected = selectedTab == AppTab.MY_DAY,
                 onClick = { onTabSelected(AppTab.MY_DAY) },
                 icon = { tint ->
