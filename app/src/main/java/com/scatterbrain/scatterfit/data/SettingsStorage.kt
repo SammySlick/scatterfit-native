@@ -14,8 +14,8 @@ class SettingsStorage(private val prefs: SharedPreferences? = null) {
         if (prefs == null) return ScoringSettings()
         val kcal = prefs.getInt("kcal_target", 2500)
         val protein = prefs.getInt("protein_target", 160)
-        val carbs = prefs.getInt("carb_target_g", 200)
-        val fat = prefs.getInt("fat_target_g", 70)
+        val carbs = if (prefs.contains("carb_target_g")) prefs.getInt("carb_target_g", 0) else 0
+        val fat = if (prefs.contains("fat_target_g")) prefs.getInt("fat_target_g", 0) else 0
         val activeGoalStr = prefs.getString("active_goal", null)
         val activeGoal = activeGoalStr?.let {
             try { GoalPreset.valueOf(it) } catch (_: Exception) { GoalPreset.FAT_LOSS }

@@ -30,6 +30,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scatterbrain.scatterfit.data.SettingsStorage
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
@@ -52,6 +53,7 @@ fun MainAppScreen(
     val context = LocalContext.current
     val foodStorage = remember { FoodStorage(context) }
     val savedFoodStore = remember { SavedFoodStore(context) }
+    val settingsStorage = remember { SettingsStorage(context) }
     val foodViewModel = remember {
         FoodTrackerViewModel(
             storage = foodStorage,
@@ -101,7 +103,8 @@ fun MainAppScreen(
                         foodViewModel.setDayKey(dayKey)
                         selectedTab = AppTab.FOOD
                     },
-                    onOpenTraining = { selectedTab = AppTab.TRAINING }
+                    onOpenTraining = { selectedTab = AppTab.TRAINING },
+                    foodViewModel = foodViewModel
                 )
                 AppTab.ODYSSEY -> OdysseyScreen(
                     onSettingsClick = onSettingsClick
@@ -109,7 +112,8 @@ fun MainAppScreen(
                 AppTab.FOOD -> {
                     FoodHomeScreen(
                         viewModel = foodViewModel,
-                        onBackClick = { selectedTab = AppTab.MY_DAY }
+                        onBackClick = { selectedTab = AppTab.MY_DAY },
+                        settings = settingsStorage.loadSettings()
                     )
                 }
                 AppTab.TRAINING -> {

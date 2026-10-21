@@ -75,26 +75,29 @@ fun computeDayCardTicks(
     settings: ScoringSettings = ScoringSettings(),
     todayKey: String,
     isTrainingDay: Boolean,
+    consumedKcal: Double? = null,
+    consumedProtein: Double? = null,
+    totalSteps: Double? = null,
 ): DayCardTicks {
     val totalM = if (isTrainingDay) 5 else 4
-    if (daily == null) {
+    if (daily == null && consumedKcal == null && consumedProtein == null && totalSteps == null) {
         return DayCardTicks(completedCount = 0, totalTarget = totalM)
     }
 
-    val calVal = daily.caloriesEaten[todayKey] ?: 0.0
+    val calVal = consumedKcal ?: daily?.caloriesEaten?.get(todayKey) ?: 0.0
     // Ticked if calories in band (or logged within goal)
     val calCompleted = calVal > 0.0 && calVal <= (settings.kcalTarget + settings.tolerances.kcalGreen)
 
-    val stepVal = daily.steps[todayKey] ?: 0.0
+    val stepVal = totalSteps ?: daily?.steps?.get(todayKey) ?: 0.0
     val stepCompleted = stepVal >= settings.stepTarget
 
-    val protVal = daily.protein[todayKey] ?: 0.0
+    val protVal = consumedProtein ?: daily?.protein?.get(todayKey) ?: 0.0
     val protCompleted = protVal >= settings.proteinTarget
 
-    val weightVal = daily.weight[todayKey]
+    val weightVal = daily?.weight?.get(todayKey)
     val weightCompleted = weightVal != null && weightVal > 0.0
 
-    val trainMins = daily.trainingMinutes[todayKey] ?: 0.0
+    val trainMins = daily?.trainingMinutes?.get(todayKey) ?: 0.0
     // Training days only! Rest days never auto-tick training.
     val trainCompleted = isTrainingDay && trainMins > 0.0
 
@@ -160,17 +163,33 @@ fun DayCard(
     onPlanEditorClick: (() -> Unit)? = null,
     onWeighInClick: (() -> Unit)? = null,
     onResetToToday: (() -> Unit)? = null,
+    consumedKcal: Double? = null,
+    consumedProtein: Double? = null,
+    deviceSteps: Double? = null,
+    estimatedSteps: Int = 0,
+    onAdjustStepsClick: (() -> Unit)? = null,
 ) {
     val isTrainingDay = planName != null && !planName.equals("Rest day", ignoreCase = true)
-    val ticks = remember(daily, settings, dayKey, isTrainingDay) {
-        computeDayCardTicks(daily, settings, dayKey, isTrainingDay)
+    val deviceStepsVal = deviceSteps ?: daily?.steps?.get(dayKey) ?: 0.0
+    val totalSteps = deviceStepsVal + estimatedSteps.toDouble()
+
+    val ticks = remember(daily, settings, dayKey, isTrainingDay, consumedKcal, consumedProtein, totalSteps) {
+        computeDayCardTicks(
+            daily = daily,
+            settings = settings,
+            todayKey = dayKey,
+            isTrainingDay = isTrainingDay,
+            consumedKcal = consumedKcal,
+            consumedProtein = consumedProtein,
+            totalSteps = totalSteps
+        )
     }
 
     val isCurrentToday = dayKey == remember { todayKey() }
 
     // Hero calculations: when nothing eaten, shows kcalTarget (not 0); over goal -> "N kcal over T" (number Bold red StateBad)
     val kcalTarget = settings.kcalTarget
-    val kcalEaten = daily?.caloriesEaten?.get(dayKey)?.roundToInt() ?: 0
+    val kcalEaten = (consumedKcal ?: daily?.caloriesEaten?.get(dayKey) ?: 0.0).roundToInt()
     val isOverGoal = kcalEaten > kcalTarget
     val overKcal = (kcalEaten - kcalTarget).coerceAtLeast(0)
     val remainingKcal = (kcalTarget - kcalEaten).coerceAtLeast(0)
@@ -267,7 +286,7 @@ fun DayCard(
                 // CONTINUOUS METRIC ROWS (Calories, Steps, Protein)
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     // 1. Calories row
-                    val calRaw = daily?.caloriesEaten?.get(dayKey)
+                    val calRaw = consumedKcal ?: daily?.caloriesEaten?.get(dayKey)
                     val calFraction = if (calRaw != null && kcalTarget > 0) (calRaw.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
                     val calColor = getBarColor(computeCaloriesBarColor(calRaw, kcalTarget, settings.tolerances.kcalGreen))
                     DayCardBarRow(
@@ -281,22 +300,36 @@ fun DayCard(
                     )
 
                     // 2. Steps row
-                    val stepRaw = daily?.steps?.get(dayKey)
+                    val stepRaw = totalSteps
                     val stepTarget = settings.stepTarget
-                    val stepFraction = if (stepRaw != null && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
+                    val stepFraction = if (stepRaw > 0 && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
                     val stepColor = getBarColor(computeStepsBarColor(stepRaw, stepTarget))
                     DayCardBarRow(
                         icon = { FootstepsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
                         label = "Steps",
-                        currentText = String.format(Locale.US, "%,d", stepRaw?.roundToInt() ?: 0),
+                        currentText = String.format(Locale.US, "%,d", totalSteps.roundToInt()),
                         targetText = "of %,d".format(Locale.US, stepTarget),
                         progressFraction = stepFraction,
                         fillColor = stepColor,
+                        breakdownText = if (estimatedSteps > 0) {
+                            "${String.format(Locale.US, "%,d", deviceStepsVal.roundToInt())} device + ${String.format(Locale.US, "%,d", estimatedSteps)} estimated"
+                        } else null,
+                        trailingAffordance = if (onAdjustStepsClick != null) {
+                            {
+                                Text(
+                                    text = "Adjust steps",
+                                    color = AccentTeal,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable { onAdjustStepsClick() }
+                                )
+                            }
+                        } else null,
                         onClick = { onMetricClick(MetricId.STEPS) }
                     )
 
                     // 3. Protein row
-                    val protRaw = daily?.protein?.get(dayKey)
+                    val protRaw = consumedProtein ?: daily?.protein?.get(dayKey)
                     val protTarget = settings.proteinTarget
                     val protFraction = if (protRaw != null && protTarget > 0) (protRaw.toFloat() / protTarget.toFloat()).coerceIn(0f, 1f) else 0f
                     val protColor = getBarColor(computeProteinBarColor(protRaw, protTarget))
@@ -437,6 +470,8 @@ private fun DayCardBarRow(
     fillColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    breakdownText: String? = null,
+    trailingAffordance: (@Composable () -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -472,6 +507,9 @@ private fun DayCardBarRow(
                     color = TextForeground,
                     fontWeight = FontWeight.SemiBold
                 )
+                if (trailingAffordance != null) {
+                    trailingAffordance()
+                }
             }
 
             Row(verticalAlignment = Alignment.Bottom) {
@@ -509,6 +547,16 @@ private fun DayCardBarRow(
                     .height(6.dp)
                     .clip(CircleShape)
                     .background(fillColor)
+            )
+        }
+
+        if (breakdownText != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = breakdownText,
+                fontSize = 11.sp,
+                color = TextMuted,
+                fontWeight = FontWeight.Normal
             )
         }
     }

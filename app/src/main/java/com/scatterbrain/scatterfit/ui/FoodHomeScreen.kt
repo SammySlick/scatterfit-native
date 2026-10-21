@@ -101,7 +101,20 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
+import androidx.compose.ui.platform.LocalContext
+import com.scatterbrain.scatterfit.data.SettingsStorage
+
 enum class MacroCardMode { CONSUMED, REMAINING }
+
+fun formatMacroTarget(target: Int?): String =
+    if (target != null && target > 0) "${target}g" else "—"
+
+fun computeMacroBarColor(current: Int, target: Int?): Color = when {
+    target == null || target <= 0 || current <= 0 -> TextMuted
+    current > target -> StateBad
+    current >= (target * 0.85).roundToInt() -> StateLocked
+    else -> AccentTeal
+}
 
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -109,9 +122,14 @@ fun FoodHomeScreen(
     viewModel: FoodTrackerViewModel,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
-    settings: ScoringSettings = remember { ScoringSettings() },
+    settings: ScoringSettings? = null,
 ) {
     BackHandler(onBack = onBackClick)
+
+    val context = LocalContext.current
+    val currentSettings = remember(settings) {
+        settings ?: SettingsStorage(context).loadSettings()
+    }
 
     val storedMeals by viewModel.mealsForDay.collectAsState()
     val presets by viewModel.presets.collectAsState()
@@ -240,8 +258,10 @@ fun FoodHomeScreen(
     val totalCarbs = displayMeals.sumOf { it.carbs ?: 0.0 }.roundToInt()
     val totalFat = displayMeals.sumOf { it.fat ?: 0.0 }.roundToInt()
 
-    val kcalTarget = settings.kcalTarget
-    val proteinTarget = settings.proteinTarget
+    val kcalTarget = currentSettings.kcalTarget
+    val proteinTarget = currentSettings.proteinTarget
+    val carbTarget = currentSettings.carbTargetG.takeIf { it > 0 }
+    val fatTarget = currentSettings.fatTargetG.takeIf { it > 0 }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -413,7 +433,7 @@ fun FoodHomeScreen(
                         }
 
                         val barFillColor = if (isOverGoal) {
-                            getBarColor(computeCaloriesBarColor(totalKcal.toDouble(), kcalTarget, settings.tolerances.kcalGreen))
+                            getBarColor(computeCaloriesBarColor(totalKcal.toDouble(), kcalTarget, currentSettings.tolerances.kcalGreen))
                         } else {
                             AccentTeal
                         }
@@ -471,22 +491,30 @@ fun FoodHomeScreen(
                                 fillColor = protColor
                             )
 
-                            // Carbs Row (optional / untracked target -> "—", kept visible even at zero)
+                            // Carbs Row
+                            val carbFraction = if (carbTarget != null && carbTarget > 0) {
+                                (totalCarbs.toFloat() / carbTarget.toFloat()).coerceIn(0f, 1f)
+                            } else 0f
+                            val carbColor = computeMacroBarColor(totalCarbs, carbTarget)
                             MacroMiniRow(
                                 label = "Carbs",
                                 currentGrams = totalCarbs,
-                                targetText = "—",
-                                progressFraction = 0f,
-                                fillColor = AccentTeal
+                                targetText = formatMacroTarget(carbTarget),
+                                progressFraction = carbFraction,
+                                fillColor = carbColor
                             )
 
-                            // Fat Row (optional / untracked target -> "—", kept visible even at zero)
+                            // Fat Row
+                            val fatFraction = if (fatTarget != null && fatTarget > 0) {
+                                (totalFat.toFloat() / fatTarget.toFloat()).coerceIn(0f, 1f)
+                            } else 0f
+                            val fatColor = computeMacroBarColor(totalFat, fatTarget)
                             MacroMiniRow(
                                 label = "Fat",
                                 currentGrams = totalFat,
-                                targetText = "—",
-                                progressFraction = 0f,
-                                fillColor = AccentTeal
+                                targetText = formatMacroTarget(fatTarget),
+                                progressFraction = fatFraction,
+                                fillColor = fatColor
                             )
                         }
                     }
