@@ -19,6 +19,7 @@ import com.scatterbrain.scatterfit.data.GoalTargetsStore
 import com.scatterbrain.scatterfit.data.HealthRecord
 import com.scatterbrain.scatterfit.data.LocalRecordConvert
 import com.scatterbrain.scatterfit.data.RecordMethod
+import com.scatterbrain.scatterfit.data.SettingsStorage
 import com.scatterbrain.scatterfit.data.TodayFacade
 import com.scatterbrain.scatterfit.data.Zones
 import com.scatterbrain.scatterfit.data.currentPrimaryMetricValue
@@ -89,7 +90,7 @@ class TodayFacadeMomentumSource(
         }
         Daily.buildDailyDataFromMaps(records, Zones.DEFAULT_ZONES, zone, nowMs = now.toEpochMilli())
     },
-    private val settings: ScoringSettings = ScoringSettings(activeGoal = GoalPreset.FAT_LOSS, kcalTarget = 2270),
+    private val settings: ScoringSettings = SettingsStorage().loadSettings(),
     private val zone: ZoneId = daily.zone,
 ) : MomentumSource {
 

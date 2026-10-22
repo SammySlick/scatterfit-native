@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scatterbrain.scatterfit.core.goalLabel
 import com.scatterbrain.scatterfit.data.GoalHistoryStorage
+import com.scatterbrain.scatterfit.data.SettingsStorage
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
@@ -54,6 +55,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val goalHistoryStorage = remember(context) { GoalHistoryStorage(context) }
     val activeGoal = remember(goalHistoryStorage) { goalHistoryStorage.activeGoal() }
+    val settingsStorage = remember(context) { SettingsStorage(context) }
+    val settings = remember(settingsStorage) { settingsStorage.loadSettings() }
 
     val goalValueText = if (activeGoal != null) {
         val label = goalLabel[activeGoal.preset] ?: activeGoal.preset.name
@@ -160,9 +163,26 @@ fun SettingsScreen(
                                 .padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            SettingRow(label = "Calories target", value = "2,000 kcal")
-                            SettingRow(label = "Steps target", value = "10,000")
-                            SettingRow(label = "Protein target", value = "100 g")
+                            SettingRow(
+                                label = "Calories target",
+                                value = String.format(Locale.US, "%,d kcal", settings.kcalTarget)
+                            )
+                            SettingRow(
+                                label = "Steps target",
+                                value = String.format(Locale.US, "%,d", settings.stepTarget)
+                            )
+                            SettingRow(
+                                label = "Protein target",
+                                value = "${settings.proteinTarget} g"
+                            )
+                            SettingRow(
+                                label = "Carbs target",
+                                value = if (settings.carbTargetG > 0) "${settings.carbTargetG} g" else "—"
+                            )
+                            SettingRow(
+                                label = "Fat target",
+                                value = if (settings.fatTargetG > 0) "${settings.fatTargetG} g" else "—"
+                            )
                             SettingRow(label = "Sleep target", value = "8h")
                             SettingRow(label = "Alcohol", value = "14 units/week")
                             SettingRow(

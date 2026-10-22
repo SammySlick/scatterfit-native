@@ -41,10 +41,12 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.scatterbrain.scatterfit.core.MetricId
 import com.scatterbrain.scatterfit.core.ScoringSettings
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.AssembledDaily
+import com.scatterbrain.scatterfit.data.SettingsStorage
 import com.scatterbrain.scatterfit.data.SleepNight
 import com.scatterbrain.scatterfit.data.ZoneBounds
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
@@ -72,7 +74,7 @@ data class DayCardTicks(
 
 fun computeDayCardTicks(
     daily: AssembledDaily?,
-    settings: ScoringSettings = ScoringSettings(),
+    settings: ScoringSettings = SettingsStorage().loadSettings(),
     todayKey: String,
     isTrainingDay: Boolean,
     consumedKcal: Double? = null,
@@ -156,7 +158,7 @@ fun DayCard(
     daily: AssembledDaily?,
     modifier: Modifier = Modifier,
     dayKey: String = remember { todayKey() },
-    settings: ScoringSettings = remember { ScoringSettings() },
+    settings: ScoringSettings? = null,
     planName: String? = null,
     drinksCount: Int? = null,
     onMetricClick: (MetricId) -> Unit = {},
@@ -169,14 +171,19 @@ fun DayCard(
     estimatedSteps: Int = 0,
     onAdjustStepsClick: (() -> Unit)? = null,
 ) {
+    val context = LocalContext.current
+    val effectiveSettings = remember(settings) {
+        settings ?: SettingsStorage(context).loadSettings()
+    }
+
     val isTrainingDay = planName != null && !planName.equals("Rest day", ignoreCase = true)
     val deviceStepsVal = deviceSteps ?: daily?.steps?.get(dayKey) ?: 0.0
     val totalSteps = deviceStepsVal + estimatedSteps.toDouble()
 
-    val ticks = remember(daily, settings, dayKey, isTrainingDay, consumedKcal, consumedProtein, totalSteps) {
+    val ticks = remember(daily, effectiveSettings, dayKey, isTrainingDay, consumedKcal, consumedProtein, totalSteps) {
         computeDayCardTicks(
             daily = daily,
-            settings = settings,
+            settings = effectiveSettings,
             todayKey = dayKey,
             isTrainingDay = isTrainingDay,
             consumedKcal = consumedKcal,
@@ -188,7 +195,7 @@ fun DayCard(
     val isCurrentToday = dayKey == remember { todayKey() }
 
     // Hero calculations: when nothing eaten, shows kcalTarget (not 0); over goal -> "N kcal over T" (number Bold red StateBad)
-    val kcalTarget = settings.kcalTarget
+    val kcalTarget = effectiveSettings.kcalTarget
     val kcalEaten = (consumedKcal ?: daily?.caloriesEaten?.get(dayKey) ?: 0.0).roundToInt()
     val isOverGoal = kcalEaten > kcalTarget
     val overKcal = (kcalEaten - kcalTarget).coerceAtLeast(0)
@@ -288,7 +295,7 @@ fun DayCard(
                     // 1. Calories row
                     val calRaw = consumedKcal ?: daily?.caloriesEaten?.get(dayKey)
                     val calFraction = if (calRaw != null && kcalTarget > 0) (calRaw.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
-                    val calColor = getBarColor(computeCaloriesBarColor(calRaw, kcalTarget, settings.tolerances.kcalGreen))
+                    val calColor = getBarColor(computeCaloriesBarColor(calRaw, kcalTarget, effectiveSettings.tolerances.kcalGreen))
                     DayCardBarRow(
                         icon = { UtensilsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
                         label = "Calories",
@@ -301,7 +308,7 @@ fun DayCard(
 
                     // 2. Steps row
                     val stepRaw = totalSteps
-                    val stepTarget = settings.stepTarget
+                    val stepTarget = effectiveSettings.stepTarget
                     val stepFraction = if (stepRaw > 0 && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
                     val stepColor = getBarColor(computeStepsBarColor(stepRaw, stepTarget))
                     DayCardBarRow(
@@ -330,7 +337,7 @@ fun DayCard(
 
                     // 3. Protein row
                     val protRaw = consumedProtein ?: daily?.protein?.get(dayKey)
-                    val protTarget = settings.proteinTarget
+                    val protTarget = effectiveSettings.proteinTarget
                     val protFraction = if (protRaw != null && protTarget > 0) (protRaw.toFloat() / protTarget.toFloat()).coerceIn(0f, 1f) else 0f
                     val protColor = getBarColor(computeProteinBarColor(protRaw, protTarget))
                     DayCardBarRow(

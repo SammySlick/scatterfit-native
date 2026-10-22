@@ -2,8 +2,11 @@ package com.scatterbrain.scatterfit.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -16,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -62,8 +66,62 @@ import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.round
 import kotlin.math.roundToInt
+
+const val DEFAULT_WEIGHT_KG = 80.0
+const val DEFAULT_HEIGHT_CM = 178
+const val DEFAULT_AGE_YEARS = 35
+
+fun formatProjectionDate(targetDate: LocalDate, anchorDate: LocalDate = LocalDate.now()): String {
+    val monthName = targetDate.format(DateTimeFormatter.ofPattern("MMMM", Locale.US))
+    val shortMonth = targetDate.format(DateTimeFormatter.ofPattern("MMM", Locale.US))
+    val day = targetDate.dayOfMonth
+    val yearSuffix = if (targetDate.year != anchorDate.year && targetDate.year != anchorDate.year + 1) " ${targetDate.year}" else ""
+    return when (day) {
+        in 11..20 -> "around mid-$monthName$yearSuffix"
+        in 1..10 -> "around $day $shortMonth$yearSuffix"
+        else -> "late $monthName$yearSuffix"
+    }
+}
+
+fun computeWeightProjectionSentence(
+    currentWeightKg: Double,
+    targetWeightKg: Double?,
+    kcalTarget: Int,
+    tdee: Double,
+    anchorDate: LocalDate = LocalDate.now(),
+): String? {
+    if (targetWeightKg == null || targetWeightKg <= 0.0) return null
+    val weightDiff = currentWeightKg - targetWeightKg
+    if (abs(weightDiff) < 0.1) return null
+
+    val targetWeightStr = if (targetWeightKg % 1.0 == 0.0) "${targetWeightKg.toInt()} kg" else "%.1f kg".format(Locale.US, targetWeightKg)
+    val kcalFormatted = String.format(Locale.US, "%,d", kcalTarget)
+
+    if (weightDiff > 0) {
+        // Weight loss
+        val dailyDeficit = tdee - kcalTarget
+        if (dailyDeficit <= 0) return null
+        val days = round(weightDiff / (dailyDeficit / 7700.0)).toLong().coerceAtLeast(1)
+        val targetDate = anchorDate.plusDays(days)
+        val dateStr = formatProjectionDate(targetDate, anchorDate)
+        return "At $kcalFormatted kcal/day you'd reach $targetWeightStr $dateStr"
+    } else {
+        // Weight gain
+        val dailySurplus = kcalTarget - tdee
+        if (dailySurplus <= 0) return null
+        val kgToGain = -weightDiff
+        val days = round(kgToGain / (dailySurplus / 7700.0)).toLong().coerceAtLeast(1)
+        val targetDate = anchorDate.plusDays(days)
+        val dateStr = formatProjectionDate(targetDate, anchorDate)
+        return "At $kcalFormatted kcal/day you'd reach $targetWeightStr $dateStr"
+    }
+}
 
 @Composable
 fun GoalSetScreen(
@@ -87,9 +145,38 @@ fun GoalSetScreen(
             }
     }
 
-    val hasRecordedWeight = latestRecordedWeight != null && latestRecordedWeight > 0.0
-    val effectiveWeight = latestRecordedWeight ?: settings.weightTarget
-    val hasMissingBodyData = settings.heightCm <= 0 || settings.ageYears <= 0 || !hasRecordedWeight
+    val effectiveWeight = when {
+        latestRecordedWeight != null && latestRecordedWeight > 0.0 -> latestRecordedWeight
+        settings.weightTarget > 0.0 -> settings.weightTarget
+        else -> DEFAULT_WEIGHT_KG
+    }
+
+    var heightInput by remember {
+        mutableStateOf(if (settings.heightCm > 0) settings.heightCm.toString() else "")
+    }
+    var ageInput by remember {
+        mutableStateOf(if (settings.ageYears > 0) settings.ageYears.toString() else "")
+    }
+    var selectedSex by remember { mutableStateOf(settings.sex) }
+    var targetWeightInput by remember {
+        mutableStateOf(
+            if (settings.weightTarget > 0.0) {
+                if (settings.weightTarget % 1.0 == 0.0) settings.weightTarget.toInt().toString()
+                else settings.weightTarget.toString()
+            } else ""
+        )
+    }
+
+    val enteredHeight = heightInput.toIntOrNull()
+    val isHeightDefault = enteredHeight == null || enteredHeight <= 0
+    val effectiveHeight = enteredHeight?.takeIf { it > 0 } ?: DEFAULT_HEIGHT_CM
+
+    val enteredAge = ageInput.toIntOrNull()
+    val isAgeDefault = enteredAge == null || enteredAge <= 0
+    val effectiveAge = enteredAge?.takeIf { it > 0 } ?: DEFAULT_AGE_YEARS
+
+    val targetWeightKg = targetWeightInput.toDoubleOrNull()?.takeIf { it > 0.0 }
+    val isUsingDefaults = isHeightDefault || isAgeDefault
 
     var selectedPreset by remember { mutableStateOf(settings.activeGoal) }
     var selectedActivity by remember { mutableStateOf(ActivityLevel.MODERATE) }
@@ -98,12 +185,12 @@ fun GoalSetScreen(
     var manualKcalInput by remember { mutableStateOf("") }
     var manualProteinInput by remember { mutableStateOf("") }
 
-    val bmr = remember(effectiveWeight, settings.heightCm, settings.ageYears, settings.sex) {
+    val bmr = remember(effectiveWeight, effectiveHeight, effectiveAge, selectedSex) {
         MifflinStJeor.calculateBmr(
             weightKg = effectiveWeight,
-            heightCm = settings.heightCm.toDouble(),
-            ageYears = settings.ageYears,
-            sex = settings.sex
+            heightCm = effectiveHeight.toDouble(),
+            ageYears = effectiveAge,
+            sex = selectedSex
         )
     }
 
@@ -117,7 +204,9 @@ fun GoalSetScreen(
         selectedPreset,
         selectedActivity,
         effectiveWeight,
-        settings,
+        effectiveHeight,
+        effectiveAge,
+        selectedSex,
         isManualActive,
         customKcal,
         customProtein,
@@ -137,9 +226,9 @@ fun GoalSetScreen(
                 preset = selectedPreset,
                 activityLevel = selectedActivity,
                 weightKg = effectiveWeight,
-                heightCm = settings.heightCm.toDouble(),
-                ageYears = settings.ageYears,
-                sex = settings.sex
+                heightCm = effectiveHeight.toDouble(),
+                ageYears = effectiveAge,
+                sex = selectedSex
             )
         }
     }
@@ -303,7 +392,123 @@ fun GoalSetScreen(
                     }
                 }
 
-                // BLOCK 3: Live Preview
+                // BLOCK 3: Body Data
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "BODY DATA",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.2.sp
+                    )
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                        border = BorderStroke(1.dp, BorderDefault)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = heightInput,
+                                    onValueChange = { if (it.isEmpty() || it.matches(Regex("""^\d*$"""))) heightInput = it },
+                                    label = { Text("Height (cm)", color = TextMuted) },
+                                    placeholder = { Text("e.g. 172", color = TextMuted) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = TextForeground,
+                                        unfocusedTextColor = TextForeground,
+                                        focusedBorderColor = AccentTeal,
+                                        unfocusedBorderColor = BorderInput,
+                                        focusedContainerColor = SecondaryFill,
+                                        unfocusedContainerColor = SecondaryFill
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = ageInput,
+                                    onValueChange = { if (it.isEmpty() || it.matches(Regex("""^\d*$"""))) ageInput = it },
+                                    label = { Text("Age (years)", color = TextMuted) },
+                                    placeholder = { Text("e.g. 36", color = TextMuted) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = TextForeground,
+                                        unfocusedTextColor = TextForeground,
+                                        focusedBorderColor = AccentTeal,
+                                        unfocusedBorderColor = BorderInput,
+                                        focusedContainerColor = SecondaryFill,
+                                        unfocusedContainerColor = SecondaryFill
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = targetWeightInput,
+                                    onValueChange = { if (it.isEmpty() || it.matches(Regex("""^\d*\.?\d*$"""))) targetWeightInput = it },
+                                    label = { Text("Target weight (kg)", color = TextMuted) },
+                                    placeholder = { Text("optional", color = TextMuted) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = TextForeground,
+                                        unfocusedTextColor = TextForeground,
+                                        focusedBorderColor = AccentTeal,
+                                        unfocusedBorderColor = BorderInput,
+                                        focusedContainerColor = SecondaryFill,
+                                        unfocusedContainerColor = SecondaryFill
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    listOf(MifflinStJeor.Sex.MALE to "Male", MifflinStJeor.Sex.FEMALE to "Female").forEach { (sex, label) ->
+                                        val isSelected = selectedSex == sex
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (isSelected) AccentTeal else SecondaryFill)
+                                                .border(BorderStroke(1.dp, if (isSelected) AccentTeal else BorderInput), RoundedCornerShape(8.dp))
+                                                .clickable { selectedSex = sex }
+                                                .padding(vertical = 14.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSelected) Color.Black else TextForeground
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // BLOCK 4: Live Preview
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "TARGET PREVIEW",
@@ -312,6 +517,14 @@ fun GoalSetScreen(
                         color = TextMuted,
                         letterSpacing = 1.2.sp
                     )
+
+                    if (isUsingDefaults) {
+                        Text(
+                            text = "Add your height and age for an accurate target",
+                            fontSize = 12.sp,
+                            color = TextMuted
+                        )
+                    }
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -339,7 +552,9 @@ fun GoalSetScreen(
                             val weightInt = effectiveWeight.roundToInt()
                             val activityStr = selectedActivity.name.lowercase()
 
-                            val bodyDesc = "$weightInt kg, ${settings.heightCm} cm, ${settings.ageYears} y, $activityStr activity"
+                            val heightLabel = if (isHeightDefault) "$effectiveHeight cm (default)" else "$effectiveHeight cm"
+                            val ageLabel = if (isAgeDefault) "$effectiveAge y (default)" else "$effectiveAge y"
+                            val bodyDesc = "$weightInt kg, $heightLabel, $ageLabel, $activityStr activity"
                             val derivationBase = "Your body burns about $burnFormatted kcal a day (Mifflin-St Jeor, $bodyDesc)"
                             val derivationClause = when (selectedPreset) {
                                 GoalPreset.FAT_LOSS -> " — fat loss eats 500 off that."
@@ -361,6 +576,24 @@ fun GoalSetScreen(
                                 color = TextMuted
                             )
 
+                            // Optional Weight Projection
+                            val projectionSentence = remember(effectiveWeight, targetWeightKg, computedGoal.kcalTarget, tdee) {
+                                computeWeightProjectionSentence(
+                                    currentWeightKg = effectiveWeight,
+                                    targetWeightKg = targetWeightKg,
+                                    kcalTarget = computedGoal.kcalTarget,
+                                    tdee = tdee
+                                )
+                            }
+                            if (projectionSentence != null) {
+                                Text(
+                                    text = projectionSentence,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = AccentTeal
+                                )
+                            }
+
                             // Below-BMR Warning
                             if (computedGoal.belowBmr) {
                                 Text(
@@ -368,15 +601,6 @@ fun GoalSetScreen(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = JudgementWarn
-                                )
-                            }
-
-                            // Missing Body Data Hint
-                            if (hasMissingBodyData) {
-                                Text(
-                                    text = "Add height, age and sex in Settings for a real estimate",
-                                    fontSize = 12.sp,
-                                    color = TextMuted
                                 )
                             }
 
@@ -463,7 +687,11 @@ fun GoalSetScreen(
                             proteinTarget = computedGoal.proteinTargetG,
                             carbTargetG = computedGoal.carbTargetG,
                             fatTargetG = computedGoal.fatTargetG,
-                            activeGoal = selectedPreset
+                            activeGoal = selectedPreset,
+                            heightCm = enteredHeight ?: 0,
+                            ageYears = enteredAge ?: 0,
+                            sex = selectedSex,
+                            weightTargetKg = targetWeightKg
                         )
                         onBack()
                     },

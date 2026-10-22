@@ -51,6 +51,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.text.input.KeyboardType
 import com.scatterbrain.scatterfit.data.EstimatedStepEntry
 import com.scatterbrain.scatterfit.data.EstimatedStepsStorage
+import com.scatterbrain.scatterfit.data.SettingsStorage
 import com.scatterbrain.scatterfit.ui.theme.StateBad
 import androidx.compose.ui.res.painterResource
 import com.scatterbrain.scatterfit.R
@@ -120,6 +121,8 @@ fun MyDayScreen(
     val plannedStorage = remember { PlannedSessionsStorage(context) }
     val routineStorage = remember { RoutineStorage(context) }
     val estimatedStepsStorage = remember { EstimatedStepsStorage(context) }
+    val settingsStorage = remember(context) { SettingsStorage(context) }
+    val settings = remember(settingsStorage) { settingsStorage.loadSettings() }
 
     LaunchedEffect(Unit) {
         migrateLegacyTrainingPlanIfPresent(context, plannedStorage)
@@ -181,9 +184,9 @@ fun MyDayScreen(
         }
     }
 
-    val momentumSource: MomentumSource? = remember(combinedDaily) {
+    val momentumSource: MomentumSource? = remember(combinedDaily, settings) {
         combinedDaily?.let {
-            TodayFacadeMomentumSource(it)
+            TodayFacadeMomentumSource(it, settings)
         }
     }
 
@@ -464,6 +467,7 @@ fun MyDayScreen(
                 }
             },
             onResetToToday = { selectedDay = today },
+            settings = settings,
             consumedKcal = consumedKcal,
             consumedProtein = consumedProtein,
             deviceSteps = repoDaily?.steps?.get(selectedDay),
