@@ -22,7 +22,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -50,13 +54,36 @@ fun SettingsScreen(
     onOpenGoalSet: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onBack)
+    var activeEditSheet by remember { mutableStateOf<TargetEditType?>(null) }
+    var settingsRefreshKey by remember { mutableIntStateOf(0) }
+
+    BackHandler(enabled = true) {
+        if (activeEditSheet != null) {
+            activeEditSheet = null
+        } else {
+            onBack()
+        }
+    }
 
     val context = LocalContext.current
     val goalHistoryStorage = remember(context) { GoalHistoryStorage(context) }
     val activeGoal = remember(goalHistoryStorage) { goalHistoryStorage.activeGoal() }
     val settingsStorage = remember(context) { SettingsStorage(context) }
-    val settings = remember(settingsStorage) { settingsStorage.loadSettings() }
+    val settings = remember(settingsStorage, settingsRefreshKey) { settingsStorage.loadSettings() }
+
+    val weightStorage = remember(context) { WeightStorage(context) }
+    val latestRecordedWeight = remember(weightStorage) {
+        weightStorage.loadAll().maxByOrNull { it.timestamp }?.kg
+            ?: com.scatterbrain.scatterfit.data.DailyRepository.daily.value?.weight?.let { map ->
+                val maxDay = map.keys.maxOrNull()
+                maxDay?.let { map[it] }
+            }
+    }
+    val effectiveWeight = when {
+        latestRecordedWeight != null && latestRecordedWeight > 0.0 -> latestRecordedWeight
+        settings.weightTarget > 0.0 -> settings.weightTarget
+        else -> 80.0
+    }
 
     val goalValueText = if (activeGoal != null) {
         val label = goalLabel[activeGoal.preset] ?: activeGoal.preset.name
@@ -142,7 +169,6 @@ fun SettingsScreen(
                 }
 
                 // SECTION: Targets
-                // TODO: bind to ScoringSettings + settings UI
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "TARGETS",
@@ -163,31 +189,104 @@ fun SettingsScreen(
                                 .padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            val caloriesSub = if (settings.carbTargetG > 0 && settings.fatTargetG > 0) {
+                                String.format(
+                                    Locale.US,
+                                    "%,d kcal · P %dg / C %dg / F %dg",
+                                    settings.kcalTarget,
+                                    settings.proteinTarget,
+                                    settings.carbTargetG,
+                                    settings.fatTargetG
+                                )
+                            } else {
+                                String.format(Locale.US, "%,d kcal · P %dg", settings.kcalTarget, settings.proteinTarget)
+                            }
                             SettingRow(
-                                label = "Calories target",
-                                value = String.format(Locale.US, "%,d kcal", settings.kcalTarget)
+                                label = "Calories",
+                                value = caloriesSub,
+                                isClickable = true,
+                                onClick = { activeEditSheet = TargetEditType.CALORIES }
                             )
                             SettingRow(
                                 label = "Steps target",
-                                value = String.format(Locale.US, "%,d", settings.stepTarget)
+                                value = String.format(Locale.US, "%,d", settings.stepTarget),
+                                isClickable = true,
+                                onClick = { activeEditSheet = TargetEditType.STEPS }
                             )
                             SettingRow(
-                                label = "Protein target",
-                                value = "${settings.proteinTarget} g"
+                                label = "Sleep target",
+                                value = if (settings.sleepTargetHours % 1.0 == 0.0) "${settings.sleepTargetHours.toInt()}h" else "%.1fh".format(Locale.US, settings.sleepTargetHours),
+                                isClickable = true,
+                                onClick = { activeEditSheet = TargetEditType.SLEEP }
                             )
                             SettingRow(
-                                label = "Carbs target",
-                                value = if (settings.carbTargetG > 0) "${settings.carbTargetG} g" else "—"
+                                label = "Alcohol",
+                                value = "${settings.unitsPerWeek} units/week",
+                                isClickable = true,
+                                onClick = { activeEditSheet = TargetEditType.ALCOHOL }
+                            )
+                            val exerciseValue = if (settingsStorage.isExerciseModeSimple()) {
+                                "${settingsStorage.getExerciseTimesPerWeek()}× / week · ${settings.exerciseTargetPerWeek} min"
+                            } else {
+                                "${settings.exerciseTargetPerWeek} min/week · Z2 ${settings.z2Target} / Z3 ${settings.z3Target} / Z4 ${settings.z4Target} / Z5 ${settings.z5Target}"
+                            }
+                            SettingRow(
+                                label = "Exercise",
+                                value = exerciseValue,
+                                isClickable = true,
+                                onClick = { activeEditSheet = TargetEditType.EXERCISE }
+                            )
+                        }
+                    }
+                }
+
+                // SECTION: Body (Read-only)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "BODY",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.2.sp
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                        border = BorderStroke(1.dp, BorderDefault)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            SettingRow(
+                                label = "Height",
+                                value = if (settings.heightCm > 0) "${settings.heightCm} cm" else "Not set",
+                                isClickable = true,
+                                onClick = onOpenGoalSet
                             )
                             SettingRow(
-                                label = "Fat target",
-                                value = if (settings.fatTargetG > 0) "${settings.fatTargetG} g" else "—"
+                                label = "Age",
+                                value = if (settings.ageYears > 0) "${settings.ageYears} y" else "Not set",
+                                isClickable = true,
+                                onClick = onOpenGoalSet
                             )
-                            SettingRow(label = "Sleep target", value = "8h")
-                            SettingRow(label = "Alcohol", value = "14 units/week")
                             SettingRow(
-                                label = "Zone 2",
-                                value = "90 min/week · Zone 3: 45 · Zone 4: 30 · Zone 5: 15"
+                                label = "Sex",
+                                value = settings.sex.name.lowercase().replaceFirstChar { it.uppercase() },
+                                isClickable = true,
+                                onClick = onOpenGoalSet
+                            )
+                            SettingRow(
+                                label = "Target weight",
+                                value = if (settings.weightTarget > 0.0) {
+                                    if (settings.weightTarget % 1.0 == 0.0) "${settings.weightTarget.toInt()} kg"
+                                    else "%.1f kg".format(Locale.US, settings.weightTarget)
+                                } else "Not set",
+                                isClickable = true,
+                                onClick = onOpenGoalSet
                             )
                         }
                     }
@@ -286,6 +385,20 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    if (activeEditSheet != null) {
+        TargetEditSheet(
+            editType = activeEditSheet!!,
+            settingsStorage = settingsStorage,
+            currentSettings = settings,
+            effectiveWeightKg = effectiveWeight,
+            onDismissRequest = { activeEditSheet = null },
+            onSaveSuccess = {
+                settingsRefreshKey++
+                activeEditSheet = null
+            }
+        )
     }
 }
 
