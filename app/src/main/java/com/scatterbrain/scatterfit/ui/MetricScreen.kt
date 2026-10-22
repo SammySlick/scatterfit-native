@@ -23,11 +23,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalContext
 import com.scatterbrain.scatterfit.core.MetricId
 import com.scatterbrain.scatterfit.core.MetricRegistry
+import com.scatterbrain.scatterfit.core.ScoringSettings
 import com.scatterbrain.scatterfit.core.metricTargetContext
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.DailyRepository
+import com.scatterbrain.scatterfit.data.SettingsStorage
 import com.scatterbrain.scatterfit.data.StoreDailySource
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.MutedFill
@@ -64,7 +67,12 @@ fun MetricScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
     todayKey: String = remember { todayKey() },
+    settings: ScoringSettings? = null,
 ) {
+    val androidContext = LocalContext.current
+    val effectiveSettings = remember(settings, androidContext) {
+        settings ?: SettingsStorage(androidContext).loadSettings()
+    }
     var currentId by remember { mutableStateOf(initialId) }
     val def = remember(currentId) { MetricRegistry.byId(currentId) }
     val repoDaily by DailyRepository.daily.collectAsState()
@@ -118,14 +126,13 @@ fun MetricScreen(
         def.unit.ifEmpty { when (currentId) { MetricId.SLEEP -> "last night"; MetricId.STEPS -> "yesterday"; else -> "" } }
     }
 
-    // Verdict/comparison from the ported targets engine, on the same demo
-    // decision layer the Today facade uses until the goals editor exists.
-    val context = remember(def, source) {
+    // Verdict/comparison from the targets engine with real stored settings.
+    val targetContext = remember(def, source, effectiveSettings) {
         val zone = ZoneId.systemDefault()
         val nowMs = System.currentTimeMillis()
         val days = (0 until 7).map { com.scatterbrain.scatterfit.data.Daily.daysAgoKey(it, zone, nowMs) }
         val mean7 = source.series(days).mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
-        metricTargetContext(currentId, mean7, com.scatterbrain.scatterfit.core.ScoringSettings(activeGoal = com.scatterbrain.scatterfit.core.GoalPreset.FAT_LOSS, kcalTarget = 2270))
+        metricTargetContext(currentId, mean7, effectiveSettings)
     }
 
     MetricPageScreen(
@@ -135,11 +142,11 @@ fun MetricScreen(
         heroScore = latest?.score,
         isUnloggedToday = !hasTodayRecord,
         lastLoggedText = lastLoggedText,
-        verdictLabel = context.verdict.takeIf { it != "Not enough data" },
-        verdictTone = verdictTone(context.verdict),
+        verdictLabel = targetContext.verdict.takeIf { it != "Not enough data" },
+        verdictTone = verdictTone(targetContext.verdict),
         insightSentence = buildString {
-            append(context.comparison)
-            context.action?.let { append("  "); append(it) }
+            append(targetContext.comparison)
+            targetContext.action?.let { append("  "); append(it) }
         },
         chartType = if (def.chart) MetricChartType.LINE else MetricChartType.BAR,
         metricSource = source,

@@ -270,7 +270,8 @@ fun MyDayScreen(
         activeMetricId != null -> {
             MetricScreen(
                 initialId = activeMetricId!!,
-                onBackClick = { activeMetricId = null }
+                onBackClick = { activeMetricId = null },
+                settings = settings
             )
             return
         }
