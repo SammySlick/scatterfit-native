@@ -442,6 +442,65 @@ class OpenFoodFactsTest {
     }
 
     @Test
+    fun `reducedQueries produces fallback ladder for multi-token queries`() {
+        val ladder = reducedQueries("posh cheddar and pickle")
+        assertEquals(4, ladder.size)
+        // 1. Raw
+        assertEquals("posh cheddar and pickle", ladder[0])
+        // 2. Stop-word stripped
+        assertEquals("posh cheddar pickle", ladder[1])
+        // 3. Two longest tokens in relative order
+        assertEquals("cheddar pickle", ladder[2])
+        // 4. Longest token
+        assertEquals("cheddar", ladder[3])
+    }
+
+    @Test
+    fun `reducedQueries handles single token and stop words gracefully`() {
+        val single = reducedQueries("cheddar")
+        assertEquals(listOf("cheddar"), single)
+
+        val twoTokens = reducedQueries("cheddar cheese")
+        assertEquals(listOf("cheddar cheese", "cheddar"), twoTokens)
+    }
+
+    @Test
+    fun `logged meal name search finds stored meal by name token with synthetic presets`() {
+        val meals = listOf(
+            com.scatterbrain.scatterfit.ui.LoggedMeal(
+                name = "Posh Cheddar & Pickle Sandwich (Pret A Manger)",
+                displayName = "Posh Cheddar & Pickle Sandwich",
+                note = "bought for lunch",
+                kcal = 550.0,
+                protein = 18.0
+            ),
+            com.scatterbrain.scatterfit.ui.LoggedMeal(
+                name = "Oatmeal with Blueberries",
+                displayName = "Oatmeal",
+                note = "breakfast bowl",
+                kcal = 300.0,
+                protein = 12.0
+            )
+        )
+        val presets = com.scatterbrain.scatterfit.ui.deriveMealPresets(meals)
+
+        // 1. Search by token in displayName ("pickle")
+        val pickleHits = filterFuzzy(presets, "pickle", limit = 5, { it.name }, { it.displayName }, { it.note })
+        assertEquals(1, pickleHits.size)
+        assertTrue(pickleHits.first().name.contains("Pret"))
+
+        // 2. Search by token in note ("lunch")
+        val lunchHits = filterFuzzy(presets, "lunch", limit = 5, { it.name }, { it.displayName }, { it.note })
+        assertEquals(1, lunchHits.size)
+        assertTrue(lunchHits.first().name.contains("Pret"))
+
+        // 3. Search by token in stored name ("pret")
+        val pretHits = filterFuzzy(presets, "pret", limit = 5, { it.name }, { it.displayName }, { it.note })
+        assertEquals(1, pretHits.size)
+        assertTrue(pretHits.first().name.contains("Pret"))
+    }
+
+    @Test
     fun `product with nutrition only per-serving normalises to per-100ml and scales correctly`() {
         val product = ProductResult(
             code = "vieve1",

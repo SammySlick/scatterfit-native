@@ -414,6 +414,51 @@ fun <T> filterFuzzy(
         .map { it.first }
 }
 
+fun reducedQueries(query: String): List<String> {
+    val qClean = query.trim()
+    if (qClean.isBlank()) return emptyList()
+
+    val rawTokens = qClean.split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (rawTokens.isEmpty()) return emptyList()
+
+    val stopWords = setOf("and", "the", "a", "of", "with", "in")
+    val contentTokens = rawTokens.filter { it.lowercase() !in stopWords }
+
+    val queries = mutableListOf<String>()
+
+    // 1. Raw query
+    queries.add(qClean)
+
+    // 2. Stop-word stripped query
+    if (contentTokens.isNotEmpty()) {
+        val stopStripped = contentTokens.joinToString(" ")
+        if (!queries.contains(stopStripped)) {
+            queries.add(stopStripped)
+        }
+    }
+
+    // 3. Two longest tokens
+    val tokensForLength = if (contentTokens.isNotEmpty()) contentTokens else rawTokens
+    if (tokensForLength.size > 2) {
+        val sortedByLen = tokensForLength.sortedByDescending { it.length }
+        val topTwo = sortedByLen.take(2).toSet()
+        val twoLongest = tokensForLength.filter { it in topTwo }.take(2).joinToString(" ")
+        if (!queries.contains(twoLongest)) {
+            queries.add(twoLongest)
+        }
+    }
+
+    // 4. Single longest token
+    if (tokensForLength.size > 1) {
+        val longest = tokensForLength.maxByOrNull { it.length } ?: ""
+        if (longest.isNotBlank() && !queries.contains(longest)) {
+            queries.add(longest)
+        }
+    }
+
+    return queries
+}
+
 @Serializable
 data class ProductResult(
     val code: String = "",
@@ -428,6 +473,8 @@ data class ProductResult(
     val servingQuantity: JsonElement? = null,
     @SerialName("categories")
     val categories: String? = null,
+    @kotlinx.serialization.Transient
+    val fallbackLevel: Int = 1,
 ) {
     val servingQuantityGrams: Double?
         get() {
@@ -636,6 +683,20 @@ object OpenFoodFactsClient {
         val filtered = results.filter { !it.productName.isNullOrBlank() }
         queryCache[q.lowercase()] = filtered
         filtered
+    }
+
+    suspend fun searchWithFallback(query: String): List<ProductResult> = withContext(Dispatchers.IO) {
+        val queries = reducedQueries(query)
+        if (queries.isEmpty()) return@withContext emptyList()
+
+        for ((index, q) in queries.withIndex()) {
+            val level = index + 1
+            val results = search(q)
+            if (results.isNotEmpty()) {
+                return@withContext results.map { it.copy(fallbackLevel = level) }
+            }
+        }
+        emptyList()
     }
 
     suspend fun lookupBarcode(barcode: String): ProductResult? = withContext(Dispatchers.IO) {

@@ -33,6 +33,8 @@ data class LoggedMeal(
     val isLocal: Boolean = true,
     val portionGrams: Double? = null,
     val portionLabel: String? = null,
+    val displayName: String? = null,
+    val note: String? = null,
 ) {
     fun toHealthRecord(): HealthRecord {
         val startIso = Instant.ofEpochMilli(timestamp).toString()
@@ -100,6 +102,8 @@ data class MealPreset(
     val lastUsedTimestamp: Long,
     val portionGrams: Double? = null,
     val portionLabel: String? = null,
+    val displayName: String? = null,
+    val note: String? = null,
 )
 
 fun deriveMealPresets(meals: List<LoggedMeal>, limit: Int = 8): List<MealPreset> {
@@ -116,7 +120,9 @@ fun deriveMealPresets(meals: List<LoggedMeal>, limit: Int = 8): List<MealPreset>
                 fat = it.fat,
                 lastUsedTimestamp = it.timestamp,
                 portionGrams = it.portionGrams,
-                portionLabel = it.portionLabel
+                portionLabel = it.portionLabel,
+                displayName = it.displayName,
+                note = it.note,
             )
         }
 }

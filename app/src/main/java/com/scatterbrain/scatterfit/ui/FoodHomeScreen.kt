@@ -206,7 +206,7 @@ fun FoodHomeScreen(
         if (q.length >= 2) {
             delay(400L)
             isSearchingOff = true
-            offResults = OpenFoodFactsClient.search(q).take(8)
+            offResults = OpenFoodFactsClient.searchWithFallback(q).take(8)
             isSearchingOff = false
             searchHasExecuted = true
         } else {
@@ -1643,9 +1643,18 @@ private fun LiveFoodSearchResults(
     val context = androidx.compose.ui.platform.LocalContext.current
     val genericFoodsList = remember(context) { OpenFoodFactsClient.loadGenericFoods(context) }
 
-    val matchedPresets = filterFuzzy(presets, q, limit = 8, { it.name })
+    val matchedPresets = filterFuzzy(
+        presets, q, limit = 8,
+        { it.name },
+        { it.displayName },
+        { it.note }
+    )
     val matchedFavourites = filterFuzzy(favourites, q, limit = 8, { it.name })
-    val matchedRecipes = filterFuzzy(recipes, q, limit = 8, { it.name })
+    val matchedRecipes = filterFuzzy(
+        recipes, q, limit = 8,
+        { it.name },
+        { it.note }
+    )
     val genericSearchResults = filterFuzzy(
         genericFoodsList, q, limit = 8,
         { it.productName },
@@ -1777,16 +1786,21 @@ private fun LiveFoodSearchResults(
             }
 
             // Open Food Facts results
+            val offFallbackLevel = offResults.firstOrNull()?.fallbackLevel ?: 1
+            val isWidened = offFallbackLevel > 1
+            val hasLocalMatches = matchedFavourites.isNotEmpty() || matchedPresets.isNotEmpty() || matchedRecipes.isNotEmpty() || genericSearchResults.isNotEmpty()
+
             if (isSearchingOff) {
                 Text("Searching Open Food Facts…", color = TextMuted, fontSize = 12.sp)
-            } else if (offResults.isNotEmpty()) {
+            } else if (offResults.isNotEmpty() && (!isWidened || !hasLocalMatches)) {
                 val displayOffResults = filterFuzzy(
                     offResults, q, limit = 8,
                     { it.productName },
                     { it.brands },
                     { it.categories }
                 ).ifEmpty { offResults.take(8) }
-                Text("OPEN FOOD FACTS (UK)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                val headerText = if (isWidened) "OPEN FOOD FACTS (UK) — WIDER MATCHES" else "OPEN FOOD FACTS (UK)"
+                Text(headerText, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     displayOffResults.forEach { product ->
                         Card(
