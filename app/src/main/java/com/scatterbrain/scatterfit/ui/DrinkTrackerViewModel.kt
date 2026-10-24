@@ -36,7 +36,8 @@ data class DailyState(
 class DrinkTrackerViewModel(
     private val storage: DrinkStorage? = null,
     initialDayKey: String = todayKey(),
-    initialLibrary: List<DrinkReference> = emptyList()
+    initialLibrary: List<DrinkReference> = emptyList(),
+    var clock: java.time.Clock = java.time.Clock.systemDefaultZone()
 ) : ViewModel() {
 
     private var activeDayKey: String = initialDayKey
@@ -86,8 +87,8 @@ class DrinkTrackerViewModel(
      * Returns true if logged successfully, false if refused.
      */
     fun logDrink(drink: DrinkReference, timestamp: Long? = null): Boolean {
-        val today = com.scatterbrain.scatterfit.core.todayKey()
-        val zone = java.time.ZoneId.systemDefault()
+        val zone = clock.zone
+        val today = com.scatterbrain.scatterfit.core.todayKey(zone)
 
         val actualTimestamp = if (timestamp != null) {
             timestamp
@@ -95,22 +96,19 @@ class DrinkTrackerViewModel(
             val selectedDate = try {
                 java.time.LocalDate.parse(activeDayKey)
             } catch (_: Exception) {
-                java.time.LocalDate.now(zone)
+                java.time.LocalDate.now(clock)
             }
 
             val currentLogs = storage?.getDrinksForDay(activeDayKey)
                 ?: inMemoryStorage[activeDayKey]
             val lastLogForDay = currentLogs?.maxByOrNull { it.timestamp }
 
-            val timeToUse = if (lastLogForDay != null) {
-                val cal = java.util.Calendar.getInstance().apply { timeInMillis = lastLogForDay.timestamp }
-                java.time.LocalTime.of(
-                    cal.get(java.util.Calendar.HOUR_OF_DAY),
-                    cal.get(java.util.Calendar.MINUTE),
-                    cal.get(java.util.Calendar.SECOND)
-                )
+            val timeToUse = if (activeDayKey == today) {
+                java.time.LocalTime.now(clock)
+            } else if (lastLogForDay != null) {
+                java.time.Instant.ofEpochMilli(lastLogForDay.timestamp).atZone(zone).toLocalTime()
             } else {
-                java.time.LocalTime.now(zone)
+                java.time.LocalTime.now(clock)
             }
 
             selectedDate.atTime(timeToUse).atZone(zone).toInstant().toEpochMilli()

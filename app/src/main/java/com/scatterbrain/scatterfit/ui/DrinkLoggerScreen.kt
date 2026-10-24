@@ -13,14 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import com.scatterbrain.scatterfit.data.filterFuzzy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -934,13 +931,11 @@ fun LoggedDrinksSection(
                 )
             }
 
-            // Strips container: hugs 1 row, scrolls when many drinks logged
+            // Strips container: wraps content and renders all logged drinks without clipping
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .wrapContentHeight()
-                    .heightIn(max = 240.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .wrapContentHeight(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 loggedDrinks.forEach { logged ->

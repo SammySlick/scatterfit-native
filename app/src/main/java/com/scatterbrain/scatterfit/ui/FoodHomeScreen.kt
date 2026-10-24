@@ -517,6 +517,15 @@ fun FoodHomeScreen(
                                 progressFraction = fatFraction,
                                 fillColor = fatColor
                             )
+
+                            // Fourth row: Alcohol (CONSUMED view only, and only when alcohol kcal > 0)
+                            val dayAlcoholKcal = (repoDaily?.alcoholKcal?.get(activeDay) ?: 0.0).roundToInt()
+                            if (macroMode == MacroCardMode.CONSUMED && dayAlcoholKcal > 0) {
+                                AlcoholMiniRow(
+                                    alcoholKcal = dayAlcoholKcal,
+                                    kcalTarget = kcalTarget
+                                )
+                            }
                         }
                     }
                 }
@@ -846,6 +855,55 @@ private fun MacroMiniRow(
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp))
                         .background(fillColor)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlcoholMiniRow(
+    alcoholKcal: Int,
+    kcalTarget: Int,
+    modifier: Modifier = Modifier,
+) {
+    val progressFraction = if (kcalTarget > 0) {
+        (alcoholKcal.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Alcohol", fontSize = 12.sp, color = TextForeground, fontWeight = FontWeight.Medium)
+            Text(
+                text = "$alcoholKcal kcal",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextForeground
+            )
+        }
+
+        // 4dp bar in TextMuted/neutral colour (information, not judgement)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+        ) {
+            if (progressFraction > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction = progressFraction.coerceIn(0f, 1f))
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(TextMuted)
                 )
             }
         }

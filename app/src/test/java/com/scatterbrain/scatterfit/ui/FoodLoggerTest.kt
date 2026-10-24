@@ -696,4 +696,34 @@ class FoodLoggerTest {
         assertEquals("0 / —", if (carbsTargetText == "—") "$totalCarbs / —" else "$totalCarbs / $carbsTargetText")
         assertEquals("0 / —", if (fatTargetText == "—") "$totalFat / —" else "$totalFat / $fatTargetText")
     }
+
+    @Test
+    fun `alcohol kcal row on food macro card renders only when alcohol kcal greater than zero`() {
+        val dailyZero = Daily.buildDailyDataFromMaps(
+            records = emptyMap(),
+            zones = Zones.DEFAULT_ZONES,
+            zone = defaultZone,
+            nowMs = nowMs
+        )
+        val dayAlcoholKcalZero = (dailyZero.alcoholKcal[today] ?: 0.0).toInt()
+        val shouldRenderZero = dayAlcoholKcalZero > 0
+        assertFalse("When alcohol kcal == 0, row must not render", shouldRenderZero)
+
+        val drink = LoggedDrink(
+            id = "d1",
+            drink = DrinkReference(name = "Beer", units = 1.8, kcals = 180),
+            timestamp = nowMs,
+            dayKey = today
+        )
+        val dailyPositive = Daily.buildDailyDataFromMaps(
+            records = mapOf(RecordMethod.ALCOHOL to listOf(drink.toHealthRecord())),
+            zones = Zones.DEFAULT_ZONES,
+            zone = defaultZone,
+            nowMs = nowMs
+        )
+        val dayAlcoholKcalPositive = (dailyPositive.alcoholKcal[today] ?: 0.0).toInt()
+        val shouldRenderPositive = dayAlcoholKcalPositive > 0
+        assertTrue("When alcohol kcal > 0, row must render", shouldRenderPositive)
+        assertEquals(180, dayAlcoholKcalPositive)
+    }
 }
