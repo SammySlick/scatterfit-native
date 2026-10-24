@@ -401,6 +401,47 @@ class OpenFoodFactsTest {
     }
 
     @Test
+    fun `stop-word set dropped from query tokens and all tokens dropped returns zero`() {
+        // Query of only stop words returns 0.0
+        assertEquals(0.0, fuzzyScore("and", "Chicken and rice"), 0.001)
+        assertEquals(0.0, fuzzyScore("the", "The big cheese"), 0.001)
+        assertEquals(0.0, fuzzyScore("in with of a", "Bowl with a salad"), 0.001)
+
+        // Query with stop words drops stop words and matches content tokens
+        val score = fuzzyScore("chicken and rice", "Chicken Rice Bowl")
+        assertTrue("Query with stop words should match content tokens", score >= 0.6)
+    }
+
+    @Test
+    fun `tokenised AND matches synthetic data`() {
+        val syntheticFoods = listOf(
+            ProductResult(code = "1", productName = "Cheese and Pickle Sandwich"),
+            ProductResult(code = "2", productName = "Ham Sandwich"),
+            ProductResult(code = "3", productName = "Cheddar Cheese Block")
+        )
+        val hits = filterFuzzy(syntheticFoods, "cheese sandwich", limit = 5, { it.productName })
+        assertTrue("Tokenised AND matches item containing both tokens", hits.any { it.code == "1" })
+    }
+
+    @Test
+    fun `multi-field match across productName brands and categories`() {
+        val items = listOf(
+            ProductResult(code = "1", productName = "Carb Killa", brands = "Grenade", categories = "High Protein Bars"),
+            ProductResult(code = "2", productName = "Oat Bar", brands = "Flapjack Co", categories = "Cereal Bars")
+        )
+
+        // Match brand
+        val brandHits = filterFuzzy(items, "grenade", limit = 5, { it.productName }, { it.brands }, { it.categories })
+        assertEquals(1, brandHits.size)
+        assertEquals("1", brandHits.first().code)
+
+        // Match category
+        val categoryHits = filterFuzzy(items, "cereal", limit = 5, { it.productName }, { it.brands }, { it.categories })
+        assertEquals(1, categoryHits.size)
+        assertEquals("2", categoryHits.first().code)
+    }
+
+    @Test
     fun `product with nutrition only per-serving normalises to per-100ml and scales correctly`() {
         val product = ProductResult(
             code = "vieve1",

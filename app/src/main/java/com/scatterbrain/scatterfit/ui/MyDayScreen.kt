@@ -456,6 +456,9 @@ fun MyDayScreen(
             onMetricClick = { metricId ->
                 activeMetricId = metricId
             },
+            onDrinksClick = {
+                showDrinkLoggerScreen = true
+            },
             onPlanEditorClick = onOpenTraining,
             onWeighInClick = {
                 val hasWeight = repoDaily?.weight?.get(selectedDay)?.let { it > 0.0 } == true

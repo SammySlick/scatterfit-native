@@ -1643,10 +1643,15 @@ private fun LiveFoodSearchResults(
     val context = androidx.compose.ui.platform.LocalContext.current
     val genericFoodsList = remember(context) { OpenFoodFactsClient.loadGenericFoods(context) }
 
-    val matchedPresets = filterFuzzy(presets, q, limit = 8) { it.name }
-    val matchedFavourites = filterFuzzy(favourites, q, limit = 8) { it.name }
-    val matchedRecipes = filterFuzzy(recipes, q, limit = 8) { it.name }
-    val genericSearchResults = filterFuzzy(genericFoodsList, q, limit = 8) { it.productName }
+    val matchedPresets = filterFuzzy(presets, q, limit = 8, { it.name })
+    val matchedFavourites = filterFuzzy(favourites, q, limit = 8, { it.name })
+    val matchedRecipes = filterFuzzy(recipes, q, limit = 8, { it.name })
+    val genericSearchResults = filterFuzzy(
+        genericFoodsList, q, limit = 8,
+        { it.productName },
+        { it.brands },
+        { it.categories }
+    )
 
     val searchScrollState = rememberScrollState()
 
@@ -1775,9 +1780,15 @@ private fun LiveFoodSearchResults(
             if (isSearchingOff) {
                 Text("Searching Open Food Facts…", color = TextMuted, fontSize = 12.sp)
             } else if (offResults.isNotEmpty()) {
+                val displayOffResults = filterFuzzy(
+                    offResults, q, limit = 8,
+                    { it.productName },
+                    { it.brands },
+                    { it.categories }
+                ).ifEmpty { offResults.take(8) }
                 Text("OPEN FOOD FACTS (UK)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    offResults.forEach { product ->
+                    displayOffResults.forEach { product ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()

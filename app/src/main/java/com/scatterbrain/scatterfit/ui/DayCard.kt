@@ -164,6 +164,7 @@ fun DayCard(
     onMetricClick: (MetricId) -> Unit = {},
     onPlanEditorClick: (() -> Unit)? = null,
     onWeighInClick: (() -> Unit)? = null,
+    onDrinksClick: (() -> Unit)? = null,
     onResetToToday: (() -> Unit)? = null,
     consumedKcal: Double? = null,
     consumedProtein: Double? = null,
@@ -425,7 +426,7 @@ fun DayCard(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onMetricClick(MetricId.ALCOHOL_UNITS) }
+                        .clickable { onDrinksClick?.invoke() ?: onMetricClick(MetricId.ALCOHOL_UNITS) }
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {

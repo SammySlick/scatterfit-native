@@ -19,7 +19,8 @@ data class DrinkReference(
     @SerialName("kcal") val kcals: Int = 0,
     @SerialName("price_gbp") val cost: Double = 0.0,
     val fav: Boolean = false,
-    val category: String = ""
+    val category: String = "",
+    val aliases: List<String> = emptyList()
 )
 
 @Serializable

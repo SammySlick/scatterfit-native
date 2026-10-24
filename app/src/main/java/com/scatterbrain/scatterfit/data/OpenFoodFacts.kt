@@ -334,18 +334,22 @@ fun fuzzyScore(query: String, target: String): Double {
     val tClean = target.trim().lowercase()
     if (qClean.isEmpty() || tClean.isEmpty()) return 0.0
 
+    val qTokens = qClean.split(Regex("\\s+")).filter { it.isNotBlank() }
+    val stopWords = setOf("and", "the", "a", "of", "with", "in")
+    val filteredQTokens = qTokens.filter { it !in stopWords }
+    if (filteredQTokens.isEmpty()) return 0.0
+
     if (tClean.contains(qClean)) {
         return 1.0 + if (tClean.startsWith(qClean)) 0.2 else 0.0
     }
 
-    val qTokens = qClean.split(Regex("\\s+")).filter { it.isNotBlank() }
     val tTokens = tClean.split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }
-    if (qTokens.isEmpty() || tTokens.isEmpty()) return 0.0
+    if (tTokens.isEmpty()) return 0.0
 
     var matchedTokensCount = 0
     var totalTokenScore = 0.0
 
-    for (qTok in qTokens) {
+    for (qTok in filteredQTokens) {
         var bestTokenScore = 0.0
         for (tTok in tTokens) {
             if (tTok == qTok) {
@@ -379,7 +383,7 @@ fun fuzzyScore(query: String, target: String): Double {
 
     if (matchedTokensCount == 0) return 0.0
 
-    return (totalTokenScore / qTokens.size.toDouble()) * (matchedTokensCount.toDouble() / qTokens.size.toDouble()) +
+    return (totalTokenScore / filteredQTokens.size.toDouble()) * (matchedTokensCount.toDouble() / filteredQTokens.size.toDouble()) +
             (0.5 * totalTokenScore / matchedTokensCount)
 }
 
@@ -388,13 +392,21 @@ fun <T> filterFuzzy(
     query: String,
     limit: Int = 8,
     nameSelector: (T) -> String?
+): List<T> = filterFuzzy(items, query, limit, nameSelector, *emptyArray())
+
+fun <T> filterFuzzy(
+    items: List<T>,
+    query: String,
+    limit: Int = 8,
+    nameSelector: (T) -> String?,
+    vararg extraSelectors: (T) -> String?
 ): List<T> {
     val q = query.trim()
     if (q.isBlank()) return emptyList()
     return items
         .mapNotNull { item ->
-            val name = nameSelector(item) ?: return@mapNotNull null
-            val score = fuzzyScore(q, name)
+            val fields = listOfNotNull(nameSelector(item)) + extraSelectors.mapNotNull { it(item) }
+            val score = fields.maxOfOrNull { fuzzyScore(q, it) } ?: 0.0
             if (score >= 0.6) item to score else null
         }
         .sortedByDescending { it.second }

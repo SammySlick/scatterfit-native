@@ -4835,8 +4835,9 @@
   },
   {
     "id": "white-claw-all-flavours--330ml-can",
-    "name": "White Claw (All Flavours)",
+    "name": "White Claw Hard Seltzer (All Flavours)",
     "brand": "White Claw",
+    "aliases": ["hard seltzer", "seltzer", "spiked sparkling water"],
     "category": "premixed",
     "serving": "330ml Can",
     "volume_ml": 330,

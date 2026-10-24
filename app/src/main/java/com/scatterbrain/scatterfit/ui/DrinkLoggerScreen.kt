@@ -13,10 +13,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.scatterbrain.scatterfit.data.filterFuzzy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -167,19 +172,25 @@ fun DrinkLoggerContent(
     }
 
     val filteredDrinks = remember(dailyState.libraryDrinks, dailyState.searchQuery, dailyState.selectedCategory) {
-        dailyState.libraryDrinks.filter { drink ->
-            val matchesQuery = dailyState.searchQuery.isBlank() ||
-                    drink.name.contains(dailyState.searchQuery, ignoreCase = true) ||
-                    drink.brand.contains(dailyState.searchQuery, ignoreCase = true) ||
-                    drink.category.contains(dailyState.searchQuery, ignoreCase = true)
-
-            val matchesCategory = when (dailyState.selectedCategory) {
+        val categoryFiltered = dailyState.libraryDrinks.filter { drink ->
+            when (dailyState.selectedCategory) {
                 "All" -> true
                 "Favorites" -> drink.fav
                 else -> drink.category.equals(dailyState.selectedCategory, ignoreCase = true)
             }
-
-            matchesQuery && matchesCategory
+        }
+        if (dailyState.searchQuery.isBlank()) {
+            categoryFiltered
+        } else {
+            filterFuzzy(
+                categoryFiltered,
+                dailyState.searchQuery,
+                limit = 100,
+                { it.name },
+                { it.brand },
+                { it.category },
+                { it.aliases.joinToString(" ") }
+            )
         }
     }
 
@@ -894,7 +905,7 @@ fun LoggedDrinksSection(
     val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().wrapContentHeight(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SecondaryFill),
         border = BorderStroke(1.dp, BorderDefault)
@@ -923,60 +934,69 @@ fun LoggedDrinksSection(
                 )
             }
 
-            // Strips sorted newest-first by timestamp
-            loggedDrinks.forEach { logged ->
-                val timeStr = timeFormat.format(Date(logged.timestamp))
+            // Strips container: hugs 1 row, scrolls when many drinks logged
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .heightIn(max = 240.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                loggedDrinks.forEach { logged ->
+                    val timeStr = timeFormat.format(Date(logged.timestamp))
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onEditDrinkTime(logged) }
-                        .padding(vertical = 4.dp, horizontal = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
                     Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onEditDrinkTime(logged) }
+                            .padding(vertical = 4.dp, horizontal = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Clickable Time Pill
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MutedFill)
-                                .border(BorderStroke(0.5.dp, BorderDefault), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            // Clickable Time Pill
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(MutedFill)
+                                    .border(BorderStroke(0.5.dp, BorderDefault), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = timeStr,
+                                    color = AccentTeal,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
                             Text(
-                                text = timeStr,
-                                color = AccentTeal,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
+                                text = logged.drink.name,
+                                color = TextForeground,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = String.format(Locale.US, "• %.1fu · %d kcal · £%.2f", logged.drink.units, logged.drink.kcals, logged.drink.cost),
+                                color = TextMuted,
+                                fontSize = 11.sp
                             )
                         }
 
-                        Text(
-                            text = logged.drink.name,
-                            color = TextForeground,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = String.format(Locale.US, "• %.1fu · %d kcal · £%.2f", logged.drink.units, logged.drink.kcals, logged.drink.cost),
-                            color = TextMuted,
-                            fontSize = 11.sp
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { onRemoveDrink(logged) },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Text("✕", color = TextMuted, fontSize = 12.sp)
+                        IconButton(
+                            onClick = { onRemoveDrink(logged) },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Text("✕", color = TextMuted, fontSize = 12.sp)
+                        }
                     }
                 }
             }
