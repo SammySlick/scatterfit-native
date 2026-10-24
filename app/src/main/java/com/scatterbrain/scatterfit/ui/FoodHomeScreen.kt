@@ -57,6 +57,7 @@ import com.scatterbrain.scatterfit.data.resolvePortionAmount
 import com.scatterbrain.scatterfit.data.scaleNutriments
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import java.util.UUID
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -578,12 +579,21 @@ fun FoodHomeScreen(
                         product = pendingConfirmProduct!!,
                         defaultMealType = viewModel.mealTypeInput,
                         dayKey = activeDay,
+                        existingMealId = editingMealId,
                         onConfirm = { mealToLog ->
-                            viewModel.logCustomMeal(mealToLog)
+                            if (editingMealId != null) {
+                                viewModel.updateMeal(editingMealId!!, mealToLog)
+                                editingMealId = null
+                            } else {
+                                viewModel.logCustomMeal(mealToLog)
+                            }
                             pendingConfirmProduct = null
                             searchQuery = ""
                         },
-                        onCancel = { pendingConfirmProduct = null }
+                        onCancel = {
+                            editingMealId = null
+                            pendingConfirmProduct = null
+                        }
                     )
                 }
 
@@ -1207,6 +1217,7 @@ fun ConfirmProductCard(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     dayKey: String = remember { todayKey() },
+    existingMealId: String? = null,
 ) {
     val defaultUnit = remember(product) { product.inferredUnit }
     val servingQuantity = remember(product) { product.servingQuantityOrFallback }
@@ -1570,8 +1581,10 @@ fun ConfirmProductCard(
 
                 Button(
                     onClick = {
+                        val mealId = existingMealId ?: UUID.randomUUID().toString()
                         val meal = if (isManualEntry) {
                             LoggedMeal(
+                                id = mealId,
                                 name = manualName.ifBlank { "Custom Meal" },
                                 kcal = manualKcal.toDoubleOrNull() ?: 0.0,
                                 protein = manualProtein.toDoubleOrNull(),
@@ -1581,7 +1594,8 @@ fun ConfirmProductCard(
                                 isLocal = true,
                                 dayKey = dayKey,
                                 portionGrams = null,
-                                portionLabel = null
+                                portionLabel = null,
+                                displayName = manualName.ifBlank { "Custom Meal" }
                             )
                         } else {
                             val matchedPreset = presets.firstOrNull {
@@ -1597,6 +1611,7 @@ fun ConfirmProductCard(
                             }
 
                             LoggedMeal(
+                                id = mealId,
                                 name = product.displayName,
                                 kcal = scaled.kcal,
                                 protein = scaled.protein,
@@ -1606,7 +1621,8 @@ fun ConfirmProductCard(
                                 isLocal = true,
                                 dayKey = dayKey,
                                 portionGrams = resolvedGramsOrMl,
-                                portionLabel = resolvedLabel
+                                portionLabel = resolvedLabel,
+                                displayName = product.displayName
                             )
                         }
                         onConfirm(meal)

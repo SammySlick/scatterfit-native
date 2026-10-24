@@ -135,6 +135,57 @@ class FoodLoggerTest {
     }
 
     @Test
+    fun `upsert-by-id editing meal updates values in place and does not duplicate`() {
+        val viewModel = FoodTrackerViewModel()
+        viewModel.setDayKey(today)
+
+        val meal1 = LoggedMeal(id = "meal-1", name = "Toast", kcal = 150.0, dayKey = today, mealType = "breakfast")
+        val meal2 = LoggedMeal(id = "meal-2", name = "Eggs", kcal = 200.0, dayKey = today, mealType = "breakfast")
+        viewModel.logCustomMeal(meal1)
+        viewModel.logCustomMeal(meal2)
+        assertEquals(2, viewModel.mealsForDay.value.size)
+
+        // Edit meal1: change kcal to 250.0 and mealType to lunch
+        val editedMeal = meal1.copy(kcal = 250.0, mealType = "lunch")
+        viewModel.updateMeal(meal1.id, editedMeal)
+
+        // Count stays same
+        assertEquals(2, viewModel.mealsForDay.value.size)
+        // Values change
+        val updated = viewModel.mealsForDay.value.first { it.id == "meal-1" }
+        assertEquals(250.0, updated.kcal, 0.001)
+        assertEquals("lunch", updated.mealType)
+    }
+
+    @Test
+    fun `undo-delete restore preserves original meal id and count without duplication`() {
+        val viewModel = FoodTrackerViewModel()
+        viewModel.setDayKey(today)
+
+        val meal1 = LoggedMeal(id = "meal-a", name = "Apple", kcal = 80.0, dayKey = today)
+        val meal2 = LoggedMeal(id = "meal-b", name = "Banana", kcal = 100.0, dayKey = today)
+        viewModel.logCustomMeal(meal1)
+        viewModel.logCustomMeal(meal2)
+        assertEquals(2, viewModel.mealsForDay.value.size)
+
+        // Delete meal-a
+        viewModel.deleteMeal("meal-a")
+        assertEquals(1, viewModel.mealsForDay.value.size)
+        assertTrue(viewModel.mealsForDay.value.none { it.id == "meal-a" })
+
+        // Undo restore meal-a
+        viewModel.logCustomMeal(meal1)
+        assertEquals(2, viewModel.mealsForDay.value.size)
+        val restored = viewModel.mealsForDay.value.first { it.id == "meal-a" }
+        assertEquals("meal-a", restored.id)
+        assertEquals(80.0, restored.kcal, 0.001)
+
+        // Re-inserting already-present meal does not duplicate
+        viewModel.logCustomMeal(meal1)
+        assertEquals(2, viewModel.mealsForDay.value.size)
+    }
+
+    @Test
     fun `preset derivation duplicates dedupe, recency ordering, cap at 8`() {
         val list = mutableListOf<LoggedMeal>()
 

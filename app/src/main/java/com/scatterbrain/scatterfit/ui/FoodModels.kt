@@ -330,11 +330,20 @@ class FoodTrackerViewModel(
             syncStorageToPipeline()
         } else {
             val list = inMemoryStorage.getOrPut(targetDay) { mutableListOf() }
-            list.removeAll { it.id == mealWithDay.id }
-            list.add(mealWithDay)
+            val index = list.indexOfFirst { it.id == mealWithDay.id }
+            if (index >= 0) {
+                list[index] = mealWithDay
+            } else {
+                list.add(mealWithDay)
+            }
         }
         setDayKey(activeDayKey)
         refreshPresets()
+    }
+
+    fun updateMeal(id: String, meal: LoggedMeal) {
+        val updatedMeal = meal.copy(id = id)
+        logCustomMeal(updatedMeal)
     }
 
     fun setDayKey(dayKey: String) {
