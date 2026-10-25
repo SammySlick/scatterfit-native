@@ -42,6 +42,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -434,9 +435,12 @@ fun MetricScoreRow(
         ) {
             Text(
                 text = item.name.uppercase(),
+                modifier = Modifier.weight(1f, fill = false),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextForeground
+                color = TextForeground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
             val isCalOrSleep = item.id == GoalId.CALORIES || item.id == GoalId.SLEEP

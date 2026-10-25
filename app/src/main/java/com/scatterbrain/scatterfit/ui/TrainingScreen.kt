@@ -735,10 +735,24 @@ private fun WeeklyPlannerSection(
                                                         showRoutinePicker = false
                                                     }
                                                     .padding(horizontal = 10.dp, vertical = 6.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(r.name, color = TextForeground, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                                Text("${r.exercises.size} ex", color = TextMuted, fontSize = 10.sp)
+                                                Text(
+                                                    text = r.name,
+                                                    modifier = Modifier.weight(1f, fill = false),
+                                                    color = TextForeground,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = "${r.exercises.size} ex",
+                                                    color = TextMuted,
+                                                    fontSize = 10.sp,
+                                                    maxLines = 1
+                                                )
                                             }
                                         }
 
