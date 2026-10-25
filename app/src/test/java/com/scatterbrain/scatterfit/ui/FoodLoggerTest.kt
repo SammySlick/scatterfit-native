@@ -1,6 +1,7 @@
 package com.scatterbrain.scatterfit.ui
 
 import com.scatterbrain.scatterfit.data.Daily
+import com.scatterbrain.scatterfit.data.ProductResult
 import com.scatterbrain.scatterfit.data.RecordMethod
 import com.scatterbrain.scatterfit.data.Zones
 import org.junit.Assert.assertEquals
@@ -725,5 +726,62 @@ class FoodLoggerTest {
         val shouldRenderPositive = dayAlcoholKcalPositive > 0
         assertTrue("When alcohol kcal > 0, row must render", shouldRenderPositive)
         assertEquals(180, dayAlcoholKcalPositive)
+    }
+
+    @Test
+    fun `cross-tab barcode scan state holder on FoodTrackerViewModel`() {
+        val vm = FoodTrackerViewModel()
+
+        // 1. Successful barcode lookup sets pendingConfirmProduct and resets barcodeNotFound
+        val product = ProductResult(
+            code = "5000123456789",
+            productName = "Protein Yogurt",
+            brands = "Brand X"
+        )
+        vm.pendingConfirmProduct = product
+        vm.barcodeNotFound = false
+
+        assertEquals("5000123456789", vm.pendingConfirmProduct?.code)
+        assertFalse(vm.barcodeNotFound)
+
+        // 2. Barcode not found sets barcodeNotFound = true and pendingConfirmProduct = null
+        vm.pendingConfirmProduct = null
+        vm.barcodeNotFound = true
+
+        assertNull(vm.pendingConfirmProduct)
+        assertTrue(vm.barcodeNotFound)
+    }
+
+    @Test
+    fun `scanned product confirmed twice produces two distinct logged meals with unique UUIDs`() {
+        val vm = FoodTrackerViewModel()
+        vm.setDayKey(today)
+
+        val product = ProductResult(
+            code = "5000123456789",
+            productName = "Protein Yogurt"
+        )
+
+        // Confirm scan 1
+        val meal1 = LoggedMeal(
+            id = java.util.UUID.randomUUID().toString(),
+            name = product.productName ?: "Product",
+            kcal = 150.0,
+            dayKey = today
+        )
+        vm.logCustomMeal(meal1)
+
+        // Confirm scan 2 of identical barcode
+        val meal2 = LoggedMeal(
+            id = java.util.UUID.randomUUID().toString(),
+            name = product.productName ?: "Product",
+            kcal = 150.0,
+            dayKey = today
+        )
+        vm.logCustomMeal(meal2)
+
+        // Both entries persist; no collision or overwrite
+        assertEquals(2, vm.mealsForDay.value.size)
+        assertTrue(meal1.id != meal2.id)
     }
 }

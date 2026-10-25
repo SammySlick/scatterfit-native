@@ -228,10 +228,34 @@ fun MyDayScreen(
 
     var showCalendarSheet by remember { mutableStateOf(false) }
     var showDrinkLoggerScreen by remember { mutableStateOf(false) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
     var showWeighInDialog by remember { mutableStateOf(false) }
     var showAdjustStepsSheet by remember { mutableStateOf(false) }
     var activeMetricScreen by remember { mutableStateOf<String?>(null) }
     var activeMetricId by remember { mutableStateOf<com.scatterbrain.scatterfit.core.MetricId?>(null) }
+
+    val scope = rememberCoroutineScope()
+
+    if (showBarcodeScanner) {
+        BarcodeScannerOverlay(
+            onBarcodeDetected = { barcode ->
+                showBarcodeScanner = false
+                scope.launch {
+                    val product = com.scatterbrain.scatterfit.data.OpenFoodFactsClient.lookupBarcode(barcode)
+                    if (product != null) {
+                        foodVm.pendingConfirmProduct = product
+                        foodVm.barcodeNotFound = false
+                    } else {
+                        foodVm.pendingConfirmProduct = null
+                        foodVm.barcodeNotFound = true
+                    }
+                    onOpenFood(selectedDay)
+                }
+            },
+            onDismiss = { showBarcodeScanner = false }
+        )
+        return
+    }
 
     if (showWeighInDialog) {
         WeighInDialog(
@@ -257,8 +281,9 @@ fun MyDayScreen(
         )
     }
 
-    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen || showAdjustStepsSheet) {
+    BackHandler(enabled = activeMetricId != null || activeMetricScreen != null || showDrinkLoggerScreen || showAdjustStepsSheet || showBarcodeScanner) {
         when {
+            showBarcodeScanner -> showBarcodeScanner = false
             activeMetricId != null -> activeMetricId = null
             activeMetricScreen != null -> activeMetricScreen = null
             showDrinkLoggerScreen -> showDrinkLoggerScreen = false
@@ -480,9 +505,10 @@ fun MyDayScreen(
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 
-        // Quick Actions strip (Log food / Log drink / Log weight)
+        // Quick Actions strip (Log food / Scan / Log drink / Log weight)
         QuickActionsStrip(
             onLogFoodClick = { if (!isFutureDay) onOpenFood(selectedDay) },
+            onScanFoodClick = { if (!isFutureDay) showBarcodeScanner = true },
             onLogDrinkClick = { if (!isFutureDay) showDrinkLoggerScreen = true },
             onLogWeightClick = { showWeighInDialog = true },
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
@@ -740,6 +766,7 @@ fun DeltaPointsBlock(
 @Composable
 fun QuickActionsStrip(
     onLogFoodClick: () -> Unit,
+    onScanFoodClick: () -> Unit = {},
     onLogDrinkClick: () -> Unit,
     onLogWeightClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -753,6 +780,13 @@ fun QuickActionsStrip(
             label = "Log food",
             icon = { UtensilsIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
             onClick = onLogFoodClick,
+            modifier = Modifier.weight(1f)
+        )
+
+        QuickActionButton(
+            label = "Scan",
+            icon = { CameraIcon(modifier = Modifier.size(18.dp), tint = AccentTeal) },
+            onClick = onScanFoodClick,
             modifier = Modifier.weight(1f)
         )
 
@@ -1034,6 +1068,7 @@ fun QuickActionsStripPreview() {
     ScatterFitTheme {
         QuickActionsStrip(
             onLogFoodClick = {},
+            onScanFoodClick = {},
             onLogDrinkClick = {},
             onLogWeightClick = {},
             modifier = Modifier.padding(16.dp)

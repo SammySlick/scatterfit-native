@@ -236,6 +236,9 @@ class FoodTrackerViewModel(
     var portionLabelInput by mutableStateOf<String?>(null)
     var mealTypeInput by mutableStateOf(guessMealType(java.time.LocalTime.now().hour))
 
+    var pendingConfirmProduct by mutableStateOf<com.scatterbrain.scatterfit.data.ProductResult?>(null)
+    var barcodeNotFound by mutableStateOf(false)
+
     private val _mealsForDay = MutableStateFlow<List<LoggedMeal>>(emptyList())
     val mealsForDay: StateFlow<List<LoggedMeal>> = _mealsForDay.asStateFlow()
 

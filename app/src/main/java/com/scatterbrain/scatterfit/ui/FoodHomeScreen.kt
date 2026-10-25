@@ -188,8 +188,8 @@ fun FoodHomeScreen(
     // Search bar & OFF states
     var searchQuery by remember { mutableStateOf("") }
     var showBarcodeScanner by remember { mutableStateOf(false) }
-    var barcodeNotFound by remember { mutableStateOf(false) }
-    var pendingConfirmProduct by remember { mutableStateOf<ProductResult?>(null) }
+    var barcodeNotFound by viewModel::barcodeNotFound
+    var pendingConfirmProduct by viewModel::pendingConfirmProduct
     var offResults by remember { mutableStateOf<List<ProductResult>>(emptyList()) }
     var isSearchingOff by remember { mutableStateOf(false) }
     var searchHasExecuted by remember { mutableStateOf(false) }
