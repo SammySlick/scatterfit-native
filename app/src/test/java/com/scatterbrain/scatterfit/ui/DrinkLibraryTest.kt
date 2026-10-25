@@ -77,10 +77,11 @@ class DrinkLibraryTest {
         val fixed1 = java.time.Instant.parse("2026-10-24T18:45:00Z")
         val fixed2 = java.time.Instant.parse("2026-10-24T20:45:00Z")
 
-        val todayStr = "2026-10-24"
+        val clock1 = java.time.Clock.fixed(fixed1, zone)
+        val todayStr = com.scatterbrain.scatterfit.core.todayKey(clock1)
         val vm = DrinkTrackerViewModel(
             initialDayKey = todayStr,
-            clock = java.time.Clock.fixed(fixed1, zone)
+            clock = clock1
         )
         val drink = DrinkReference(id = "brewdog", name = "Brewdog IPA", units = 2.0, kcals = 180)
 
@@ -105,11 +106,14 @@ class DrinkLibraryTest {
     fun `retro-logging two drinks to a past day shares the last logged time`() {
         val zone = java.time.ZoneId.of("UTC")
         val todayInstant = java.time.Instant.parse("2026-10-24T12:00:00Z")
-        val pastDay = "2026-10-20"
+        val clockToday = java.time.Clock.fixed(todayInstant, zone)
+        val pastDay = com.scatterbrain.scatterfit.core.todayKey(
+            java.time.Clock.fixed(todayInstant.minus(java.time.Duration.ofDays(4)), zone)
+        )
 
         val vm = DrinkTrackerViewModel(
             initialDayKey = pastDay,
-            clock = java.time.Clock.fixed(todayInstant, zone)
+            clock = clockToday
         )
         val drink = DrinkReference(id = "brewdog", name = "Brewdog IPA", units = 2.0, kcals = 180)
 

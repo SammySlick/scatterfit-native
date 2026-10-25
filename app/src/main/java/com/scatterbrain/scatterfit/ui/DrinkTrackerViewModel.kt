@@ -88,7 +88,7 @@ class DrinkTrackerViewModel(
      */
     fun logDrink(drink: DrinkReference, timestamp: Long? = null): Boolean {
         val zone = clock.zone
-        val today = com.scatterbrain.scatterfit.core.todayKey(zone)
+        val today = todayKey(clock)
 
         val actualTimestamp = if (timestamp != null) {
             timestamp

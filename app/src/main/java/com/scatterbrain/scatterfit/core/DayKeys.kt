@@ -1,5 +1,6 @@
 package com.scatterbrain.scatterfit.core
 
+import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
@@ -38,6 +39,10 @@ fun dayKeyFromIso(iso: String, zone: ZoneId = ZoneId.systemDefault()): String =
  *  the codebase — everything else derives windows from a passed anchor. */
 fun todayKey(zone: ZoneId = ZoneId.systemDefault()): String =
     LocalDate.now(zone).toString()
+
+/** Today, per the given Clock. Supports deterministic testing with fixed clocks. */
+fun todayKey(clock: Clock): String =
+    LocalDate.now(clock).toString()
 
 /** The last [n] day keys ending at [endKey] (defaults to today). */
 fun lastNDayKeys(n: Int, endKey: String? = null, zone: ZoneId = ZoneId.systemDefault()): List<String> {
