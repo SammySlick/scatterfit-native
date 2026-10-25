@@ -61,6 +61,12 @@ fun MainAppScreen(
         )
     }
 
+    val repoDaily by com.scatterbrain.scatterfit.data.DailyRepository.daily.collectAsState()
+    val momentumSource: MomentumSource = remember(repoDaily) {
+        val s = settingsStorage.loadSettings()
+        repoDaily?.let { TodayFacadeMomentumSource(it, s) } ?: TodayFacadeMomentumSource()
+    }
+
     var selectedTab by remember { mutableStateOf(AppTab.MY_DAY) }
 
     BackHandler(enabled = selectedTab != AppTab.MY_DAY) {
@@ -107,6 +113,7 @@ fun MainAppScreen(
                     foodViewModel = foodViewModel
                 )
                 AppTab.ODYSSEY -> OdysseyScreen(
+                    momentumSource = momentumSource,
                     onSettingsClick = onSettingsClick
                 )
                 AppTab.FOOD -> {
@@ -171,7 +178,7 @@ fun BottomNavBar(
             )
 
             BottomNavItem(
-                label = "Odyssey",
+                label = "Matrix",
                 isSelected = selectedTab == AppTab.ODYSSEY,
                 onClick = { onTabSelected(AppTab.ODYSSEY) },
                 icon = { tint ->

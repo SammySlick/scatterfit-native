@@ -1,16 +1,25 @@
 package com.scatterbrain.scatterfit.ui
 
 import com.scatterbrain.scatterfit.core.ConsistencySummary
+import com.scatterbrain.scatterfit.core.GOAL_WEIGHTS
+import com.scatterbrain.scatterfit.core.GoalDay
 import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.GoalPreset
 import com.scatterbrain.scatterfit.core.GoalSeries
+import com.scatterbrain.scatterfit.core.MomentumContribution
+import com.scatterbrain.scatterfit.core.MetricScoreInput
+import com.scatterbrain.scatterfit.core.ProgressInputs
+import com.scatterbrain.scatterfit.core.ScoreShape
 import com.scatterbrain.scatterfit.core.ScoringSettings
+import com.scatterbrain.scatterfit.core.dailyMetricScore
 import com.scatterbrain.scatterfit.core.dayBefore
 import com.scatterbrain.scatterfit.core.dayKeyFromIso
 import com.scatterbrain.scatterfit.core.goalLabel
 import com.scatterbrain.scatterfit.core.lastNDayKeys
 import com.scatterbrain.scatterfit.core.computeConsistencySummaries
 import com.scatterbrain.scatterfit.core.todayKey
+import com.scatterbrain.scatterfit.core.unitsScore
+import com.scatterbrain.scatterfit.core.weekContributions
 import com.scatterbrain.scatterfit.data.AssembledDaily
 import com.scatterbrain.scatterfit.data.CardInputs
 import com.scatterbrain.scatterfit.data.Daily
@@ -50,8 +59,11 @@ data class GoalProjectionInfo(
 data class DomainScore(val id: String, val score: Double?)
 
 interface MomentumSource {
+    val scoringSettings: ScoringSettings get() = ScoringSettings()
     fun momentumForDay(dayKey: String): Double?
     fun scoreForDay(dayKey: String): Double? = momentumForDay(dayKey)
+    fun metricScoreForDay(id: GoalId, dayKey: String): Double? = null
+    fun contributions(days: Int, anchorDay: String = todayKey()): List<MomentumContribution> = emptyList()
     fun isDayLogged(dayKey: String): Boolean
     fun computeStreak(today: String = todayKey(), todayLoggedOverride: Boolean = false): StreakInfo
     fun computeGoalProjection(today: String = todayKey()): GoalProjectionInfo
@@ -92,8 +104,10 @@ class TodayFacadeMomentumSource(
     },
     private val settings: ScoringSettings = SettingsStorage().loadSettings(),
     private val zone: ZoneId = daily.zone,
+    var clock: java.time.Clock = java.time.Clock.systemDefaultZone(),
 ) : MomentumSource {
 
+    override val scoringSettings: ScoringSettings get() = settings
     override val isUsingDemoData: Boolean = daily.steps.isEmpty() && daily.weight.isEmpty()
 
     private val cardCache = mutableMapOf<String, CardInputs>()
@@ -104,12 +118,129 @@ class TodayFacadeMomentumSource(
         }
     }
 
-    override fun momentumForDay(dayKey: String): Double? {
-        val today = todayKey(zone)
+    override fun metricScoreForDay(id: GoalId, dayKey: String): Double? {
+        return when (id) {
+            GoalId.STEPS -> {
+                val value = daily.steps[dayKey] ?: return null
+                dailyMetricScore(
+                    ScoreShape.ONE_SIDED,
+                    MetricScoreInput(value = value, target = settings.stepTarget.toDouble())
+                )
+            }
+            GoalId.PROTEIN -> {
+                val value = daily.protein[dayKey] ?: return null
+                if (value <= 0.0) return null
+                dailyMetricScore(
+                    ScoreShape.ONE_SIDED,
+                    MetricScoreInput(value = value, target = settings.proteinTarget.toDouble())
+                )
+            }
+            GoalId.EXERCISE -> {
+                val value = daily.trainingMinutes[dayKey] ?: return null
+                val target = settings.exerciseTargetPerWeek / 7.0
+                dailyMetricScore(
+                    ScoreShape.ONE_SIDED,
+                    MetricScoreInput(value = value, target = target)
+                )
+            }
+            GoalId.CALORIES -> {
+                val value = daily.caloriesEaten[dayKey] ?: return null
+                if (value <= 0.0) return null
+                dailyMetricScore(
+                    ScoreShape.TWO_SIDED,
+                    MetricScoreInput(value = value, target = settings.kcalTarget.toDouble())
+                )
+            }
+            GoalId.SLEEP -> {
+                val value = sleepMinutesForDay(dayKey) ?: return null
+                val target = settings.sleepTargetHours * 60.0
+                dailyMetricScore(
+                    ScoreShape.TWO_SIDED,
+                    MetricScoreInput(value = value, target = target)
+                )
+            }
+            GoalId.WEIGHT -> {
+                val value = daily.weight[dayKey] ?: return null
+                val start = daily.weight.entries.minByOrNull { it.key }?.value ?: return null
+                val goal = settings.weightTarget
+                if (start == goal) return null
+                dailyMetricScore(
+                    ScoreShape.PROGRESS,
+                    MetricScoreInput(
+                        value = value,
+                        target = goal,
+                        progress = ProgressInputs(current = value, start = start, goal = goal)
+                    )
+                )
+            }
+            GoalId.BODY_FAT -> {
+                val value = daily.bodyFat[dayKey] ?: return null
+                val start = daily.bodyFat.entries.minByOrNull { it.key }?.value ?: return null
+                val goal = settings.bodyFatTarget
+                if (start == goal) return null
+                dailyMetricScore(
+                    ScoreShape.PROGRESS,
+                    MetricScoreInput(
+                        value = value,
+                        target = goal,
+                        progress = ProgressInputs(current = value, start = start, goal = goal)
+                    )
+                )
+            }
+            GoalId.UNITS, GoalId.ALCOHOL -> {
+                val value = daily.alcoholUnits[dayKey]
+                if (value == null && daily.drinks[dayKey] == null) return null
+                val units = value ?: 0.0
+                unitsScore(units, settings.unitsPerWeek.toDouble())
+            }
+            GoalId.Z4PLUS -> {
+                val zones = daily.hrZones[dayKey] ?: return null
+                val z4p = zones.z4 + zones.z5
+                val target = (settings.z4Target + settings.z5Target) / 7.0
+                dailyMetricScore(
+                    ScoreShape.ONE_SIDED,
+                    MetricScoreInput(value = z4p, target = target)
+                )
+            }
+            GoalId.RHR_TREND -> {
+                val series = getCard(dayKey).goals.find { it.id == GoalId.RHR_TREND }
+                series?.days?.firstOrNull { it.day == dayKey }?.score
+            }
+        }
+    }
+
+    fun computeDayMomentum(dayKey: String): Double? {
+        val today = todayKey(clock)
         if (dayKey > today) return null
-        val card = getCard(dayKey)
-        val point = card.momentum.find { it.day == dayKey } ?: card.momentum.lastOrNull()
-        return point?.daily ?: card.current
+
+        val weights = GOAL_WEIGHTS[settings.activeGoal] ?: GOAL_WEIGHTS[GoalPreset.FAT_LOSS]!!
+        val participating = mutableListOf<Pair<Double, Double>>() // (score, weight)
+
+        for ((goalId, weight) in weights) {
+            if (weight <= 0.0) continue
+            val score = metricScoreForDay(goalId, dayKey)
+            if (score != null) {
+                participating.add(score to weight)
+            }
+        }
+
+        val totalWeight = participating.sumOf { it.second }
+        if (totalWeight <= 0.0) return null
+
+        return participating.sumOf { it.first * it.second } / totalWeight
+    }
+
+    override fun momentumForDay(dayKey: String): Double? {
+        val today = todayKey(clock)
+        if (dayKey > today) return null
+
+        // Old path (TodayFacade card rolling momentum):
+        // val card = getCard(dayKey)
+        // val point = card.momentum.find { it.day == dayKey } ?: card.momentum.lastOrNull()
+        // return point?.daily ?: card.current
+
+        // New path (Momentum Rework Spec v1 — GOAL_WEIGHTS-weighted mean over metrics WITH DATA):
+        return computeDayMomentum(dayKey)
     }
 
     override fun scoreForDay(dayKey: String): Double? = momentumForDay(dayKey)
@@ -217,7 +348,33 @@ class TodayFacadeMomentumSource(
 
     override fun restingHrForDay(dayKey: String): Double? = daily.restingHr[dayKey]
 
-    override fun consistencySeries(dayKey: String): List<GoalSeries> = getCard(dayKey).goals
+    override fun consistencySeries(dayKey: String): List<GoalSeries> {
+        val keys = lastNDayKeys(30, dayKey)
+        val allGoalIds = listOf(
+            GoalId.BODY_FAT to "Body fat",
+            GoalId.CALORIES to "Calories",
+            GoalId.UNITS to "Alcohol units",
+            GoalId.PROTEIN to "Protein",
+            GoalId.EXERCISE to "Exercise",
+            GoalId.STEPS to "Steps",
+            GoalId.SLEEP to "Sleep",
+            GoalId.WEIGHT to "Weight",
+        )
+
+        return allGoalIds.map { (id, name) ->
+            val days = keys.map { k ->
+                GoalDay(k, metricScoreForDay(id, k))
+            }
+            val latestScore = days.lastOrNull { it.score != null }?.score ?: 0.0
+            GoalSeries(id, name, days, latestScore, "Momentum Rework v1")
+        }
+    }
+
+    override fun contributions(days: Int, anchorDay: String): List<MomentumContribution> {
+        val seriesList = consistencySeries(anchorDay)
+        val weights = GOAL_WEIGHTS[settings.activeGoal] ?: GOAL_WEIGHTS[GoalPreset.FAT_LOSS]!!
+        return weekContributions(seriesList, weights, days)
+    }
 
     override fun consistencySummaries(dayKey: String): List<ConsistencySummary> =
         computeConsistencySummaries(TodayFacade.toCoreDaily(daily), settings, 7, dayKey)
