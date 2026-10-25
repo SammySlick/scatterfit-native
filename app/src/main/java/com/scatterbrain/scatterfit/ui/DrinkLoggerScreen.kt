@@ -979,11 +979,13 @@ fun LoggedDrinksSection(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Text(
-                                text = String.format(Locale.US, "• %.1fu · %d kcal · £%.2f", logged.drink.units, logged.drink.kcals, logged.drink.cost),
-                                color = TextMuted,
-                                fontSize = 11.sp
-                            )
+                            if (isValidDrinkDetails(logged.drink)) {
+                                Text(
+                                    text = String.format(Locale.US, "• %.1fu · %d kcal · £%.2f", logged.drink.units, logged.drink.kcals, logged.drink.cost),
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
 
                         IconButton(

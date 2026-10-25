@@ -40,6 +40,12 @@ class DrinkTrackerViewModel(
     var clock: java.time.Clock = java.time.Clock.systemDefaultZone()
 ) : ViewModel() {
 
+    init {
+        if (initialLibrary.isNotEmpty()) {
+            storage?.setLibrary(initialLibrary)
+        }
+    }
+
     private var activeDayKey: String = initialDayKey
     private val inMemoryStorage = mutableMapOf<String, MutableList<LoggedDrink>>()
 
@@ -48,8 +54,15 @@ class DrinkTrackerViewModel(
     )
     val dailyState: StateFlow<DailyState> = _dailyState.asStateFlow()
 
+    fun resolveLibraryDrink(id: String): DrinkReference? {
+        if (id.isBlank()) return null
+        return _dailyState.value.libraryDrinks.find { it.id == id }
+            ?: storage?.resolveLibraryDrink(id)
+    }
+
     private fun createInitialState(dayKey: String, library: List<DrinkReference>): DailyState {
-        val initialLogs = storage?.getDrinksForDay(dayKey) ?: (inMemoryStorage[dayKey] ?: emptyList())
+        val rawLogs = storage?.getDrinksForDay(dayKey) ?: (inMemoryStorage[dayKey] ?: emptyList())
+        val initialLogs = rawLogs.mapNotNull { sanitizeLoggedDrink(it) { id -> library.find { lib -> lib.id == id } } }
         val units = initialLogs.sumOf { it.drink.units }
         val kcals = initialLogs.sumOf { it.drink.kcals }
         val spent = initialLogs.sumOf { it.drink.cost }
@@ -73,7 +86,8 @@ class DrinkTrackerViewModel(
      */
     fun setDayKey(newDayKey: String) {
         activeDayKey = newDayKey
-        val logsForDay = storage?.getDrinksForDay(newDayKey) ?: (inMemoryStorage[newDayKey] ?: emptyList())
+        val rawLogs = storage?.getDrinksForDay(newDayKey) ?: (inMemoryStorage[newDayKey] ?: emptyList())
+        val logsForDay = rawLogs.mapNotNull { sanitizeLoggedDrink(it, ::resolveLibraryDrink) }
         recalculateTotals(logsForDay, newDayKey)
     }
 
@@ -114,6 +128,10 @@ class DrinkTrackerViewModel(
             selectedDate.atTime(timeToUse).atZone(zone).toInstant().toEpochMilli()
         }
 
+        if (!isValidDrinkTimestamp(actualTimestamp)) {
+            return false
+        }
+
         val computedDayKey = com.scatterbrain.scatterfit.core.dayKey(actualTimestamp, zone)
 
         // Rule: Future days are blocked! Logging into future days is refused.
@@ -121,8 +139,24 @@ class DrinkTrackerViewModel(
             return false
         }
 
+        val libDrink = resolveLibraryDrink(drink.id)
+        val units = if (isValidDrinkUnits(drink.units)) drink.units else (libDrink?.units?.takeIf { isValidDrinkUnits(it) } ?: drink.units)
+        val kcals = if (isValidDrinkKcals(drink.kcals)) drink.kcals else (libDrink?.kcals?.takeIf { isValidDrinkKcals(it) } ?: drink.kcals)
+        val cost = if (isValidDrinkCost(drink.cost)) drink.cost else (libDrink?.cost?.takeIf { isValidDrinkCost(it) } ?: drink.cost)
+
+        if (!isValidDrinkUnits(units) || !isValidDrinkKcals(kcals) || !isValidDrinkCost(cost)) {
+            return false
+        }
+
+        val validatedDrink = drink.copy(
+            units = units,
+            kcals = kcals,
+            cost = cost,
+            name = drink.name.ifBlank { libDrink?.name ?: "" }
+        )
+
         val loggedDrink = LoggedDrink(
-            drink = drink,
+            drink = validatedDrink,
             timestamp = actualTimestamp,
             dayKey = computedDayKey
         )
@@ -145,8 +179,29 @@ class DrinkTrackerViewModel(
      * persists changes to storage, and re-sorts the strip newest-first.
      */
     fun updateLoggedDrinkTime(loggedDrink: LoggedDrink, newTimestamp: Long) {
+        if (!isValidDrinkTimestamp(newTimestamp)) {
+            return
+        }
+
+        val libDrink = resolveLibraryDrink(loggedDrink.drink.id)
+        val units = if (isValidDrinkUnits(loggedDrink.drink.units)) loggedDrink.drink.units else (libDrink?.units?.takeIf { isValidDrinkUnits(it) } ?: loggedDrink.drink.units)
+        val kcals = if (isValidDrinkKcals(loggedDrink.drink.kcals)) loggedDrink.drink.kcals else (libDrink?.kcals?.takeIf { isValidDrinkKcals(it) } ?: loggedDrink.drink.kcals)
+        val cost = if (isValidDrinkCost(loggedDrink.drink.cost)) loggedDrink.drink.cost else (libDrink?.cost?.takeIf { isValidDrinkCost(it) } ?: loggedDrink.drink.cost)
+
+        if (!isValidDrinkUnits(units) || !isValidDrinkKcals(kcals) || !isValidDrinkCost(cost)) {
+            return
+        }
+
+        val validatedDrink = loggedDrink.drink.copy(
+            units = units,
+            kcals = kcals,
+            cost = cost,
+            name = loggedDrink.drink.name.ifBlank { libDrink?.name ?: "" }
+        )
+
         val newDayKey = com.scatterbrain.scatterfit.core.dayKey(newTimestamp)
         val updatedDrink = loggedDrink.copy(
+            drink = validatedDrink,
             timestamp = newTimestamp,
             dayKey = newDayKey
         )
@@ -202,6 +257,7 @@ class DrinkTrackerViewModel(
 
     fun setLibrary(drinks: List<DrinkReference>) {
         _dailyState.update { it.copy(libraryDrinks = drinks) }
+        storage?.setLibrary(drinks)
     }
 
     fun loadLibraryFromAssets(context: Context, filename: String = "drinks-library.json") {
@@ -209,6 +265,7 @@ class DrinkTrackerViewModel(
             _dailyState.update { it.copy(isLoading = true) }
             val drinks = DrinkLibraryParser.loadFromAssets(context, filename)
             _dailyState.update { it.copy(libraryDrinks = drinks, isLoading = false) }
+            storage?.setLibrary(drinks)
         }
     }
 
