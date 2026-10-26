@@ -180,4 +180,108 @@ class MomentumSourceScoreWiringTest {
         // Body fat had no data in the 7-day window -> not in participating contributions
         assertNull("BF has no participating contribution in window", bfContrib)
     }
+
+    /**
+     * Rule (a): metricMeanOverWindow excludes null days in window and averages
+     * participating days only.
+     */
+    @Test
+    fun `mean over window excludes null days`() {
+        val settings = ScoringSettings(stepTarget = 10000)
+        // 3 days logged in 7-day window ending on testDay (2026-10-25):
+        // 2026-10-25: 8000 -> 80.0
+        // 2026-10-24: 10000 -> 100.0
+        // 2026-10-23: 12000 -> 100.0 (capped)
+        // 2026-10-22, 21, 20, 19: null (unlogged)
+        val daily = AssembledDaily(
+            steps = mapOf(
+                "2026-10-25" to 8000.0,
+                "2026-10-24" to 10000.0,
+                "2026-10-23" to 12000.0
+            ),
+            zoneBounds = defaultBounds,
+            zone = zone
+        )
+        val source = TodayFacadeMomentumSource(
+            daily = daily,
+            settings = settings,
+            zone = zone,
+            clock = fixedClock
+        )
+
+        val mean = source.metricMeanOverWindow(GoalId.STEPS, testDay, 7)
+        assertNotNull(mean)
+        val expectedMean = (80.0 + 100.0 + 100.0) / 3.0
+        assertEquals(expectedMean, mean!!, 0.0001)
+
+        val participating = source.metricParticipatingDaysOverWindow(GoalId.STEPS, testDay, 7)
+        assertEquals(3, participating)
+    }
+
+    /**
+     * Rule (b): all-null window returns null (row shows No data state).
+     */
+    @Test
+    fun `all-null window returns null`() {
+        val settings = ScoringSettings(stepTarget = 10000)
+        val daily = AssembledDaily(
+            steps = emptyMap(),
+            zoneBounds = defaultBounds,
+            zone = zone
+        )
+        val source = TodayFacadeMomentumSource(
+            daily = daily,
+            settings = settings,
+            zone = zone,
+            clock = fixedClock
+        )
+
+        val mean = source.metricMeanOverWindow(GoalId.STEPS, testDay, 7)
+        assertNull("All-null window must return null", mean)
+
+        val participating = source.metricParticipatingDaysOverWindow(GoalId.STEPS, testDay, 7)
+        assertEquals(0, participating)
+    }
+
+    /**
+     * Rule (c): window 14 and 30 use the right span.
+     */
+    @Test
+    fun `window 14 and 30 use the right span`() {
+        val settings = ScoringSettings(stepTarget = 10000)
+        // testDay is 2026-10-25
+        // 10 days ago is 2026-10-15 (within 14d and 30d, but NOT 7d)
+        // 20 days ago is 2026-10-05 (within 30d, but NOT 14d)
+        val daily = AssembledDaily(
+            steps = mapOf(
+                "2026-10-15" to 10000.0, // score 100.0
+                "2026-10-05" to 6000.0   // score 60.0
+            ),
+            zoneBounds = defaultBounds,
+            zone = zone
+        )
+        val source = TodayFacadeMomentumSource(
+            daily = daily,
+            settings = settings,
+            zone = zone,
+            clock = fixedClock
+        )
+
+        // 7-day window (2026-10-19 to 2026-10-25): neither entry included
+        assertNull("7d window has no data", source.metricMeanOverWindow(GoalId.STEPS, testDay, 7))
+        assertEquals(0, source.metricParticipatingDaysOverWindow(GoalId.STEPS, testDay, 7))
+
+        // 14-day window (2026-10-12 to 2026-10-25): includes 2026-10-15 only
+        val mean14 = source.metricMeanOverWindow(GoalId.STEPS, testDay, 14)
+        assertNotNull(mean14)
+        assertEquals(100.0, mean14!!, 0.0001)
+        assertEquals(1, source.metricParticipatingDaysOverWindow(GoalId.STEPS, testDay, 14))
+
+        // 30-day window (2026-09-26 to 2026-10-25): includes both 2026-10-15 and 2026-10-05
+        val mean30 = source.metricMeanOverWindow(GoalId.STEPS, testDay, 30)
+        assertNotNull(mean30)
+        val expected30 = (100.0 + 60.0) / 2.0 // 80.0
+        assertEquals(expected30, mean30!!, 0.0001)
+        assertEquals(2, source.metricParticipatingDaysOverWindow(GoalId.STEPS, testDay, 30))
+    }
 }

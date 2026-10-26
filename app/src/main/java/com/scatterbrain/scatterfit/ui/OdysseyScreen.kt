@@ -75,8 +75,10 @@ data class SpokeItem(
     val mean: Double?,
     val loggedDays: Int,
     val share: Double,
-    val score: Double?,
-    val points: Double?,
+    val windowMean: Double?,
+    val participatingDays: Int,
+    val todayScore: Double?,
+    val todayPoints: Double?,
 )
 
 @Composable
@@ -100,9 +102,11 @@ fun OdysseyScreen(
     }
     val contribMap = remember(contribs) { contribs.associateBy { it.id } }
 
-    val spokeItems = remember(weights, contribMap, today) {
+    val spokeItems = remember(weights, contribMap, selectedWindowDays, today) {
         weights.filter { it.value > 0.0 }.map { (goalId, weight) ->
             val contrib = contribMap[goalId]
+            val windowMean = source.metricMeanOverWindow(goalId, today, selectedWindowDays)
+            val participatingDays = source.metricParticipatingDaysOverWindow(goalId, today, selectedWindowDays)
             val dailyScore = source.metricScoreForDay(goalId, today)
             val shape = when (goalId) {
                 GoalId.STEPS, GoalId.PROTEIN, GoalId.EXERCISE -> ScoreShape.ONE_SIDED
@@ -128,11 +132,13 @@ fun OdysseyScreen(
                 id = goalId,
                 name = name,
                 weight = weight,
-                mean = contrib?.mean,
-                loggedDays = contrib?.loggedDays ?: 0,
+                mean = contrib?.mean ?: windowMean,
+                loggedDays = contrib?.loggedDays ?: participatingDays,
                 share = contrib?.share ?: 0.0,
-                score = dailyScore,
-                points = points,
+                windowMean = windowMean,
+                participatingDays = participatingDays,
+                todayScore = dailyScore,
+                todayPoints = points,
             )
         }
     }
@@ -444,7 +450,7 @@ fun MetricScoreRow(
             )
 
             val isCalOrSleep = item.id == GoalId.CALORIES || item.id == GoalId.SLEEP
-            if (isCalOrSleep && item.loggedDays < 3) {
+            if (isCalOrSleep && item.participatingDays < 3) {
                 // "Not enough logged days" state for calories/sleep: NEUTRAL GREY (TextMuted), never red
                 Text(
                     text = "Not enough logged days",
@@ -452,35 +458,46 @@ fun MetricScoreRow(
                     color = TextMuted,
                     fontWeight = FontWeight.Normal
                 )
-            } else if (item.score != null) {
-                val scoreInt = item.score.roundToInt()
-                val band = momentumBand(item.score)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            } else if (item.windowMean != null) {
+                val scoreInt = item.windowMean.roundToInt()
+                val band = momentumBand(item.windowMean)
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    if (item.points != null) {
-                        Text(
-                            text = "+${item.points.roundToInt()} pts",
-                            fontSize = 11.sp,
-                            color = TextMuted,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(band.color.copy(alpha = 0.15f))
-                            .border(BorderStroke(1.dp, band.color), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "$scoreInt%",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = band.color
-                        )
+                        if (item.todayPoints != null) {
+                            Text(
+                                text = "+${item.todayPoints.roundToInt()} pts",
+                                fontSize = 11.sp,
+                                color = TextMuted,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(band.color.copy(alpha = 0.15f))
+                                .border(BorderStroke(1.dp, band.color), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "$scoreInt%",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = band.color
+                            )
+                        }
                     }
+                    Text(
+                        text = "mean of ${item.participatingDays} ${if (item.participatingDays == 1) "day" else "days"}",
+                        fontSize = 10.sp,
+                        color = TextMuted,
+                        fontWeight = FontWeight.Normal
+                    )
                 }
             } else {
                 Text(

@@ -63,6 +63,8 @@ interface MomentumSource {
     fun momentumForDay(dayKey: String): Double?
     fun scoreForDay(dayKey: String): Double? = momentumForDay(dayKey)
     fun metricScoreForDay(id: GoalId, dayKey: String): Double? = null
+    fun metricMeanOverWindow(id: GoalId, dayKey: String, days: Int): Double? = null
+    fun metricParticipatingDaysOverWindow(id: GoalId, dayKey: String, days: Int): Int = 0
     fun contributions(days: Int, anchorDay: String = todayKey()): List<MomentumContribution> = emptyList()
     fun isDayLogged(dayKey: String): Boolean
     fun computeStreak(today: String = todayKey(), todayLoggedOverride: Boolean = false): StreakInfo
@@ -244,6 +246,17 @@ class TodayFacadeMomentumSource(
     }
 
     override fun scoreForDay(dayKey: String): Double? = momentumForDay(dayKey)
+
+    override fun metricMeanOverWindow(id: GoalId, dayKey: String, days: Int): Double? {
+        val keys = lastNDayKeys(days, dayKey, zone)
+        val scores = keys.mapNotNull { metricScoreForDay(id, it) }
+        return if (scores.isNotEmpty()) scores.average() else null
+    }
+
+    override fun metricParticipatingDaysOverWindow(id: GoalId, dayKey: String, days: Int): Int {
+        val keys = lastNDayKeys(days, dayKey, zone)
+        return keys.count { metricScoreForDay(id, it) != null }
+    }
 
     override fun isDayLogged(dayKey: String): Boolean {
         return GoalInsights.dayLogged(daily, dayKey)
