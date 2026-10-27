@@ -309,6 +309,9 @@ private fun debugLog(tag: String, msg: String) {
     }
 }
 
+fun normaliseQuery(raw: String): String =
+    raw.trim().replace(Regex("\\s+"), " ")
+
 fun levenshteinDistance(s1: String, s2: String): Int {
     val m = s1.length
     val n = s2.length
@@ -330,7 +333,7 @@ fun levenshteinDistance(s1: String, s2: String): Int {
 }
 
 fun fuzzyScore(query: String, target: String): Double {
-    val qClean = query.trim().lowercase()
+    val qClean = normaliseQuery(query).lowercase()
     val tClean = target.trim().lowercase()
     if (qClean.isEmpty() || tClean.isEmpty()) return 0.0
 
@@ -401,7 +404,7 @@ fun <T> filterFuzzy(
     nameSelector: (T) -> String?,
     vararg extraSelectors: (T) -> String?
 ): List<T> {
-    val q = query.trim()
+    val q = normaliseQuery(query)
     if (q.isBlank()) return emptyList()
     return items
         .mapNotNull { item ->
@@ -415,7 +418,7 @@ fun <T> filterFuzzy(
 }
 
 fun reducedQueries(query: String): List<String> {
-    val qClean = query.trim()
+    val qClean = normaliseQuery(query)
     if (qClean.isBlank()) return emptyList()
 
     val rawTokens = qClean.split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -551,11 +554,50 @@ data class ProductResult(
         }
 }
 
+class OffUnavailableException : Exception("Open Food Facts unavailable")
+
+sealed interface OffSearchOutcome {
+    data class Results(val items: List<ProductResult>) : OffSearchOutcome
+    data object NoMatches : OffSearchOutcome
+    data object Unavailable : OffSearchOutcome
+}
+
 @Serializable
 data class SearchResponse(
     val count: Int = 0,
     val products: List<ProductResult> = emptyList(),
 )
+
+@Serializable
+private data class SaResponse(
+    val hits: List<SaHit> = emptyList(),
+)
+
+@Serializable
+private data class SaHit(
+    val code: String = "",
+    @SerialName("product_name")
+    val productName: String? = null,
+    val brands: List<String>? = null,
+    val quantity: String? = null,
+    val nutriments: OffNutriments = OffNutriments(),
+    @SerialName("serving_size")
+    val servingSize: String? = null,
+    @SerialName("serving_quantity")
+    val servingQuantity: JsonElement? = null,
+    val categories: String? = null,
+) {
+    fun toProductResult(): ProductResult = ProductResult(
+        code = code,
+        productName = productName,
+        brands = brands?.filter { it.isNotBlank() }?.joinToString(", ")?.takeIf { it.isNotBlank() },
+        quantity = quantity,
+        nutriments = nutriments,
+        servingSize = servingSize,
+        servingQuantity = servingQuantity,
+        categories = categories,
+    )
+}
 
 @Serializable
 data class BarcodeResponse(
@@ -642,6 +684,7 @@ object OpenFoodFactsClient {
         return items
     }
     private const val BASE_URL = "https://world.openfoodfacts.org"
+    private const val SEARCH_URL = "https://search.openfoodfacts.org/search"
     private const val FIELDS = "code,product_name,brands,quantity,nutriments,images_url,serving_size,serving_quantity,categories"
     private const val USER_AGENT = "ScatterFit - Android - Version 1.0"
 
@@ -662,6 +705,14 @@ object OpenFoodFactsClient {
         }
     }
 
+    fun parseSaSearchJson(rawJson: String): List<ProductResult>? {
+        return try {
+            json.decodeFromString<SaResponse>(rawJson).hits.map { it.toProductResult() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun parseBarcodeJson(rawJson: String): ProductResult? {
         return try {
             json.decodeFromString<BarcodeResponse>(rawJson).product
@@ -670,8 +721,23 @@ object OpenFoodFactsClient {
         }
     }
 
-    suspend fun search(query: String): List<ProductResult> = withContext(Dispatchers.IO) {
-        val q = query.trim()
+    suspend fun searchPrimary(query: String): List<ProductResult> = withContext(Dispatchers.IO) {
+        val q = normaliseQuery(query)
+        if (q.isBlank()) return@withContext emptyList()
+        val cached = queryCache[q.lowercase()]
+        if (cached != null) return@withContext cached
+
+        val encoded = URLEncoder.encode(q, "UTF-8")
+        val urlStr = "$SEARCH_URL?q=$encoded&page_size=20&fields=code,product_name,brands,quantity,nutriments,serving_size,serving_quantity,categories"
+        val responseText = executeGet(urlStr) ?: return@withContext emptyList()
+        val results = parseSaSearchJson(responseText) ?: emptyList()
+        val filtered = results.filter { !it.productName.isNullOrBlank() }
+        queryCache[q.lowercase()] = filtered
+        filtered
+    }
+
+    suspend fun searchLegacy(query: String): List<ProductResult> = withContext(Dispatchers.IO) {
+        val q = normaliseQuery(query)
         if (q.isBlank()) return@withContext emptyList()
         val cached = queryCache[q.lowercase()]
         if (cached != null) return@withContext cached
@@ -685,18 +751,44 @@ object OpenFoodFactsClient {
         filtered
     }
 
-    suspend fun searchWithFallback(query: String): List<ProductResult> = withContext(Dispatchers.IO) {
+    suspend fun search(query: String): List<ProductResult> {
+        val q = normaliseQuery(query)
+        if (q.isBlank()) return emptyList()
+        val cached = queryCache[q.lowercase()]
+        if (cached != null) return cached
+
+        val primaryResults = searchPrimary(q)
+        if (primaryResults.isNotEmpty()) {
+            return primaryResults
+        }
+        return searchLegacy(q)
+    }
+
+    suspend fun searchWithFallback(query: String): OffSearchOutcome = withContext(Dispatchers.IO) {
         val queries = reducedQueries(query)
-        if (queries.isEmpty()) return@withContext emptyList()
+        if (queries.isEmpty()) return@withContext OffSearchOutcome.NoMatches
+
+        var anyUnavailable = false
 
         for ((index, q) in queries.withIndex()) {
             val level = index + 1
-            val results = search(q)
-            if (results.isNotEmpty()) {
-                return@withContext results.map { it.copy(fallbackLevel = level) }
+            val results = try {
+                search(q)
+            } catch (_: OffUnavailableException) {
+                anyUnavailable = true
+                null
+            }
+
+            if (results != null && results.isNotEmpty()) {
+                return@withContext OffSearchOutcome.Results(results.map { it.copy(fallbackLevel = level) })
             }
         }
-        emptyList()
+
+        if (anyUnavailable) {
+            OffSearchOutcome.Unavailable
+        } else {
+            OffSearchOutcome.NoMatches
+        }
     }
 
     suspend fun lookupBarcode(barcode: String): ProductResult? = withContext(Dispatchers.IO) {
@@ -705,31 +797,57 @@ object OpenFoodFactsClient {
         if (barcodeCache.containsKey(b)) return@withContext barcodeCache[b]
 
         val urlStr = "$BASE_URL/api/v2/product/$b.json?fields=$FIELDS"
-        val responseText = executeGet(urlStr) ?: return@withContext null
+        val responseText = try {
+            executeGet(urlStr)
+        } catch (_: OffUnavailableException) {
+            null
+        } ?: return@withContext null
         val result = parseBarcodeJson(responseText)
         barcodeCache[b] = result
         result
     }
 
     private fun executeGet(urlStr: String): String? {
-        return try {
+        val conn: HttpURLConnection
+        try {
             val url = URL(urlStr)
-            val conn = url.openConnection() as HttpURLConnection
+            conn = url.openConnection() as HttpURLConnection
             conn.connectTimeout = 10000
             conn.readTimeout = 10000
             conn.requestMethod = "GET"
             conn.setRequestProperty("User-Agent", USER_AGENT)
             conn.setRequestProperty("Accept", "application/json")
+        } catch (_: java.io.IOException) {
+            throw OffUnavailableException()
+        } catch (_: Exception) {
+            return null
+        }
 
-            if (conn.responseCode in 200..299) {
+        val code: Int
+        try {
+            code = conn.responseCode
+        } catch (_: java.io.IOException) {
+            throw OffUnavailableException()
+        } catch (_: Exception) {
+            return null
+        }
+
+        if (code == 503 || code == 429) {
+            throw OffUnavailableException()
+        }
+
+        if (code in 200..299) {
+            return try {
                 BufferedReader(InputStreamReader(conn.inputStream, "UTF-8")).use { reader ->
                     reader.readText()
                 }
-            } else {
+            } catch (_: java.io.IOException) {
+                throw OffUnavailableException()
+            } catch (_: Exception) {
                 null
             }
-        } catch (_: Exception) {
-            null
+        } else {
+            return null
         }
     }
 

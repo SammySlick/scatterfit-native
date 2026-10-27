@@ -117,6 +117,12 @@ fun computeMacroBarColor(current: Int, target: Int?): Color = when {
     else -> AccentTeal
 }
 
+/**
+ * Derives the initial set of expanded meal section keys (lowercase) from the day's meals.
+ */
+fun deriveInitialExpandedSections(meals: List<LoggedMeal>): Set<String> =
+    meals.map { it.mealType.lowercase() }.toSet()
+
 @OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun FoodHomeScreen(
@@ -158,6 +164,16 @@ fun FoodHomeScreen(
         storedMeals + externalHcMeals
     }
 
+    var expandedSections by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var sectionsSeeded by remember(activeDay) { mutableStateOf(false) }
+
+    LaunchedEffect(activeDay, storedMeals.size) {
+        if (!sectionsSeeded && storedMeals.isNotEmpty()) {
+            expandedSections = deriveInitialExpandedSections(storedMeals)
+            sectionsSeeded = true
+        }
+    }
+
     // Pending delete + undo state (5 second timeout)
     var pendingDeletedMeal by remember { mutableStateOf<LoggedMeal?>(null) }
     var undoSecondsRemaining by remember { mutableIntStateOf(5) }
@@ -177,20 +193,17 @@ fun FoodHomeScreen(
 
     var macroMode by remember { mutableStateOf(MacroCardMode.CONSUMED) }
 
-    // Section expansion: Breakfast expanded by default, others collapsed
-    var expandedSections by remember {
-        mutableStateOf(setOf("breakfast"))
-    }
-
     // Inline logging / entry mode
     var editingMealId by remember { mutableStateOf<String?>(null) }
 
     // Search bar & OFF states
     var searchQuery by remember { mutableStateOf("") }
+    val canonicalQuery = com.scatterbrain.scatterfit.data.normaliseQuery(searchQuery)
     var showBarcodeScanner by remember { mutableStateOf(false) }
     var barcodeNotFound by viewModel::barcodeNotFound
     var pendingConfirmProduct by viewModel::pendingConfirmProduct
     var offResults by remember { mutableStateOf<List<ProductResult>>(emptyList()) }
+    var offUnavailable by remember { mutableStateOf(false) }
     var isSearchingOff by remember { mutableStateOf(false) }
     var searchHasExecuted by remember { mutableStateOf(false) }
 
@@ -202,16 +215,30 @@ fun FoodHomeScreen(
     val scrollState = rememberScrollState()
 
     // Debounced text search to Open Food Facts (400ms)
-    LaunchedEffect(searchQuery) {
-        val q = searchQuery.trim()
-        if (q.length >= 2) {
+    LaunchedEffect(canonicalQuery) {
+        offUnavailable = false
+        if (canonicalQuery.length >= 2) {
             delay(400L)
             isSearchingOff = true
-            offResults = OpenFoodFactsClient.searchWithFallback(q).take(8)
+            when (val outcome = OpenFoodFactsClient.searchWithFallback(canonicalQuery)) {
+                is com.scatterbrain.scatterfit.data.OffSearchOutcome.Results -> {
+                    offResults = outcome.items.take(8)
+                    offUnavailable = false
+                }
+                is com.scatterbrain.scatterfit.data.OffSearchOutcome.NoMatches -> {
+                    offResults = emptyList()
+                    offUnavailable = false
+                }
+                is com.scatterbrain.scatterfit.data.OffSearchOutcome.Unavailable -> {
+                    offResults = emptyList()
+                    offUnavailable = true
+                }
+            }
             isSearchingOff = false
             searchHasExecuted = true
         } else {
             offResults = emptyList()
+            offUnavailable = false
             isSearchingOff = false
             searchHasExecuted = false
         }
@@ -596,6 +623,7 @@ fun FoodHomeScreen(
                             } else {
                                 viewModel.logCustomMeal(mealToLog)
                             }
+                            expandedSections = expandedSections + mealToLog.mealType.lowercase()
                             pendingConfirmProduct = null
                             searchQuery = ""
                         },
@@ -723,13 +751,14 @@ fun FoodHomeScreen(
                     Text("Quick Log (Coming Soon)", fontWeight = FontWeight.SemiBold)
                 }
 
-                if (searchQuery.isNotBlank()) {
+                if (canonicalQuery.isNotBlank()) {
                     LiveFoodSearchResults(
-                        query = searchQuery,
+                        query = canonicalQuery,
                         presets = presets,
                         favourites = favourites,
                         recipes = recipes,
                         offResults = offResults,
+                        offUnavailable = offUnavailable,
                         isSearchingOff = isSearchingOff,
                         searchHasExecuted = searchHasExecuted,
                         onSelectPreset = { preset ->
@@ -738,12 +767,16 @@ fun FoodHomeScreen(
                             searchQuery = ""
                         },
                         onSelectFavourite = { fav ->
+                            val targetMeal = activeBottomSheetMealType ?: viewModel.mealTypeInput
                             viewModel.logFavourite(fav)
+                            expandedSections = expandedSections + targetMeal.lowercase()
                             activeBottomSheetMealType = null
                             searchQuery = ""
                         },
                         onSelectRecipe = { recipe ->
+                            val targetMeal = activeBottomSheetMealType ?: viewModel.mealTypeInput
                             viewModel.logRecipePortion(recipe)
+                            expandedSections = expandedSections + targetMeal.lowercase()
                             activeBottomSheetMealType = null
                             searchQuery = ""
                         },
@@ -1705,6 +1738,7 @@ private fun LiveFoodSearchResults(
     favourites: List<FavouriteFood>,
     recipes: List<Recipe>,
     offResults: List<ProductResult>,
+    offUnavailable: Boolean = false,
     isSearchingOff: Boolean,
     searchHasExecuted: Boolean,
     onSelectPreset: (MealPreset) -> Unit,
@@ -1713,7 +1747,7 @@ private fun LiveFoodSearchResults(
     onSelectOffProduct: (ProductResult) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val q = query.trim().lowercase()
+    val q = com.scatterbrain.scatterfit.data.normaliseQuery(query).lowercase()
     val context = androidx.compose.ui.platform.LocalContext.current
     val genericFoodsList = remember(context) { OpenFoodFactsClient.loadGenericFoods(context) }
 
@@ -1873,7 +1907,7 @@ private fun LiveFoodSearchResults(
                     { it.brands },
                     { it.categories }
                 ).ifEmpty { offResults.take(8) }
-                val headerText = if (isWidened) "OPEN FOOD FACTS (UK) — WIDER MATCHES" else "OPEN FOOD FACTS (UK)"
+                val headerText = if (isWidened) "OPEN FOOD FACTS — WIDER MATCHES" else "OPEN FOOD FACTS"
                 Text(headerText, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     displayOffResults.forEach { product ->
@@ -1927,7 +1961,9 @@ private fun LiveFoodSearchResults(
                         }
                     }
                 }
-            } else if (searchHasExecuted && matchedFavourites.isEmpty() && matchedPresets.isEmpty() && matchedRecipes.isEmpty()) {
+            } else if (offUnavailable && !hasLocalMatches) {
+                Text("Open Food Facts is busy — try again in a moment", fontSize = 12.sp, color = TextMuted)
+            } else if (searchHasExecuted && !hasLocalMatches) {
                 Text("No matches for '$query' — try a brand name", fontSize = 12.sp, color = TextMuted)
             }
         }

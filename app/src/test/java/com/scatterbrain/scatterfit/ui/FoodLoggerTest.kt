@@ -784,4 +784,19 @@ class FoodLoggerTest {
         assertEquals(2, vm.mealsForDay.value.size)
         assertTrue(meal1.id != meal2.id)
     }
+
+    @Test
+    fun `deriveInitialExpandedSections seeds lowercase section names from meals and handles empty list`() {
+        // Empty meals list -> empty expanded set
+        assertTrue(deriveInitialExpandedSections(emptyList()).isEmpty())
+
+        // Meals with various casings and meal types
+        val meals = listOf(
+            LoggedMeal(id = "1", name = "Oats", kcal = 300.0, mealType = "Breakfast"),
+            LoggedMeal(id = "2", name = "Sandwich", kcal = 500.0, mealType = "LUNCH"),
+            LoggedMeal(id = "3", name = "Apple", kcal = 80.0, mealType = "snacks"),
+        )
+        val expanded = deriveInitialExpandedSections(meals)
+        assertEquals(setOf("breakfast", "lunch", "snacks"), expanded)
+    }
 }

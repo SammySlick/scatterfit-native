@@ -614,4 +614,75 @@ class OpenFoodFactsTest {
         assertEquals(42.5, scaled.kcal, 0.001)
         assertEquals(10.0, scaled.protein, 0.001)
     }
+
+    @Test
+    fun `parseSaSearchJson parses search-openfoodfacts-org hits with array brands into ProductResult`() {
+        val json = """
+            {
+              "hits": [
+                {
+                  "code": "5060495115448",
+                  "product_name": "Huel v3.0 Chocolate",
+                  "brands": ["Huel", "Huel Ltd"],
+                  "quantity": "1.7 kg",
+                  "serving_size": "100 g",
+                  "serving_quantity": 100.0,
+                  "categories": "Meals,Meal replacements",
+                  "nutriments": {
+                    "energy-kcal_100g": 400.0,
+                    "proteins_100g": 30.0,
+                    "carbohydrates_100g": 37.0,
+                    "fat_100g": 12.0
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val results = OpenFoodFactsClient.parseSaSearchJson(json)
+        assertNotNull(results)
+        assertEquals(1, results!!.size)
+
+        val product = results.first()
+        assertEquals("5060495115448", product.code)
+        assertEquals("Huel v3.0 Chocolate", product.productName)
+        assertEquals("Huel, Huel Ltd", product.brands)
+        assertEquals("Huel v3.0 Chocolate (Huel, Huel Ltd)", product.displayName)
+        assertEquals(400.0, product.nutriments.energyKcal_100g!!, 0.001)
+        assertEquals(30.0, product.nutriments.proteins_100g!!, 0.001)
+        assertEquals("Meals,Meal replacements", product.categories)
+    }
+
+    @Test
+    fun `parseSaSearchJson returns null on invalid JSON`() {
+        assertNull(OpenFoodFactsClient.parseSaSearchJson("{ bad json }"))
+    }
+
+    @Test
+    fun `OffUnavailableException message verifies provider outage indicator`() {
+        val ex = OffUnavailableException()
+        assertEquals("Open Food Facts unavailable", ex.message)
+    }
+
+    @Test
+    fun `normaliseQuery collapses whitespace, trims trailing and leading space, and handles tabs and all-whitespace`() {
+        // Trailing space
+        assertEquals("bread", normaliseQuery("bread "))
+        assertEquals("bread", normaliseQuery(" bread"))
+        assertEquals("bread", normaliseQuery("  bread   "))
+
+        // Double space / internal whitespace runs
+        assertEquals("bread rolls", normaliseQuery("bread  rolls"))
+        assertEquals("whole wheat bread rolls", normaliseQuery("whole   wheat   bread   rolls"))
+
+        // Tabs and newlines
+        assertEquals("bread rolls", normaliseQuery("bread\trolls"))
+        assertEquals("bread rolls", normaliseQuery("bread\t\trolls\n"))
+        assertEquals("bread rolls", normaliseQuery("\t  bread \t rolls \n "))
+
+        // All-whitespace -> empty
+        assertEquals("", normaliseQuery(""))
+        assertEquals("", normaliseQuery("   "))
+        assertEquals("", normaliseQuery("\t\t\n  "))
+    }
 }
