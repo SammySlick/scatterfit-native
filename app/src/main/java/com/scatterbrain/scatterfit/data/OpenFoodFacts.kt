@@ -721,10 +721,13 @@ object OpenFoodFactsClient {
         }
     }
 
+    private fun cacheKey(source: String, q: String) = "$source:${q.lowercase()}"
+
     suspend fun searchPrimary(query: String): List<ProductResult> = withContext(Dispatchers.IO) {
         val q = normaliseQuery(query)
         if (q.isBlank()) return@withContext emptyList()
-        val cached = queryCache[q.lowercase()]
+        val key = cacheKey("sa", q)
+        val cached = queryCache[key]
         if (cached != null) return@withContext cached
 
         val encoded = URLEncoder.encode(q, "UTF-8")
@@ -732,14 +735,15 @@ object OpenFoodFactsClient {
         val responseText = executeGet(urlStr) ?: return@withContext emptyList()
         val results = parseSaSearchJson(responseText) ?: emptyList()
         val filtered = results.filter { !it.productName.isNullOrBlank() }
-        queryCache[q.lowercase()] = filtered
+        queryCache[key] = filtered
         filtered
     }
 
     suspend fun searchLegacy(query: String): List<ProductResult> = withContext(Dispatchers.IO) {
         val q = normaliseQuery(query)
         if (q.isBlank()) return@withContext emptyList()
-        val cached = queryCache[q.lowercase()]
+        val key = cacheKey("legacy", q)
+        val cached = queryCache[key]
         if (cached != null) return@withContext cached
 
         val encoded = URLEncoder.encode(q, "UTF-8")
@@ -747,15 +751,15 @@ object OpenFoodFactsClient {
         val responseText = executeGet(urlStr) ?: return@withContext emptyList()
         val results = parseSearchJson(responseText) ?: emptyList()
         val filtered = results.filter { !it.productName.isNullOrBlank() }
-        queryCache[q.lowercase()] = filtered
+        queryCache[key] = filtered
         filtered
     }
 
     suspend fun search(query: String): List<ProductResult> {
         val q = normaliseQuery(query)
         if (q.isBlank()) return emptyList()
-        val cached = queryCache[q.lowercase()]
-        if (cached != null) return cached
+        val cachedSa = queryCache[cacheKey("sa", q)]
+        if (cachedSa != null && cachedSa.isNotEmpty()) return cachedSa
 
         val primaryResults = searchPrimary(q)
         if (primaryResults.isNotEmpty()) {
