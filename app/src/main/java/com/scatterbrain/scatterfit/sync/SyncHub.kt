@@ -78,6 +78,7 @@ object SyncHub {
 
     private var syncPrefs: android.content.SharedPreferences? = null
     private var inMemoryLastSync: Long = 0L
+    private var appContext: Context? = null
 
     fun getLastSyncTimestamp(): Long {
         return syncPrefs?.getLong("last_sync_timestamp", 0L) ?: inMemoryLastSync
@@ -98,6 +99,7 @@ object SyncHub {
     fun init(context: Context, scope: CoroutineScope) {
         if (initJob != null) return
         val appContext = context.applicationContext
+        this.appContext = appContext
         syncPrefs = appContext.getSharedPreferences("scatterfit_sync_prefs", Context.MODE_PRIVATE)
         store = SyncStore(File(appContext.filesDir, "hc-sync"))
         engine = SyncEngine(store!!, nowMs = { System.currentTimeMillis() })
@@ -215,6 +217,25 @@ object SyncHub {
             Log.d(TAG, "sync done: mergedMethods=${result.merged.size} mergedRows=${result.merged.values.sumOf { it.size }}")
             setLastSyncTimestamp(now)
             _records.value = publishFood(result.merged)
+
+            // Auto workout candidate detection on last 48h
+            try {
+                val proposalsStorage = com.scatterbrain.scatterfit.data.WorkoutProposalsStorage(appContext)
+                val hrRecords = result.merged[RecordMethod.HEART_RATE] ?: emptyList()
+                val stepRecords = result.merged[RecordMethod.STEPS] ?: emptyList()
+                val exerciseRecords = result.merged[RecordMethod.EXERCISE_SESSION] ?: emptyList()
+                com.scatterbrain.scatterfit.data.WorkoutProposalDetector.processSyncProposals(
+                    hrRecords = hrRecords,
+                    stepRecords = stepRecords,
+                    exerciseRecords = exerciseRecords,
+                    storage = proposalsStorage,
+                    nowMs = now,
+                    rawStepReader = { from, to -> HcReaders.readRawSteps(c, from, to) }
+                )
+            } catch (t: Throwable) {
+                Log.w(TAG, "Workout proposal detection error", t)
+            }
+
             _lastError.value = null
             _status.value = if (result.merged.isEmpty()) {
                 // Sync ran, read everything it was allowed to — and got nothing.

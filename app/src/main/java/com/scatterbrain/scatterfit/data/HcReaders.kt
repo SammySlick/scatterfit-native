@@ -145,6 +145,24 @@ object HcReaders {
         }
     }
 
+    /** Bounded raw STEPS read over a custom window (e.g. workout candidate span). */
+    suspend fun readRawSteps(
+        client: HealthConnectClient,
+        fromMs: Long,
+        toMs: Long,
+        maxPages: Int = 10,
+    ): List<HealthRecord> {
+        if (fromMs >= toMs) return emptyList()
+        return read(client, fromMs, toMs, "WorkoutDetection.Steps", ascendingOrder = true, maxPages = maxPages) { r: StepsRecord ->
+            HcTranslate.steps(
+                r.metadata.dataOrigin.packageName,
+                r.startTime.toEpochMilli(),
+                r.endTime.toEpochMilli(),
+                r.count
+            )
+        }
+    }
+
     /** Whole-window raw read dispatch for the low-volume types. */
     private suspend fun readMethod(
         client: HealthConnectClient,

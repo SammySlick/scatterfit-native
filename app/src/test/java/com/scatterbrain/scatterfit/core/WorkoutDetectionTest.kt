@@ -158,4 +158,73 @@ class WorkoutDetectionTest {
         assertEquals(1, candidates.size)
         assertEquals(150, candidates.first().features.durationMin)
     }
+
+    @Test
+    fun `classifyByCadence classifies 30-min candidate based on step counts`() {
+        val baseMs = 1700000000000L
+        val candidate = WorkoutCandidate(
+            features = WorkoutFeatures(
+                startMs = baseMs,
+                endMs = baseMs + 30 * 60000L,
+                durationMin = 30,
+                meanHr = 150.0,
+                peakHr = 165.0,
+                pctTimeInZ3Plus = 0.7,
+                cadenceSpm = null,
+                hrSpikiness = 4.0
+            ),
+            kind = WorkoutKind.OTHER
+        )
+
+        // 4400 steps in span -> RUN (146.6 spm >= 130)
+        val runBuckets = listOf(baseMs to 4400)
+        val runCandidate = classifyByCadence(candidate, runBuckets)
+        assertEquals(WorkoutKind.RUN, runCandidate.kind)
+        assertEquals(146.66, runCandidate.features.cadenceSpm!!, 0.1)
+
+        // 2700 steps in span -> WALK (90 spm)
+        val walkBuckets = listOf(baseMs to 2700)
+        val walkCandidate = classifyByCadence(candidate, walkBuckets)
+        assertEquals(WorkoutKind.WALK, walkCandidate.kind)
+        assertEquals(90.0, walkCandidate.features.cadenceSpm!!, 0.001)
+
+        // 900 steps in span -> OTHER (30 spm)
+        val slowBuckets = listOf(baseMs to 900)
+        val slowCandidate = classifyByCadence(candidate, slowBuckets)
+        assertEquals(WorkoutKind.OTHER, slowCandidate.kind)
+        assertEquals(30.0, slowCandidate.features.cadenceSpm!!, 0.001)
+
+        // Empty bucket list -> OTHER (kind unchanged, cadence null)
+        val emptyCandidate = classifyByCadence(candidate, emptyList())
+        assertEquals(WorkoutKind.OTHER, emptyCandidate.kind)
+        assertNull(emptyCandidate.features.cadenceSpm)
+    }
+
+    @Test
+    fun `classifyByCadence ignores buckets outside candidate span`() {
+        val baseMs = 1700000000000L
+        val candidate = WorkoutCandidate(
+            features = WorkoutFeatures(
+                startMs = baseMs,
+                endMs = baseMs + 30 * 60000L,
+                durationMin = 30,
+                meanHr = 150.0,
+                peakHr = 165.0,
+                pctTimeInZ3Plus = 0.7,
+                cadenceSpm = null,
+                hrSpikiness = 4.0
+            ),
+            kind = WorkoutKind.OTHER
+        )
+
+        val bucketsWithOutsideNoise = listOf(
+            (baseMs - 10 * 60000L) to 3000,               // 10 min before start: ignored
+            baseMs to 2700,                               // inside span: 2700 steps
+            (baseMs + 30 * 60000L + 10 * 60000L) to 5000 // 10 min after end: ignored
+        )
+
+        val result = classifyByCadence(candidate, bucketsWithOutsideNoise)
+        assertEquals(WorkoutKind.WALK, result.kind)
+        assertEquals(90.0, result.features.cadenceSpm!!, 0.001)
+    }
 }

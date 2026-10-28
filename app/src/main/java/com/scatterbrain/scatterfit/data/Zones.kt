@@ -63,6 +63,41 @@ object Zones {
         return map.entries.sortedBy { it.key }.map { it.key to it.value }
     }
 
+    fun stepBucketsFromRecords(records: List<HealthRecord>): List<Pair<Long, Int>> {
+        val map = LinkedHashMap<Long, Int>()
+        fun addSteps(timeMs: Long, count: Int) {
+            val minuteStart = (timeMs / 60000L) * 60000L
+            map[minuteStart] = (map[minuteStart] ?: 0) + count
+        }
+        var sawSampleList = false
+        fun readSampleList(list: JsonElement?) {
+            val arr = list as? JsonArray ?: return
+            sawSampleList = true
+            for (s in arr) {
+                val o = s as? JsonObject ?: continue
+                val t = parseMillis((o["time"] ?: o["startTime"])?.jsonStringOrNull()) ?: continue
+                val c = Normalise.num(o["count"] ?: o["steps"])?.toInt() ?: continue
+                if (c > 0) addSteps(t, c)
+            }
+        }
+        for (r in records) {
+            val d = r.data ?: continue
+            readSampleList(d["samples"])
+            readSampleList((d["data"] as? JsonObject)?.get("samples"))
+        }
+        if (!sawSampleList) {
+            for (r in records) {
+                val d = r.data ?: continue
+                val t = parseMillis(r.start)
+                    ?: parseMillis((d["startTime"] ?: d["time"])?.jsonStringOrNull())
+                    ?: continue
+                val c = Normalise.num(d["count"] ?: d["steps"])?.toInt() ?: continue
+                if (c > 0) addSteps(t, c)
+            }
+        }
+        return map.entries.sortedBy { it.key }.map { it.key to it.value }
+    }
+
     /** Evenly preserve the first/last point while capping UI-only series. */
     fun <T> downsamplePoints(points: List<T>, limit: Int = 300): List<T> {
         if (points.size <= limit || limit < 2) return points

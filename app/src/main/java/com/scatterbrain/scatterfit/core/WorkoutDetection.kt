@@ -216,21 +216,7 @@ fun detectWorkoutCandidates(
             sqrt(variance)
         } else 0.0
 
-        val cadenceSpm = if (stepBuckets.isNotEmpty()) {
-            val stepsInSpan = stepBuckets
-                .filter { it.first in startMs until endMs }
-                .sumOf { it.second }
-            if (durationMin > 0) stepsInSpan.toDouble() / durationMin else 0.0
-        } else null
-
-        val kind = when {
-            cadenceSpm == null -> WorkoutKind.OTHER
-            cadenceSpm >= 130.0 -> WorkoutKind.RUN
-            cadenceSpm >= 60.0 && cadenceSpm < 130.0 -> WorkoutKind.WALK
-            else -> WorkoutKind.OTHER
-        }
-
-        WorkoutCandidate(
+        val initialCandidate = WorkoutCandidate(
             features = WorkoutFeatures(
                 startMs = startMs,
                 endMs = endMs,
@@ -238,10 +224,40 @@ fun detectWorkoutCandidates(
                 meanHr = meanHr,
                 peakHr = peakHr,
                 pctTimeInZ3Plus = pctTimeInZ3Plus,
-                cadenceSpm = cadenceSpm,
+                cadenceSpm = null,
                 hrSpikiness = hrSpikiness
             ),
-            kind = kind
+            kind = WorkoutKind.OTHER
         )
+
+        classifyByCadence(initialCandidate, stepBuckets)
     }
+}
+
+fun classifyByCadence(
+    candidate: WorkoutCandidate,
+    stepBuckets: List<Pair<Long, Int>>
+): WorkoutCandidate {
+    val durationMin = candidate.features.durationMin
+    val startMs = candidate.features.startMs
+    val endMs = candidate.features.endMs
+
+    val cadenceSpm = if (stepBuckets.isNotEmpty()) {
+        val stepsInSpan = stepBuckets
+            .filter { it.first in startMs until endMs }
+            .sumOf { it.second }
+        if (durationMin > 0) stepsInSpan.toDouble() / durationMin else 0.0
+    } else null
+
+    val kind = when {
+        cadenceSpm == null -> WorkoutKind.OTHER
+        cadenceSpm >= 130.0 -> WorkoutKind.RUN
+        cadenceSpm in 60.0..129.9999 -> WorkoutKind.WALK
+        else -> WorkoutKind.OTHER
+    }
+
+    return candidate.copy(
+        features = candidate.features.copy(cadenceSpm = cadenceSpm),
+        kind = kind
+    )
 }
