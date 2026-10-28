@@ -51,7 +51,6 @@ import com.scatterbrain.scatterfit.core.dayBefore
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
-import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.StateBad
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
@@ -108,23 +107,18 @@ fun ConsistencyBreakdownScreen(
     val pillText = if (momentumScoreRaw == null) "No data yet" else "$momentumScoreInt ${mBand.label}"
     val pillColor = if (momentumScoreRaw == null) TextMuted else mBand.color
 
-    // Date line at very top: e.g. "Tuesday 14 October"
-    val dateHeader = remember(dayKey) {
-        runCatching {
-            val date = LocalDate.parse(dayKey)
-            date.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.US))
-        }.getOrDefault(dayKey)
+    // Accordion state: set of expanded card IDs (defaults to the first card expanded)
+    val firstCardId = summaries.firstOrNull()?.name
+    var expandedSections by rememberSaveable {
+        mutableStateOf<Set<String>>(firstCardId?.let { setOf(it) } ?: emptySet())
     }
-
-    // Accordion state: only one row expanded at a time
-    var expandedMetricKey by rememberSaveable { mutableStateOf<String?>(null) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(AppBackground)
-            .verticalScroll(scrollState)
             .navigationBarsPadding()
+            .verticalScroll(scrollState)
             .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -144,32 +138,43 @@ fun ConsistencyBreakdownScreen(
                 )
             }
 
-            Text(
-                text = "Momentum — Breakdown",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextForeground
-            )
+            Column {
+                Text(
+                    text = "Momentum — Breakdown",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextForeground
+                )
+                val today = remember { com.scatterbrain.scatterfit.core.todayKey() }
+                val dayLabel = remember(dayKey, today) {
+                    if (dayKey == today) {
+                        "Today"
+                    } else {
+                        runCatching {
+                            val date = LocalDate.parse(dayKey)
+                            date.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US))
+                        }.getOrDefault(dayKey)
+                    }
+                }
+                Text(
+                    text = dayLabel,
+                    fontSize = 12.sp,
+                    color = TextMuted
+                )
+            }
         }
 
-        // Date line at the very top of breakdown, above the momentum header
-        Text(
-            text = dateHeader,
-            fontSize = 12.sp,
-            color = TextMuted
-        )
-
-        // 2. HEADER INFO BLOCK: pill (score number + band name) and delta sentence grouped in DarkCardSurface card
+        // 2. HEADER INFO BLOCK: pill (score number + band name) and delta sentence grouped in AppCardSurface card
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = AppCardSurface),
             border = BorderStroke(1.dp, BorderDefault)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
+                    .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -240,12 +245,17 @@ fun ConsistencyBreakdownScreen(
                             )
                         }
                         sectionSummaries.forEach { summary ->
-                            val isExpanded = expandedMetricKey == summary.name
+                            val cardId = summary.name
+                            val isExpanded = expandedSections.contains(cardId)
                             ConsistencyRow(
                                 summary = summary,
                                 isExpanded = isExpanded,
                                 onToggleExpand = {
-                                    expandedMetricKey = if (isExpanded) null else summary.name
+                                    expandedSections = if (isExpanded) {
+                                        expandedSections - cardId
+                                    } else {
+                                        expandedSections + cardId
+                                    }
                                 },
                                 onMetricClick = onMetricClick
                             )
@@ -256,12 +266,17 @@ fun ConsistencyBreakdownScreen(
                 // Metrics with section == null (unlogged) render after ALL sections, with NO header
                 val unloggedSummaries = summaries.filter { it.section == null || it.unlogged }
                 unloggedSummaries.forEach { summary ->
-                    val isExpanded = expandedMetricKey == summary.name
+                    val cardId = summary.name
+                    val isExpanded = expandedSections.contains(cardId)
                     ConsistencyRow(
                         summary = summary,
                         isExpanded = isExpanded,
                         onToggleExpand = {
-                            expandedMetricKey = if (isExpanded) null else summary.name
+                            expandedSections = if (isExpanded) {
+                                expandedSections - cardId
+                            } else {
+                                expandedSections + cardId
+                            }
                         },
                         onMetricClick = onMetricClick
                     )
