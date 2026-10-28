@@ -3,6 +3,7 @@ package com.scatterbrain.scatterfit.data
 import com.scatterbrain.scatterfit.ui.toProductResult
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -684,5 +685,41 @@ class OpenFoodFactsTest {
         assertEquals("", normaliseQuery(""))
         assertEquals("", normaliseQuery("   "))
         assertEquals("", normaliseQuery("\t\t\n  "))
+    }
+
+    @Test
+    fun `hasNutritionData identifies missing nutrition items versus items with nutrition`() {
+        val emptyNutriments = ProductResult(
+            code = "00000000",
+            productName = "Incomplete Product",
+            nutriments = OffNutriments()
+        )
+        assertFalse("Missing nutriments should have hasNutritionData = false", emptyNutriments.hasNutritionData)
+
+        val zeroNutriments = ProductResult(
+            code = "00000001",
+            productName = "Zero Cal Zero Macro",
+            nutriments = OffNutriments(
+                energyKcal_100g = 0.0,
+                proteins_100g = 0.0,
+                carbohydrates_100g = 0.0,
+                fat_100g = 0.0
+            )
+        )
+        assertFalse("Explicit 0 kcal and 0 macros should have hasNutritionData = false", zeroNutriments.hasNutritionData)
+
+        val kcalOnly = ProductResult(
+            code = "00000002",
+            productName = "Soda",
+            nutriments = OffNutriments(energyKcal_100g = 42.0)
+        )
+        assertTrue("Item with kcal should have hasNutritionData = true", kcalOnly.hasNutritionData)
+
+        val proteinOnly = ProductResult(
+            code = "00000003",
+            productName = "Pure Protein Powder",
+            nutriments = OffNutriments(proteins_100g = 25.0)
+        )
+        assertTrue("Item with protein should have hasNutritionData = true", proteinOnly.hasNutritionData)
     }
 }

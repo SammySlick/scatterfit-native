@@ -552,6 +552,9 @@ data class ProductResult(
             append(productName?.takeIf { it.isNotBlank() } ?: "Unknown Product")
             brands?.takeIf { it.isNotBlank() }?.let { append(" ($it)") }
         }
+
+    val hasNutritionData: Boolean
+        get() = kcalPerServing > 0 || proteinPerServing > 0.0 || carbsPerServing > 0.0 || fatPerServing > 0.0
 }
 
 class OffUnavailableException : Exception("Open Food Facts unavailable")
@@ -734,7 +737,7 @@ object OpenFoodFactsClient {
         val urlStr = "$SEARCH_URL?q=$encoded&page_size=20&fields=code,product_name,brands,quantity,nutriments,serving_size,serving_quantity,categories"
         val responseText = executeGet(urlStr) ?: return@withContext emptyList()
         val results = parseSaSearchJson(responseText) ?: emptyList()
-        val filtered = results.filter { !it.productName.isNullOrBlank() }
+        val filtered = results.filter { !it.productName.isNullOrBlank() && it.hasNutritionData }
         queryCache[key] = filtered
         filtered
     }
@@ -750,7 +753,7 @@ object OpenFoodFactsClient {
         val urlStr = "$BASE_URL/cgi/search.pl?search_terms=$encoded&search_simple=1&action=process&json=1&page_size=20&fields=$FIELDS"
         val responseText = executeGet(urlStr) ?: return@withContext emptyList()
         val results = parseSearchJson(responseText) ?: emptyList()
-        val filtered = results.filter { !it.productName.isNullOrBlank() }
+        val filtered = results.filter { !it.productName.isNullOrBlank() && it.hasNutritionData }
         queryCache[key] = filtered
         filtered
     }
