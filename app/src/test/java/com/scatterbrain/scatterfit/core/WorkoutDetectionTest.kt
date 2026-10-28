@@ -114,19 +114,18 @@ class WorkoutDetectionTest {
     }
 
     @Test
-    fun `merged session over 150 minutes rejected`() {
+    fun `two long sessions whose union exceeds the ceiling stay separate`() {
         val baseMs = 1700000000000L
         val bounds = Zones.DEFAULT_ZONES
-        // Session 1: 0..80 min (80 min)
-        // Pause: 80..90 min (10 min rest <= 15 min merge threshold)
-        // Session 2: 90..165 min (75 min)
-        // Merged duration: 165 min > 150 min (MAX_SESSION_MIN) -> rejected
-        val samples = generateMinuteSamples(0, 80, 155.0, baseMs) +
-                generateMinuteSamples(80, 90, 95.0, baseMs) +
-                generateMinuteSamples(90, 165, 155.0, baseMs)
+        // Two 80-minute sessions at 150bpm separated by a 20-minute gap -> union 180 min > 150 min
+        val samples = generateMinuteSamples(0, 80, 150.0, baseMs) +
+                generateMinuteSamples(80, 100, 90.0, baseMs) +
+                generateMinuteSamples(100, 180, 150.0, baseMs)
 
         val candidates = detectWorkoutCandidates(samples, bounds)
-        assertTrue("Merged session over 150 minutes must be rejected", candidates.isEmpty())
+        assertEquals("Two long sessions exceeding ceiling must stay separate", 2, candidates.size)
+        assertEquals(80, candidates[0].features.durationMin)
+        assertEquals(80, candidates[1].features.durationMin)
     }
 
     @Test
@@ -144,5 +143,19 @@ class WorkoutDetectionTest {
         val c = candidates.first()
         assertTrue("Duration should be ~90-106 min", c.features.durationMin in 90..106)
         assertEquals(WorkoutKind.OTHER, c.kind)
+    }
+
+    @Test
+    fun `union of exactly 150 minutes still merges`() {
+        val baseMs = 1700000000000L
+        val bounds = Zones.DEFAULT_ZONES
+        // Two 65-minute sessions at 150bpm separated by a 20-minute gap -> union 150 min
+        val samples = generateMinuteSamples(0, 65, 150.0, baseMs) +
+                generateMinuteSamples(65, 85, 90.0, baseMs) +
+                generateMinuteSamples(85, 150, 150.0, baseMs)
+
+        val candidates = detectWorkoutCandidates(samples, bounds)
+        assertEquals(1, candidates.size)
+        assertEquals(150, candidates.first().features.durationMin)
     }
 }

@@ -32,6 +32,7 @@ private data class RawSpan(
     val startMs: Long,
     val endMs: Long,
     val meetsMinSegmentFloor: Boolean = true,
+    val mergeBlocked: Boolean = false,
 )
 
 fun detectWorkoutCandidates(
@@ -159,7 +160,7 @@ fun detectWorkoutCandidates(
             if (i + 1 < mergedSpans.size) {
                 val next = mergedSpans[i + 1]
                 val gapMin = ((next.startMs - current.endMs) / 60000L).toInt()
-                if (gapMin <= mergeGapMin && current.meetsMinSegmentFloor && next.meetsMinSegmentFloor) {
+                if (gapMin <= mergeGapMin && current.meetsMinSegmentFloor && next.meetsMinSegmentFloor && !current.mergeBlocked && !next.mergeBlocked) {
                     val candidateMerged = RawSpan(current.startMs, next.endMs, meetsMinSegmentFloor = true)
                     val mergedDuration = ((candidateMerged.endMs - candidateMerged.startMs) / 60000L).toInt()
                     if (mergedDuration <= MAX_SESSION_MIN) {
@@ -168,8 +169,10 @@ fun detectWorkoutCandidates(
                         changed = true
                         continue
                     } else {
-                        // Merged candidate longer than MAX_SESSION_MIN is rejected
-                        // Drop it completely per spec
+                        // When the union would exceed MAX_SESSION_MIN: add both spans to nextList unchanged
+                        // except with mergeBlocked = true, advance i by 2, set changed = true.
+                        nextList.add(current.copy(mergeBlocked = true))
+                        nextList.add(next.copy(mergeBlocked = true))
                         i += 2
                         changed = true
                         continue
