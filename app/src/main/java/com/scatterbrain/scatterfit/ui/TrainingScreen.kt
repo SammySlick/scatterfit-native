@@ -16,6 +16,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -34,6 +35,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -64,6 +67,11 @@ import androidx.compose.ui.unit.sp
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.scatterbrain.scatterfit.data.WorkoutProposal
+import com.scatterbrain.scatterfit.data.WorkoutProposalsStorage
+import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BorderInput
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
@@ -72,9 +80,12 @@ import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 enum class TrainingTab { PLAN, ROUTINES }
@@ -90,10 +101,16 @@ fun TrainingScreen(
     val context = LocalContext.current
     val plannedStorage = remember { PlannedSessionsStorage(context) }
     val loggedStorage = remember { LoggedSessionsStorage(context) }
+    val proposalsStorage = remember { WorkoutProposalsStorage(context) }
 
     var routines by remember { mutableStateOf(storage.loadRoutines()) }
     var plannedSessions by remember { mutableStateOf(plannedStorage.load()) }
     var loggedSessions by remember { mutableStateOf(loggedStorage.loadAll()) }
+    var proposals by remember { mutableStateOf(proposalsStorage.load().filterNot { it.dismissed }) }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        proposals = proposalsStorage.load().filterNot { it.dismissed }
+    }
 
     var activeTab by remember { mutableStateOf(TrainingTab.PLAN) }
 
@@ -268,6 +285,7 @@ fun TrainingScreen(
                         routines = routines,
                         plannedSessions = plannedSessions,
                         loggedSessions = loggedSessions,
+                        proposals = proposals,
                         onUpsertPlan = { entry ->
                             plannedStorage.upsert(entry)
                             plannedSessions = plannedStorage.load()
@@ -283,6 +301,22 @@ fun TrainingScreen(
                         onRemoveLoggedSession = { id ->
                             loggedStorage.remove(id)
                             loggedSessions = loggedStorage.loadAll()
+                        },
+                        onConfirmProposal = { proposal, chosenType ->
+                            loggedStorage.add(
+                                LoggedSession(
+                                    dayKey = proposal.dayKey,
+                                    name = chosenType,
+                                    durationMinutes = proposal.durationMin
+                                )
+                            )
+                            proposalsStorage.remove(proposal.id)
+                            loggedSessions = loggedStorage.loadAll()
+                            proposals = proposalsStorage.load().filterNot { it.dismissed }
+                        },
+                        onIgnoreProposal = { proposal ->
+                            proposalsStorage.dismiss(proposal.id)
+                            proposals = proposalsStorage.load().filterNot { it.dismissed }
                         },
                         onViewRoutine = { r -> viewingRoutine = r },
                         onCreateNewRoutine = { isCreatingNew = true },
@@ -363,10 +397,13 @@ private fun WeeklyPlannerSection(
     routines: List<Routine>,
     plannedSessions: List<PlannedSessionDay>,
     loggedSessions: List<LoggedSession>,
+    proposals: List<WorkoutProposal> = emptyList(),
     onUpsertPlan: (PlannedSessionDay) -> Unit,
     onRemovePlan: (String) -> Unit,
     onAddLoggedSession: (LoggedSession) -> Unit,
     onRemoveLoggedSession: (String) -> Unit,
+    onConfirmProposal: (WorkoutProposal, String) -> Unit = { _, _ -> },
+    onIgnoreProposal: (WorkoutProposal) -> Unit = {},
     onViewRoutine: (Routine) -> Unit,
     onCreateNewRoutine: () -> Unit,
     onStartWorkout: (Routine?, String?, String) -> Unit,
@@ -838,6 +875,16 @@ private fun WeeklyPlannerSection(
             }
         }
 
+        // Detected Sessions Card
+        if (proposals.isNotEmpty()) {
+            DetectedSessionsCard(
+                proposals = proposals,
+                onConfirm = onConfirmProposal,
+                onIgnore = onIgnoreProposal,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         // Recent Logs Strip
         val recentLogs = remember(loggedSessions) { loggedSessions.take(5) }
         if (recentLogs.isNotEmpty()) {
@@ -1182,6 +1229,168 @@ private fun TactileCardButton(
             contentAlignment = Alignment.Center
         ) {
             content()
+        }
+    }
+}
+
+@Composable
+private fun DetectedSessionsCard(
+    proposals: List<WorkoutProposal>,
+    onConfirm: (WorkoutProposal, String) -> Unit,
+    onIgnore: (WorkoutProposal) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppCardSurface),
+        border = BorderStroke(1.dp, BorderDefault)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "DETECTED SESSIONS",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextMuted,
+                letterSpacing = 1.sp
+            )
+
+            proposals.forEachIndexed { index, proposal ->
+                if (index > 0) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(BorderDefault)
+                    )
+                }
+
+                DetectedSessionRow(
+                    proposal = proposal,
+                    onConfirm = onConfirm,
+                    onIgnore = onIgnore
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetectedSessionRow(
+    proposal: WorkoutProposal,
+    onConfirm: (WorkoutProposal, String) -> Unit,
+    onIgnore: (WorkoutProposal) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val subtitle = remember(proposal) {
+        val zdt = Instant.ofEpochMilli(proposal.startMs).atZone(ZoneId.systemDefault())
+        val datePart = zdt.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US))
+        val timePart = zdt.format(DateTimeFormatter.ofPattern("HH:mm", Locale.US))
+        "$datePart · $timePart · ${proposal.durationMin} min · avg ${proposal.meanHr.roundToInt()} bpm · peak ${proposal.peakHr.roundToInt()}"
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = proposal.proposedType,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = TextForeground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = TextMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            // 1. CONFIRM
+            TextButton(
+                onClick = { onConfirm(proposal, proposal.proposedType) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "Confirm",
+                    color = AccentTeal,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // 2. CHANGE
+            var changeMenuOpen by remember { mutableStateOf(false) }
+            Box {
+                TextButton(
+                    onClick = { changeMenuOpen = true },
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "Change",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = changeMenuOpen,
+                    onDismissRequest = { changeMenuOpen = false },
+                    modifier = Modifier.background(DarkCardSurface)
+                ) {
+                    val sportOptions = listOf("Run", "Walk", "Football", "Boxing", "HIIT", "Workout")
+                    sportOptions.forEach { sport ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = sport,
+                                    color = if (sport == proposal.proposedType) AccentTeal else TextForeground,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (sport == proposal.proposedType) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            onClick = {
+                                changeMenuOpen = false
+                                onConfirm(proposal, sport)
+                            }
+                        )
+                    }
+                }
+            }
+
+            // 3. IGNORE
+            TextButton(
+                onClick = { onIgnore(proposal) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "Ignore",
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }

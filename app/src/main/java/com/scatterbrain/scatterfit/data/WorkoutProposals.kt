@@ -110,6 +110,14 @@ class WorkoutProposalsStorage(
         save(updated)
     }
 
+    fun remove(id: String) {
+        val current = load()
+        val updated = current.filterNot { it.id == id }
+        if (updated.size != current.size) {
+            save(updated)
+        }
+    }
+
     fun pruneExpired(nowMs: Long = System.currentTimeMillis()): List<WorkoutProposal> {
         val expiryMs = PROPOSAL_EXPIRY_DAYS * 24L * 3600L * 1000L
         val threshold = nowMs - expiryMs
