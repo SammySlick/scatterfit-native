@@ -17,10 +17,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -703,16 +705,22 @@ fun FoodHomeScreen(
     }
 
     if (isBottomSheetOpen) {
+        val sheetState = androidx.compose.material3.rememberModalBottomSheetState(
+            skipPartiallyExpanded = true
+        )
         androidx.compose.material3.ModalBottomSheet(
             onDismissRequest = { activeBottomSheetMealType = null },
+            sheetState = sheetState,
             containerColor = DarkCardSurface,
-            dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(color = BorderDefault) }
+            dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(color = BorderDefault) },
+            contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0) }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .padding(bottom = 32.dp),
+                    .fillMaxHeight(0.92f)
+                    .imePadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 val mealTypeDisplay = activeBottomSheetMealType?.replaceFirstChar { it.uppercase() } ?: "Meal"
@@ -783,28 +791,38 @@ fun FoodHomeScreen(
                         onSelectOffProduct = { product ->
                             pendingConfirmProduct = product
                             activeBottomSheetMealType = null
-                        }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
                     )
                 } else {
                     // "Recents"
-                    Text("Recents", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextForeground)
-                    val recents = presets.filter { it.kcal > 0 } // Very simple fallback to presets for recents
-                    if (recents.isNotEmpty()) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            recents.take(5).forEach { p ->
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(SecondaryFill)
-                                        .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            pendingConfirmProduct = p.toProductResult()
-                                            activeBottomSheetMealType = null
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text("Recents", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextForeground)
+                        val recents = presets.filter { it.kcal > 0 } // Very simple fallback to presets for recents
+                        if (recents.isNotEmpty()) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                recents.take(5).forEach { p ->
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(SecondaryFill)
+                                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                pendingConfirmProduct = p.toProductResult()
+                                                activeBottomSheetMealType = null
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
                                     Text("${p.name} · ${p.kcal.toInt()} kcal", fontSize = 11.sp, color = TextForeground)
                                 }
@@ -841,6 +859,7 @@ fun FoodHomeScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
@@ -1774,8 +1793,7 @@ private fun LiveFoodSearchResults(
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .heightIn(max = 400.dp),
+            .fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SecondaryFill),
         border = BorderStroke(1.dp, TealHighlight.copy(alpha = 0.4f))
