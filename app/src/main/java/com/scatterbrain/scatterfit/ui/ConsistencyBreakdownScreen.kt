@@ -5,7 +5,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -32,12 +32,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -63,8 +67,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private var savedBreakdownScrollPosition: Int = 0
-
 @Composable
 fun ConsistencyBreakdownScreen(
     momentumSource: MomentumSource,
@@ -72,17 +74,24 @@ fun ConsistencyBreakdownScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
     onMetricClick: (MetricId) -> Unit = {},
+    initialScrollPosition: Int = 0,
+    onScrollPositionChanged: (Int) -> Unit = {},
 ) {
-    val scrollState = rememberSaveable(saver = ScrollState.Saver) {
-        ScrollState(savedBreakdownScrollPosition)
+    val scrollState = rememberScrollState()
+    LaunchedEffect(Unit) {
+        if (initialScrollPosition > 0) {
+            snapshotFlow { scrollState.maxValue }.first { it >= initialScrollPosition }
+            scrollState.scrollTo(initialScrollPosition)
+        }
     }
-
-    LaunchedEffect(scrollState.value) {
-        savedBreakdownScrollPosition = scrollState.value
+    LaunchedEffect(Unit) {
+        snapshotFlow { scrollState.value }
+            .filter { scrollState.maxValue > 0 }
+            .collect { onScrollPositionChanged(it) }
     }
 
     val handleBack = {
-        savedBreakdownScrollPosition = 0
+        onScrollPositionChanged(0)
         onBackClick()
     }
 
@@ -107,10 +116,13 @@ fun ConsistencyBreakdownScreen(
     val pillText = if (momentumScoreRaw == null) "No data yet" else "$momentumScoreInt ${mBand.label}"
     val pillColor = if (momentumScoreRaw == null) TextMuted else mBand.color
 
-    // Accordion state: set of expanded card IDs (defaults to the first card expanded)
-    val firstCardId = summaries.firstOrNull()?.name
-    var expandedSections by rememberSaveable {
-        mutableStateOf<Set<String>>(firstCardId?.let { setOf(it) } ?: emptySet())
+    // Accordion state with seed guard: expands the first card once data lands, unless user already toggled
+    var userToggledCards by rememberSaveable { mutableStateOf(false) }
+    var expandedSections by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    LaunchedEffect(summaries) {
+        if (!userToggledCards && expandedSections.isEmpty()) {
+            summaries.firstOrNull()?.let { expandedSections = setOf(it.name) }
+        }
     }
 
     Column(
@@ -251,6 +263,7 @@ fun ConsistencyBreakdownScreen(
                                 summary = summary,
                                 isExpanded = isExpanded,
                                 onToggleExpand = {
+                                    userToggledCards = true
                                     expandedSections = if (isExpanded) {
                                         expandedSections - cardId
                                     } else {
@@ -272,6 +285,7 @@ fun ConsistencyBreakdownScreen(
                         summary = summary,
                         isExpanded = isExpanded,
                         onToggleExpand = {
+                            userToggledCards = true
                             expandedSections = if (isExpanded) {
                                 expandedSections - cardId
                             } else {

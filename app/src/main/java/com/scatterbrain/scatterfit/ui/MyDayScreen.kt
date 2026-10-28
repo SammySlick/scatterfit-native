@@ -64,6 +64,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -233,6 +234,7 @@ fun MyDayScreen(
     var showAdjustStepsSheet by remember { mutableStateOf(false) }
     var activeMetricScreen by remember { mutableStateOf<String?>(null) }
     var activeMetricId by remember { mutableStateOf<com.scatterbrain.scatterfit.core.MetricId?>(null) }
+    var breakdownScrollPosition by rememberSaveable { mutableStateOf(0) }
 
     val scope = rememberCoroutineScope()
 
@@ -324,7 +326,9 @@ fun MyDayScreen(
                     momentumSource = momentumSource,
                     dayKey = selectedDay,
                     onBackClick = { activeMetricScreen = null },
-                    onMetricClick = { activeMetricId = it }
+                    onMetricClick = { activeMetricId = it },
+                    initialScrollPosition = breakdownScrollPosition,
+                    onScrollPositionChanged = { breakdownScrollPosition = it }
                 )
             }
             return
