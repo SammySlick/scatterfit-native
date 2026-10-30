@@ -42,7 +42,7 @@ enum class AppTab {
     ODYSSEY,
     FOOD,
     TRAINING,
-    ASK
+    CHECKIN
 }
 
 @Composable
@@ -130,7 +130,7 @@ fun MainAppScreen(
                         onBackClick = { selectedTab = AppTab.MY_DAY }
                     )
                 }
-                AppTab.ASK -> AskScreen()
+                AppTab.CHECKIN -> CheckInScreen()
             }
             }
         }
@@ -217,14 +217,13 @@ fun BottomNavBar(
             )
 
             BottomNavItem(
-                label = "Ask",
-                isSelected = selectedTab == AppTab.ASK,
-                onClick = { onTabSelected(AppTab.ASK) },
+                label = "Check-in",
+                isSelected = selectedTab == AppTab.CHECKIN,
+                onClick = { onTabSelected(AppTab.CHECKIN) },
                 icon = { tint ->
-                    AskChatIcon(
+                    CheckInIcon(
                         modifier = Modifier.size(24.dp),
-                        tint = tint,
-                        strokeWidthDp = 1.8.dp
+                        tint = tint
                     )
                 }
             )
