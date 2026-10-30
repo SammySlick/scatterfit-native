@@ -388,7 +388,12 @@ fun MyDayScreen(
     val hasData by SyncHub.records.collectAsState()
 
     LaunchedEffect(Unit) {
-        SyncHub.syncToday()
+        val ageMs = System.currentTimeMillis() - SyncHub.getLastSyncTimestamp()
+        if (ageMs > 5 * 60 * 1000L) {
+            SyncHub.syncToday()
+        } else {
+            Log.d("ScatterFitSync", "MyDay entry: skipping sync, last sync ${ageMs / 1000}s ago")
+        }
     }
 
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
