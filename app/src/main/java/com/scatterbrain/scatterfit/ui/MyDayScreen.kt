@@ -83,6 +83,7 @@ import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
+import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
@@ -98,6 +99,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 @Composable
@@ -110,10 +112,13 @@ fun MyDayScreen(
 ) {
     val scrollState = rememberScrollState()
 
-    val today = remember { todayKey() }
-    var selectedDay by remember { mutableStateOf(today) }
-    val isFutureDay = selectedDay > today
-    val isToday = selectedDay == today
+    val todayKey = remember { todayKey() }
+    val today = remember(todayKey) {
+        runCatching { LocalDate.parse(todayKey) }.getOrDefault(LocalDate.now())
+    }
+    var selectedDay by remember { mutableStateOf(todayKey) }
+    val isFutureDay = selectedDay > todayKey
+    val isToday = selectedDay == todayKey
 
     val context = LocalContext.current
     val foodStorage = remember { FoodStorage(context) }
@@ -223,7 +228,7 @@ fun MyDayScreen(
             foodByDay = foodStorage.getLoggedDays(),
             drinksByDay = drinkStorage.getLoggedDays(),
             weightsByDay = weightStorage.getLoggedDays(),
-            todayKey = today
+            todayKey = todayKey
         )
     }
 
@@ -349,7 +354,7 @@ fun MyDayScreen(
         }
         CalendarSheet(
             selectedDayKey = selectedDay,
-            todayKey = today,
+            todayKey = todayKey,
             loggedDays = allLoggedDays,
             onDaySelected = { selectedDay = it },
             onDismissRequest = { showCalendarSheet = false }
@@ -385,64 +390,56 @@ fun MyDayScreen(
         SyncHub.syncToday()
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // TOP BAR: (Streak chip, My Day title, Calendar + Settings icons)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        DayAnchorBar(selectedDate = selectedDate, today = today)
+        Column(
+            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // LEFT: streak chip — flame icon + "N", SecondaryFill pill, 14sp Bold
-            Box(
+            // TOP BAR: (Streak chip, My Day title, Calendar + Settings icons)
+            Row(
                 modifier = Modifier
-                    .clip(CircleShape)
-                    .background(SecondaryFill)
-                    .border(BorderStroke(1.dp, BorderDefault), CircleShape)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // LEFT: streak chip — flame icon + "N", SecondaryFill pill, 14sp Bold
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(SecondaryFill)
+                        .border(BorderStroke(1.dp, BorderDefault), CircleShape)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    StreakIcon(
-                        modifier = Modifier.size(16.dp),
-                        tint = AccentHot
-                    )
-                    Text(
-                        text = "$streak",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextForeground
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StreakIcon(
+                            modifier = Modifier.size(16.dp),
+                            tint = AccentHot
+                        )
+                        Text(
+                            text = "$streak",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextForeground
+                        )
+                    }
                 }
-            }
 
-            // CENTRE: "My Day" title (or formatted date when viewing a past day)
-            val centerTitle = if (isToday) {
-                "My Day"
-            } else {
-                runCatching {
-                    LocalDate.parse(selectedDay).format(DateTimeFormatter.ofPattern("EEEE d MMM", Locale.US))
-                }.getOrDefault(selectedDay)
-            }
-            Text(
-                text = centerTitle,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextForeground,
-                textAlign = TextAlign.Center
-            )
+                // CENTRE: "My Day" title
+                Text(
+                    text = "My Day",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextForeground,
+                    textAlign = TextAlign.Center
+                )
 
-            // RIGHT: Calendar icon button + Settings gear button (18dp icons in 36dp circular targets, 8dp gap)
+                // RIGHT: Calendar icon button + Settings gear button (18dp icons in 36dp circular targets, 8dp gap)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -499,7 +496,7 @@ fun MyDayScreen(
                     showWeighInDialog = true
                 }
             },
-            onResetToToday = { selectedDay = today },
+            onResetToToday = { selectedDay = todayKey },
             settings = settings,
             consumedKcal = consumedKcal,
             consumedProtein = consumedProtein,
@@ -611,6 +608,57 @@ fun MyDayScreen(
         }
 
         Spacer(modifier = Modifier.height(100.dp))
+        }
+    }
+}
+
+@Composable
+private fun DayAnchorBar(selectedDate: LocalDate, today: LocalDate) {
+    val dayDelta = ChronoUnit.DAYS.between(today, selectedDate).toInt()
+    val formattedDate = selectedDate.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.US))
+    val leftText = if (dayDelta == 0) {
+        "Today · $formattedDate"
+    } else {
+        formattedDate
+    }
+    val leftColor = if (dayDelta == 0) TextMuted else TextForeground
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AppBackground)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = leftText,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = leftColor
+        )
+        if (dayDelta != 0) {
+            val pillText = when {
+                dayDelta == -1 -> "Yesterday"
+                dayDelta < -1 -> "${-dayDelta} days ago"
+                dayDelta == 1 -> "Tomorrow"
+                else -> "In $dayDelta days"
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(SecondaryFill)
+                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = pillText,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextMuted
+                )
+            }
+        }
     }
 }
 
