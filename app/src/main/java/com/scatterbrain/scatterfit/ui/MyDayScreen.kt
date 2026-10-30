@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,6 +61,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,13 +74,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scatterbrain.scatterfit.core.dayAfter
+import com.scatterbrain.scatterfit.core.dayBefore
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.sync.SyncHub
@@ -101,6 +107,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import kotlin.math.abs
 
 @Composable
 fun MyDayScreen(
@@ -396,10 +403,39 @@ fun MyDayScreen(
         }
     }
 
+    val haptic = LocalHapticFeedback.current
+    val swipeThresholdPx = with(LocalDensity.current) { 72.dp.toPx() }
+    var dragTotal by remember { mutableFloatStateOf(0f) }
+
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         DayAnchorBar(selectedDate = selectedDate, today = today)
         Column(
-            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(scrollState),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(scrollState)
+                .pointerInput(selectedDay, todayKey) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragTotal = 0f },
+                        onHorizontalDrag = { _, dragAmount -> dragTotal += dragAmount },
+                        onDragEnd = {
+                            if (abs(dragTotal) >= swipeThresholdPx) {
+                                val next = if (dragTotal < 0f) dayAfter(selectedDay) else dayBefore(selectedDay)
+                                // forward swipe must not pass today
+                                if (next > todayKey) {
+                                    dragTotal = 0f
+                                } else {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    selectedDay = next
+                                    dragTotal = 0f
+                                }
+                            } else {
+                                dragTotal = 0f
+                            }
+                        },
+                        onDragCancel = { dragTotal = 0f }
+                    )
+                },
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // TOP BAR: (Streak chip, My Day title, Calendar + Settings icons)

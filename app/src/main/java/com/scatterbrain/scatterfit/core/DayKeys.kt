@@ -89,6 +89,8 @@ fun weekKeysEndingAt(anchor: String, mode: WeekMode): List<String> {
  *  so a BST/GMT boundary can never skip a day (L audit 2026-10-06, blocker). */
 fun dayBefore(key: String): String = LocalDate.parse(key).minusDays(1).toString()
 
+fun dayAfter(key: String): String = LocalDate.parse(key).plusDays(1).toString()
+
 /** The week before the one containing [anchor] (defaults to today). Anchored so
  *  callers/tests can pin the clock. */
 fun previousWeekKeys(mode: WeekMode, anchor: String? = null, zone: ZoneId = ZoneId.systemDefault()): List<String> {
