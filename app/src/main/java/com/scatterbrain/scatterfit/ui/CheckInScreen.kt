@@ -87,9 +87,10 @@ fun CheckInScreen(
     var weekAnchor by remember { mutableStateOf(todayKey()) }
     var editingRow by remember { mutableStateOf<CheckInRow?>(null) }
 
+    val today = remember { todayKey() }
     val days = remember(weekAnchor) { weekKeysFor(weekAnchor) }
     val weekStart = days.first()
-    val currentWeekStart = remember { weekKeysFor(todayKey()).first() }
+    val currentWeekStart = remember(today) { weekKeysFor(today).first() }
     val isCurrentWeek = weekStart == currentWeekStart
 
     val daily by DailyRepository.daily.collectAsState()
@@ -221,7 +222,7 @@ fun CheckInScreen(
                     color = TextForeground
                 )
                 Text(
-                    text = "$filledCount of $rowCount rows with data",
+                    text = "$filledCount of $rowCount filled",
                     fontSize = 11.sp,
                     color = TextMuted
                 )
@@ -247,10 +248,9 @@ fun CheckInScreen(
         ) {
             Spacer(modifier = Modifier.weight(1f))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val todayStr = todayKey()
                 days.forEach { dayKey ->
                     val date = runCatching { LocalDate.parse(dayKey) }.getOrNull()
                     val letter = when (date?.dayOfWeek) {
@@ -263,32 +263,40 @@ fun CheckInScreen(
                         DayOfWeek.SUNDAY -> "S"
                         else -> ""
                     }
-                    val isToday = dayKey == todayStr
+                    val isToday = dayKey == today
                     Box(
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(22.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = letter,
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             color = if (isToday) AccentTeal else TextMuted,
                             textAlign = TextAlign.Center
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.width(48.dp))
+            Spacer(modifier = Modifier.width(56.dp))
         }
+
+        // (CHANGE 4) HINT LINE
+        Text(
+            text = "Tap a row to enter values",
+            fontSize = 11.sp,
+            color = TextMuted,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
 
         // (3) SECTIONS
         sectionsToRender.forEach { (section, rows) ->
             Text(
                 text = section.name.uppercase(),
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextMuted,
                 letterSpacing = 0.8.sp,
-                modifier = Modifier.padding(top = 12.dp)
+                modifier = Modifier.padding(top = 20.dp)
             )
 
             rows.forEach { displayRow ->
@@ -309,47 +317,82 @@ fun CheckInScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(28.dp)
+                                .height(44.dp)
                                 .clickable { editingRow = row },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = row.label,
-                                fontSize = 13.sp,
+                                fontSize = 15.sp,
                                 color = TextForeground,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 days.forEachIndexed { idx, dayKey ->
-                                    val hasValue = if (row.perDay) {
-                                        checkInRecord.perDay[dayKey]?.get(row.id)?.isNotBlank() == true
+                                    val rawVal = if (row.perDay) {
+                                        checkInRecord.perDay[dayKey]?.get(row.id)
                                     } else {
-                                        idx == 6 && checkInRecord.weekly[row.id]?.isNotBlank() == true
+                                        if (idx == 6) checkInRecord.weekly[row.id] else null
                                     }
+                                    val hasValue = rawVal?.isNotBlank() == true
+                                    val isToday = dayKey == today
+                                    val borderModifier = when {
+                                        isToday -> Modifier.border(1.dp, AccentTeal, RoundedCornerShape(3.dp))
+                                        !hasValue -> Modifier.border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
+                                        else -> Modifier
+                                    }
+
+                                    val cellText = if (hasValue) {
+                                        when (row.scale) {
+                                            CheckInScale.SCALE_1_5 -> rawVal
+                                            CheckInScale.YES_NO -> when (rawVal.lowercase()) {
+                                                "true", "yes", "1" -> "Y"
+                                                "false", "no", "0" -> "N"
+                                                else -> null
+                                            }
+                                            CheckInScale.NUMBER, CheckInScale.TEXT -> null
+                                        }
+                                    } else null
+
                                     Box(
                                         modifier = Modifier
-                                            .size(16.dp)
+                                            .size(22.dp)
                                             .clip(RoundedCornerShape(3.dp))
-                                            .then(
-                                                if (hasValue) {
-                                                    Modifier.background(SecondaryFill)
-                                                } else {
-                                                    Modifier.border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
-                                                }
-                                            )
-                                    )
+                                            .then(if (hasValue) Modifier.background(SecondaryFill) else Modifier)
+                                            .then(borderModifier),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (cellText != null) {
+                                            if (row.scale == CheckInScale.SCALE_1_5) {
+                                                Text(
+                                                    text = cellText,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = TextForeground,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            } else if (row.scale == CheckInScale.YES_NO) {
+                                                Text(
+                                                    text = cellText,
+                                                    fontSize = 10.sp,
+                                                    color = TextMuted,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             Text(
                                 text = avg,
-                                modifier = Modifier.width(48.dp),
+                                modifier = Modifier.width(56.dp),
                                 textAlign = TextAlign.End,
-                                fontSize = 13.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (avg == "—" || avg.isEmpty()) TextMuted else TextForeground
                             )
@@ -367,42 +410,43 @@ fun CheckInScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(28.dp),
+                                .height(44.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = displayRow.label,
-                                fontSize = 13.sp,
+                                fontSize = 15.sp,
                                 color = TextForeground,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
                             )
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 days.forEach { dayKey ->
                                     val hasValue = displayRow.getValue(dayKey) != null
+                                    val isToday = dayKey == today
+                                    val borderModifier = when {
+                                        isToday -> Modifier.border(1.dp, AccentTeal, RoundedCornerShape(3.dp))
+                                        !hasValue -> Modifier.border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
+                                        else -> Modifier
+                                    }
                                     Box(
                                         modifier = Modifier
-                                            .size(16.dp)
+                                            .size(22.dp)
                                             .clip(RoundedCornerShape(3.dp))
-                                            .then(
-                                                if (hasValue) {
-                                                    Modifier.background(SecondaryFill)
-                                                } else {
-                                                    Modifier.border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(3.dp))
-                                                }
-                                            )
+                                            .then(if (hasValue) Modifier.background(SecondaryFill) else Modifier)
+                                            .then(borderModifier)
                                     )
                                 }
                             }
                             Text(
                                 text = avg,
-                                modifier = Modifier.width(48.dp),
+                                modifier = Modifier.width(56.dp),
                                 textAlign = TextAlign.End,
-                                fontSize = 13.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (avg == "—") TextMuted else TextForeground
                             )

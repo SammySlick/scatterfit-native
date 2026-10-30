@@ -570,8 +570,8 @@ private fun DayCardBarRow(
                 val rawSecondary = secondaryFraction.coerceAtLeast(0f)
                 val total = rawPrimary + rawSecondary
                 val scale = if (total > 1f) 1f / total else 1f
-                val primary = rawPrimary * scale
-                val secondary = rawSecondary * scale
+                val primary = if (rawPrimary > 0f) maxOf(rawPrimary * scale, 0.02f) else 0f
+                val secondary = if (rawSecondary > 0f) maxOf(rawSecondary * scale, 0.02f) else 0f
                 val rest = (1f - primary - secondary).coerceAtLeast(0f)
                 if (primary > 0f) Box(Modifier.fillMaxHeight().weight(primary).background(fillColor))
                 if (secondary > 0f) Box(Modifier.fillMaxHeight().weight(secondary).background(secondaryColor))
