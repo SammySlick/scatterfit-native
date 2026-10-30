@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import com.scatterbrain.scatterfit.data.HcPermissions
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.sync.SyncService
+import com.scatterbrain.scatterfit.sync.SyncWorker
 import com.scatterbrain.scatterfit.ui.DebugScreen
 import com.scatterbrain.scatterfit.ui.GoalSetScreen
 import com.scatterbrain.scatterfit.ui.MainAppScreen
@@ -57,7 +58,12 @@ class MainActivity : ComponentActivity() {
                         SyncHub.setStatus("Health Connect: syncing…")
                     }
                     if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
-                        SyncService.start(this@MainActivity)
+                        val ageMs = System.currentTimeMillis() - SyncHub.getLastSyncTimestamp()
+                        if (ageMs > 5 * 60 * 1000L) {
+                            SyncService.start(this@MainActivity)
+                        } else {
+                            Log.d(logTag, "onResume: skipping sync, last sync ${ageMs / 1000}s ago")
+                        }
                     } else {
                         Log.d(logTag, "ensureHcPermissions: activity not resumed (${lifecycle.currentState}), deferring sync")
                     }
@@ -80,6 +86,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SyncHub.init(this, lifecycleScope)
+        SyncWorker.schedule(this)
         com.scatterbrain.scatterfit.data.DailyRepository.start(this, lifecycleScope)
 
         when (HealthConnectClient.getSdkStatus(this)) {

@@ -385,6 +385,7 @@ fun MyDayScreen(
     }
 
     val isSyncing by SyncHub.syncing.collectAsState()
+    val hasData by SyncHub.records.collectAsState()
 
     LaunchedEffect(Unit) {
         SyncHub.syncToday()
@@ -586,7 +587,7 @@ fun MyDayScreen(
         }
 
         // Syncing indicator
-        if (isSyncing) {
+        if (isSyncing && hasData == null) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -605,6 +606,14 @@ fun MyDayScreen(
                     color = TextMuted
                 )
             }
+        } else if (isSyncing) {
+            Text(
+                text = "Updating…",
+                fontSize = 11.sp,
+                color = TextMuted,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                textAlign = TextAlign.Center
+            )
         }
 
         Spacer(modifier = Modifier.height(100.dp))
