@@ -13,13 +13,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -86,7 +87,7 @@ fun computeDayCardTicks(
         return DayCardTicks(completedCount = 0, totalTarget = totalM)
     }
 
-    val calVal = consumedKcal ?: daily?.caloriesEaten?.get(todayKey) ?: 0.0
+    val calVal = (daily?.caloriesEaten?.get(todayKey) ?: 0.0)
     // Ticked if calories in band (or logged within goal)
     val calCompleted = calVal > 0.0 && calVal <= (settings.kcalTarget + settings.tolerances.kcalGreen)
 
@@ -197,7 +198,11 @@ fun DayCard(
 
     // Hero calculations: when nothing eaten, shows kcalTarget (not 0); over goal -> "N kcal over T" (number Bold red StateBad)
     val kcalTarget = effectiveSettings.kcalTarget
-    val kcalEaten = (consumedKcal ?: daily?.caloriesEaten?.get(dayKey) ?: 0.0).roundToInt()
+    val alcoholKcal = daily?.alcoholKcal?.get(dayKey) ?: 0.0
+    val foodKcal = consumedKcal
+        ?: ((daily?.caloriesEaten?.get(dayKey) ?: 0.0) - alcoholKcal).coerceAtLeast(0.0)
+    val totalKcal = foodKcal + alcoholKcal
+    val kcalEaten = totalKcal.roundToInt()
     val isOverGoal = kcalEaten > kcalTarget
     val overKcal = (kcalEaten - kcalTarget).coerceAtLeast(0)
     val remainingKcal = (kcalTarget - kcalEaten).coerceAtLeast(0)
@@ -294,16 +299,26 @@ fun DayCard(
                 // CONTINUOUS METRIC ROWS (Calories, Steps, Protein)
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     // 1. Calories row
-                    val calRaw = consumedKcal ?: daily?.caloriesEaten?.get(dayKey)
-                    val calFraction = if (calRaw != null && kcalTarget > 0) (calRaw.toFloat() / kcalTarget.toFloat()).coerceIn(0f, 1f) else 0f
-                    val calColor = getBarColor(computeCaloriesBarColor(calRaw, kcalTarget, effectiveSettings.tolerances.kcalGreen))
+                    val foodFraction = if (kcalTarget > 0) (foodKcal / kcalTarget).toFloat() else 0f
+                    val alcoholFraction = if (kcalTarget > 0) (alcoholKcal / kcalTarget).toFloat() else 0f
+                    val calColor = getBarColor(computeCaloriesBarColor(totalKcal, kcalTarget,
+                        effectiveSettings.tolerances.kcalGreen))
                     DayCardBarRow(
                         icon = { UtensilsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
                         label = "Calories",
-                        currentText = String.format(Locale.US, "%,d", calRaw?.roundToInt() ?: 0),
+                        currentText = String.format(Locale.US, "%,d", totalKcal.roundToInt()),
                         targetText = "of %,d kcal".format(Locale.US, kcalTarget),
-                        progressFraction = calFraction,
+                        progressFraction = foodFraction,
                         fillColor = calColor,
+                        secondaryFraction = alcoholFraction,
+                        secondaryColor = TextMuted,
+                        breakdownText = if (alcoholKcal > 0.0)
+                            "%s food + %s alcohol".format(
+                                Locale.US,
+                                String.format(Locale.US, "%,d", foodKcal.roundToInt()),
+                                String.format(Locale.US, "%,d", alcoholKcal.roundToInt())
+                            )
+                        else null,
                         onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
                     )
 
@@ -476,6 +491,8 @@ private fun DayCardBarRow(
     targetText: String,
     progressFraction: Float,
     fillColor: Color,
+    secondaryFraction: Float = 0f,
+    secondaryColor: Color = TextMuted,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     breakdownText: String? = null,
@@ -540,7 +557,7 @@ private fun DayCardBarRow(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // 6dp Progress Bar with Track token and minimum 2dp visible fill
+        // 6dp Progress Bar with Track token
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -548,14 +565,18 @@ private fun DayCardBarRow(
                 .clip(CircleShape)
                 .background(Track)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction = progressFraction.coerceIn(0f, 1f))
-                    .widthIn(min = 2.dp)
-                    .height(6.dp)
-                    .clip(CircleShape)
-                    .background(fillColor)
-            )
+            Row(modifier = Modifier.fillMaxSize()) {
+                val rawPrimary = progressFraction.coerceAtLeast(0f)
+                val rawSecondary = secondaryFraction.coerceAtLeast(0f)
+                val total = rawPrimary + rawSecondary
+                val scale = if (total > 1f) 1f / total else 1f
+                val primary = rawPrimary * scale
+                val secondary = rawSecondary * scale
+                val rest = (1f - primary - secondary).coerceAtLeast(0f)
+                if (primary > 0f) Box(Modifier.fillMaxHeight().weight(primary).background(fillColor))
+                if (secondary > 0f) Box(Modifier.fillMaxHeight().weight(secondary).background(secondaryColor))
+                if (rest > 0f) Box(Modifier.fillMaxHeight().weight(rest))
+            }
         }
 
         if (breakdownText != null) {
