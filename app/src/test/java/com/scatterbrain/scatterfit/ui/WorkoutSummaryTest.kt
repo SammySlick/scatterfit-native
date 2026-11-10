@@ -244,4 +244,23 @@ class WorkoutSummaryTest {
         val dur2 = (elapsedSec2 / 60L).toInt().coerceAtLeast(1)
         assertEquals(1, dur2)
     }
+
+    @Test
+    fun `PB detail line puts the weight and the context on one short line`() {
+        assertEquals(
+            "17.5 kg · first time logged",
+            pbDetailLine(PersonalBest("Single Arm Triceps Pushdown (Cable)", 17.5, null))
+        )
+        assertEquals(
+            "22.5 kg · was 20 kg",
+            pbDetailLine(PersonalBest("Preacher Curl (Machine)", 22.5, 20.0))
+        )
+    }
+
+    @Test
+    fun `whole-number weights never print a decimal`() {
+        assertEquals("15 kg", formatKg(15.0))
+        assertEquals("15.5 kg", formatKg(15.5))
+        assertEquals("100 kg", formatKg(100.0))
+    }
 }

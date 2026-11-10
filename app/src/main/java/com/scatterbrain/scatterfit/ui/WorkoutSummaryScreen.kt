@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
@@ -141,6 +143,20 @@ fun calculateAverageDifficulty(session: SessionRecord): String? {
         "hard" -> "HARD"
         else -> mode.uppercase()
     }
+}
+
+
+/** "17.5 kg · first time logged" — one line of detail under the exercise name. */
+fun pbDetailLine(pb: PersonalBest): String {
+    val weight = formatKg(pb.newMaxWeightKg)
+    val context = pb.previousMaxWeightKg?.let { "was ${formatKg(it)}" } ?: "first time logged"
+    return "$weight · $context"
+}
+
+/** 22.5 stays 22.5; 22.0 prints as "22 kg", never "22.0 kg". */
+fun formatKg(kg: Double): String {
+    val value = if (kg % 1.0 == 0.0) kg.toInt().toString() else kg.toString()
+    return "$value kg"
 }
 
 @Composable
@@ -356,14 +372,6 @@ fun WorkoutSummaryScreen(
 
                 if (pbs.isNotEmpty()) {
                     pbs.forEach { pb ->
-                        val weightStr = if (pb.newMaxWeightKg % 1.0 == 0.0) "${pb.newMaxWeightKg.toInt()} kg" else "${pb.newMaxWeightKg} kg"
-                        val prevStr = if (pb.previousMaxWeightKg != null) {
-                            val pw = if (pb.previousMaxWeightKg % 1.0 == 0.0) "${pb.previousMaxWeightKg.toInt()} kg" else "${pb.previousMaxWeightKg} kg"
-                            "was $pw"
-                        } else {
-                            "first time logged"
-                        }
-
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
@@ -374,22 +382,32 @@ fun WorkoutSummaryScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                // The name gets a weight so the badge keeps its own width and
+                                // the title wraps at word boundaries instead of stealing the
+                                // row. Without this, a long dumbbell name squeezed "NEW PB"
+                                // into a three-line sliver at the card edge.
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
                                     Text(
-                                        text = "${pb.exerciseName} — $weightStr",
+                                        text = pb.exerciseName,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = TextForeground
+                                        color = TextForeground,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = prevStr,
+                                        text = pbDetailLine(pb),
                                         fontSize = 11.sp,
                                         color = TextMuted
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.width(10.dp))
 
                                 Box(
                                     modifier = Modifier
@@ -403,7 +421,9 @@ fun WorkoutSummaryScreen(
                                         text = "NEW PB",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = TealHighlight
+                                        color = TealHighlight,
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
