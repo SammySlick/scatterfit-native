@@ -103,6 +103,10 @@ fun TrainingScreen(
     val loggedStorage = remember { LoggedSessionsStorage(context) }
     val proposalsStorage = remember { WorkoutProposalsStorage(context) }
 
+    // The on-disk copy of a workout in progress. Survives the process being reclaimed.
+    val draftStorage = remember { ActiveSessionStorage(context) }
+    var activeDraft by remember { mutableStateOf(draftStorage.load()) }
+
     var routines by remember { mutableStateOf(storage.loadRoutines()) }
     var plannedSessions by remember { mutableStateOf(plannedStorage.load()) }
     var loggedSessions by remember { mutableStateOf(loggedStorage.loadAll()) }
@@ -110,6 +114,7 @@ fun TrainingScreen(
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         proposals = proposalsStorage.load().filterNot { it.dismissed }
+        activeDraft = draftStorage.load()
     }
 
     var activeTab by remember { mutableStateOf(TrainingTab.PLAN) }
@@ -124,6 +129,8 @@ fun TrainingScreen(
     var activePlayingDayKey by remember { mutableStateOf(todayKey()) }
     var sessionConfirmationMessage by remember { mutableStateOf<String?>(null) }
 
+    var activePlayingDraft by remember { mutableStateOf<ActiveSessionDraft?>(null) }
+
     LaunchedEffect(sessionConfirmationMessage) {
         if (sessionConfirmationMessage != null) {
             delay(3000L)
@@ -131,22 +138,28 @@ fun TrainingScreen(
         }
     }
 
-    if (activePlayingRoutine != null || activePlayingSessionName != null) {
+    if (activePlayingRoutine != null || activePlayingSessionName != null || activePlayingDraft != null) {
         SessionPlayerScreen(
             routine = activePlayingRoutine,
             sessionName = activePlayingSessionName,
             dayKey = activePlayingDayKey,
             sessionRecordsStorage = sessionRecordsStorage,
             loggedSessionsStorage = loggedStorage,
+            draftStorage = draftStorage,
+            initialDraft = activePlayingDraft,
             onFinish = { record ->
                 activePlayingRoutine = null
                 activePlayingSessionName = null
+                activePlayingDraft = null
+                activeDraft = draftStorage.load()
                 loggedSessions = loggedStorage.loadAll()
                 sessionConfirmationMessage = "Session logged!"
             },
             onAbandon = {
                 activePlayingRoutine = null
                 activePlayingSessionName = null
+                activePlayingDraft = null
+                activeDraft = draftStorage.load()
             }
         )
         return
@@ -223,6 +236,25 @@ fun TrainingScreen(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextForeground
+                )
+            }
+
+            // A workout survives the phone sleeping: the draft waits here until resumed or
+            // discarded. Sits above the tabs so it's visible from either one.
+            val draftToResume = activeDraft
+            if (draftToResume != null) {
+                ResumeSessionCard(
+                    draft = draftToResume,
+                    onResume = {
+                        activePlayingDraft = draftToResume
+                        activePlayingRoutine = draftToResume.routineId?.let { id -> routines.find { it.id == id } }
+                        activePlayingSessionName = draftToResume.sessionName
+                        activePlayingDayKey = draftToResume.dayKey
+                    },
+                    onDiscard = {
+                        draftStorage.clear()
+                        activeDraft = null
+                    }
                 )
             }
 
@@ -1390,6 +1422,78 @@ private fun DetectedSessionRow(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
+            }
+        }
+    }
+}
+
+/**
+ * The resume prompt for a session that outlived its process. Shows what was actually
+ * done before the app was killed, so resuming is an informed choice rather than a leap.
+ */
+@Composable
+private fun ResumeSessionCard(
+    draft: ActiveSessionDraft,
+    onResume: () -> Unit,
+    onDiscard: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val now = remember(draft.updatedAt) { System.currentTimeMillis() }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+        border = BorderStroke(1.dp, TealHighlight)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "SESSION IN PROGRESS",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TealHighlight
+                )
+                TextButton(onClick = onDiscard) {
+                    Text("Discard", color = TextMuted, fontSize = 11.sp)
+                }
+            }
+
+            Text(
+                text = draft.title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextForeground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = draftProgressLabel(draft, now),
+                fontSize = 12.sp,
+                color = TextMuted
+            )
+
+            Button(
+                onClick = onResume,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Resume workout", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
     }

@@ -60,6 +60,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
@@ -83,16 +85,31 @@ data class RestTimerState(
     val remainingSeconds: Int = 0,
     val isRunning: Boolean = false,
     val isExpired: Boolean = false,
+    /**
+     * Wall-clock deadline. The countdown is derived from this, not from ticks, so a
+     * screen-off, a doze window or a frozen process can't leave the timer wrong on
+     * return — it re-derives from the clock and is either further along or done.
+     */
+    val endsAtMillis: Long? = null,
 )
 
-fun startRestTimer(seconds: Int): RestTimerState {
+fun startRestTimer(seconds: Int, nowMillis: Long = System.currentTimeMillis()): RestTimerState {
     if (seconds <= 0) return RestTimerState()
     return RestTimerState(
         totalSeconds = seconds,
         remainingSeconds = seconds,
         isRunning = true,
-        isExpired = false
+        isExpired = false,
+        endsAtMillis = nowMillis + seconds * 1000L,
     )
+}
+
+/** Seconds left on a deadline, rounded up so the last sub-second still reads "00:01". */
+fun restRemainingSeconds(endsAtMillis: Long?, nowMillis: Long): Int {
+    if (endsAtMillis == null) return 0
+    val remainMs = endsAtMillis - nowMillis
+    if (remainMs <= 0L) return 0
+    return ((remainMs + 999L) / 1000L).toInt()
 }
 
 fun tickRestTimer(current: RestTimerState): RestTimerState {
@@ -145,6 +162,10 @@ fun SessionPlayerScreen(
     onFinish: (SessionRecord) -> Unit,
     onAbandon: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Where the in-progress copy is mirrored. Null keeps the old memory-only behaviour. */
+    draftStorage: ActiveSessionStorage? = null,
+    /** A session read back from disk — its entered values win over the routine's targets. */
+    initialDraft: ActiveSessionDraft? = null,
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -158,9 +179,13 @@ fun SessionPlayerScreen(
         }
     }
 
-    val workoutTitle = routine?.name ?: sessionName ?: "Workout"
-    val startedAt = remember { System.currentTimeMillis() }
-    var elapsedSeconds by remember { mutableLongStateOf(0L) }
+    val workoutTitle = initialDraft?.title ?: routine?.name ?: sessionName ?: "Workout"
+    val draftId = remember(initialDraft?.id) { initialDraft?.id ?: UUID.randomUUID().toString() }
+    val startedAt = remember(initialDraft?.id) { initialDraft?.startedAt ?: System.currentTimeMillis() }
+    // Resuming a session started 40 minutes ago: the clock carries on from the real start.
+    var elapsedSeconds by remember(initialDraft?.id) {
+        mutableLongStateOf(((System.currentTimeMillis() - startedAt) / 1000L).coerceAtLeast(0L))
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -169,9 +194,30 @@ fun SessionPlayerScreen(
         }
     }
 
-    // Convert planned exercises and sets to mutable player states
-    val exerciseStates = remember(routine) {
-        if (routine != null) {
+    // Convert planned exercises and sets to mutable player states. A resumed draft wins
+    // over the routine, because it holds what was actually entered rather than targets.
+    val exerciseStates = remember(initialDraft?.id, routine?.id) {
+        if (initialDraft != null && initialDraft.exercises.isNotEmpty()) {
+            initialDraft.exercises.map { ex ->
+                PlayerExerciseState(
+                    exerciseId = ex.exerciseId,
+                    exerciseName = ex.exerciseName,
+                    restSeconds = ex.restSeconds,
+                    isTimed = ex.isTimed,
+                    sets = ex.sets.mapIndexed { idx, s ->
+                        PlayerSetState(
+                            setIndex = idx,
+                            initialWeightKg = s.weightKg,
+                            initialRepsMin = s.repsMin,
+                            initialRepsMax = s.repsMax,
+                            initialTimeSeconds = s.timeSeconds,
+                            initialTimeUnit = s.timeUnit,
+                            initialDifficulty = s.difficulty,
+                        )
+                    }
+                )
+            }
+        } else if (routine != null) {
             routine.exercises.map { ex ->
                 PlayerExerciseState(
                     exerciseId = ex.exerciseId,
@@ -207,47 +253,129 @@ fun SessionPlayerScreen(
         }
     }
 
-    // Rest timer state
-    var restTimer by remember { mutableStateOf(RestTimerState()) }
+    // Rest timer state. A resumed draft's still-live rest is restored too, so locking
+    // the phone mid-rest doesn't lose the countdown or restart it.
+    var restTimer by remember(initialDraft?.id) {
+        val endsAt = initialDraft?.restEndsAt
+        val total = initialDraft?.restTotalSeconds ?: 0
+        val remaining = restRemainingSeconds(endsAt, System.currentTimeMillis())
+        mutableStateOf(
+            if (endsAt != null && total > 0 && remaining > 0) {
+                RestTimerState(total, remaining, isRunning = true, isExpired = false, endsAtMillis = endsAt)
+            } else {
+                RestTimerState()
+            }
+        )
+    }
     var restDoneBannerVisible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(restTimer.isRunning) {
-        if (restTimer.isRunning) {
-            while (restTimer.isRunning && restTimer.remainingSeconds > 0) {
-                delay(1000L)
-                restTimer = tickRestTimer(restTimer)
-            }
-            if (restTimer.isExpired) {
-                // Vibrate once on rest done
-                try {
-                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                    if (vibrator != null && vibrator.hasVibrator()) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
-                        } else {
-                            @Suppress("DEPRECATION")
-                            vibrator.vibrate(300L)
-                        }
-                    }
-                } catch (_: Exception) {}
+    // Countdown derived from the deadline on every tick: correct after a lock, a doze
+    // window or a frozen process, where a decrementing counter would drift or stall.
+    LaunchedEffect(restTimer.endsAtMillis) {
+        val endsAt = restTimer.endsAtMillis ?: return@LaunchedEffect
+        while (true) {
+            val remaining = restRemainingSeconds(endsAt, System.currentTimeMillis())
+            restTimer = restTimer.copy(
+                remainingSeconds = remaining,
+                isRunning = remaining > 0,
+                isExpired = remaining <= 0,
+            )
+            if (remaining <= 0) break
+            delay(250L)
+        }
+    }
 
-                restDoneBannerVisible = true
-                delay(3000L)
-                restDoneBannerVisible = false
-                restTimer = RestTimerState()
-            }
+    // Rest-done side effects, once per expiry.
+    LaunchedEffect(restTimer.isExpired) {
+        if (restTimer.isExpired) {
+            try {
+                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator.vibrate(300L)
+                    }
+                }
+            } catch (_: Exception) {}
+
+            restDoneBannerVisible = true
+            delay(3000L)
+            restDoneBannerVisible = false
+            restTimer = RestTimerState()
         }
     }
 
     var showAbandonConfirm by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
+    // Abandoning is deliberate, so the draft goes with it rather than lurking to be resumed.
+    fun abandonSession() {
+        draftStorage?.clear()
+        onAbandon()
+    }
+
     BackHandler {
-        if (!showAbandonConfirm) showAbandonConfirm = true else onAbandon()
+        if (!showAbandonConfirm) showAbandonConfirm = true else abandonSession()
     }
 
     val previousHistory = remember { sessionRecordsStorage.loadAll() }
     var finishedSessionRecord by remember { mutableStateOf<SessionRecord?>(null) }
+
+    // The draft mirror. Written every couple of seconds and again whenever the app leaves
+    // the foreground, so a process kill costs at most the last couple of taps.
+    fun snapshotDraft(): ActiveSessionDraft = ActiveSessionDraft(
+        id = draftId,
+        dayKey = dayKey,
+        routineId = routine?.id ?: initialDraft?.routineId,
+        routineName = routine?.name ?: initialDraft?.routineName,
+        sessionName = sessionName ?: initialDraft?.sessionName,
+        startedAt = startedAt,
+        updatedAt = System.currentTimeMillis(),
+        exercises = exerciseStates.map { ex ->
+            DraftExerciseState(
+                exerciseId = ex.exerciseId,
+                exerciseName = ex.exerciseName,
+                restSeconds = ex.restSeconds,
+                isTimed = ex.isTimed,
+                sets = ex.sets.map { s ->
+                    DraftSetState(
+                        weightKg = s.weightKg,
+                        repsMin = s.repsMin,
+                        repsMax = s.repsMax,
+                        timeSeconds = s.timeSeconds,
+                        timeUnit = s.timeUnit,
+                        difficulty = s.difficulty,
+                        done = s.isDone,
+                    )
+                }
+            )
+        },
+        restTotalSeconds = restTimer.totalSeconds,
+        restEndsAt = restTimer.endsAtMillis,
+    )
+
+    /** Skips a session where nothing has been entered yet, so opening the player and
+     *  leaving straight away doesn't leave a "resume" prompt behind. */
+    fun persistDraft() {
+        val storage = draftStorage ?: return
+        val draft = snapshotDraft()
+        if (!isDraftUntouched(draft)) storage.save(draft)
+    }
+
+    LaunchedEffect(draftId) {
+        if (draftStorage == null) return@LaunchedEffect
+        while (true) {
+            delay(2000L)
+            if (finishedSessionRecord == null) persistDraft()
+        }
+    }
+
+    // ON_STOP is the last guaranteed moment before Android may freeze or kill us.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        if (finishedSessionRecord == null) persistDraft()
+    }
 
     if (finishedSessionRecord != null) {
         WorkoutSummaryScreen(
@@ -304,7 +432,7 @@ fun SessionPlayerScreen(
                                 val durationMins = (elapsedSeconds / 60L).toInt().coerceAtLeast(1)
                                 val finishedRecord = SessionRecord(
                                     dayKey = dayKey,
-                                    routineId = routine?.id,
+                                    routineId = routine?.id ?: initialDraft?.routineId,
                                     name = workoutTitle,
                                     durationMinutes = durationMins,
                                     startedAt = startedAt,
@@ -331,6 +459,8 @@ fun SessionPlayerScreen(
                                     LoggedSession(dayKey = dayKey, name = workoutTitle, durationMinutes = durationMins)
                                 )
                                 DailyRepository.notifySessionRecorded(finishedRecord)
+                                // The session is now a real record; the draft must not linger.
+                                draftStorage?.clear()
                                 finishedSessionRecord = finishedRecord
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = TealHighlight, contentColor = Color.Black),
@@ -356,7 +486,7 @@ fun SessionPlayerScreen(
                             TextButton(onClick = { showAbandonConfirm = false }) {
                                 Text("No", color = TextMuted)
                             }
-                            TextButton(onClick = onAbandon) {
+                            TextButton(onClick = { abandonSession() }) {
                                 Text("Yes, abandon", color = StateBad, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -384,6 +514,7 @@ fun SessionPlayerScreen(
                             onSetDone = { set ->
                                 set.isDone = true
                                 if (exState.restSeconds > 0) {
+                                    restDoneBannerVisible = false
                                     restTimer = startRestTimer(exState.restSeconds)
                                 }
                             }
