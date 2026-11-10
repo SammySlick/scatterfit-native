@@ -220,12 +220,15 @@ class ActiveSessionStorageTest {
         val reloaded = storage.load()
         assertNotNull(reloaded)
         assertEquals(2, reloaded!!.exercises.size)
-        assertEquals(3, reloaded.exercises[0].sets.size)
+        // Upper A's bench sets, plus the one added mid-session.
+        assertEquals(withAdditions.exercises[0].sets.size, reloaded.exercises[0].sets.size)
+        assertEquals(4, reloaded.exercises[0].sets.size)
         assertEquals("cable-fly", reloaded.exercises[1].exerciseId)
         assertEquals(3, reloaded.exercises[1].sets.size)
         assertEquals(ADDED_EXERCISE_REST_SECONDS, reloaded.exercises[1].restSeconds)
-        // 2 ticked on bench + the new bench set + 3 new unticked sets.
-        assertEquals(6, reloaded.totalSets)
+        // Whatever was ticked before the kill is still ticked, and the additions are not.
+        assertEquals(withAdditions.doneSets, reloaded.doneSets)
+        assertEquals(withAdditions.totalSets, reloaded.totalSets)
         assertEquals(2, reloaded.doneSets)
     }
 
