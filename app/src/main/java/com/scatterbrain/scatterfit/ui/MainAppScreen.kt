@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +55,10 @@ fun MainAppScreen(
     val foodStorage = remember { FoodStorage(context) }
     val savedFoodStore = remember { SavedFoodStore(context) }
     val settingsStorage = remember { SettingsStorage(context) }
+
+    // Ships with routines imported from Sam's Hevy account; runs once per install.
+    LaunchedEffect(Unit) { StarterRoutines.seedIfNeeded(context, RoutineStorage(context)) }
+
     val foodViewModel = remember {
         FoodTrackerViewModel(
             storage = foodStorage,
