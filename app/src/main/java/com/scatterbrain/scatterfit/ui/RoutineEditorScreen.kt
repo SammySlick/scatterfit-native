@@ -1230,7 +1230,7 @@ fun RoutineSummaryCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ExercisePickerSheet(
+internal fun ExercisePickerSheet(
     library: List<ExerciseRef>,
     onExerciseSelected: (ExerciseRef) -> Unit,
     onDismissRequest: () -> Unit,

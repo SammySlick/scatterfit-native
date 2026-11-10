@@ -80,6 +80,26 @@ fun isDraftUntouched(draft: ActiveSessionDraft): Boolean = draft.exercises.all {
     ex.sets.none { it.done || it.weightKg != null || it.difficulty != null }
 }
 
+/**
+ * A set added mid-workout, seeded from the set before it.
+ *
+ * The load and the rep/time target carry over, because adding a set almost always means
+ * "another one like that". The tick and the difficulty rating do not: nothing has been
+ * performed yet.
+ */
+fun DraftSetState.asAddedSet(): DraftSetState = copy(
+    difficulty = null,
+    done = false,
+)
+
+/** Rest used for an exercise added mid-workout when nothing better is known. */
+const val ADDED_EXERCISE_REST_SECONDS: Int = 90
+
+/** Sets a brand-new (mid-workout) exercise starts with: three working sets of 8-12. */
+fun defaultSetsForAddedExercise(): List<DraftSetState> = List(3) {
+    DraftSetState(repsMin = 8, repsMax = 12)
+}
+
 class ActiveSessionStorage(
     private val prefsProvider: () -> String?,
     private val prefsWriter: (String) -> Unit,
@@ -120,6 +140,9 @@ class ActiveSessionStorage(
     }
 
     fun hasDraft(): Boolean = load() != null
+
+    /** True once a draft exists that isn't empty — the state the Training tab cares about. */
+    fun hasResumableDraft(): Boolean = load()?.let { !isDraftUntouched(it) } == true
 
     companion object {
         private const val KEY = "training_active_session_draft"

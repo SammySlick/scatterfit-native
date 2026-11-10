@@ -40,12 +40,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +76,7 @@ import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.StateBad
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
+import kotlinx.coroutines.launch
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextFaint
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
@@ -149,8 +153,49 @@ class PlayerExerciseState(
     val exerciseName: String,
     val restSeconds: Int,
     val isTimed: Boolean,
-    val sets: List<PlayerSetState>,
+    // A snapshot list: sets get added and removed mid-session, and the card must recompose.
+    val sets: MutableList<PlayerSetState>,
 )
+
+/** Builds the live player state for a planned/drafted set. */
+private fun playerSetFrom(
+    setIndex: Int,
+    weightKg: Double?,
+    repsMin: Int?,
+    repsMax: Int?,
+    timeSeconds: Int?,
+    timeUnit: String,
+    difficulty: String?,
+): PlayerSetState = PlayerSetState(
+    setIndex = setIndex,
+    initialWeightKg = weightKg,
+    initialRepsMin = repsMin,
+    initialRepsMax = repsMax,
+    initialTimeSeconds = timeSeconds,
+    initialTimeUnit = timeUnit,
+    initialDifficulty = difficulty,
+)
+
+/** A set added mid-exercise: the previous set's load and target, nothing ticked. */
+fun PlayerSetState.asAddedPlayerSet(setIndex: Int): PlayerSetState {
+    val seed = DraftSetState(
+        weightKg = weightKg,
+        repsMin = repsMin,
+        repsMax = repsMax,
+        timeSeconds = timeSeconds,
+        timeUnit = timeUnit,
+        difficulty = difficulty,
+    ).asAddedSet()
+    return playerSetFrom(
+        setIndex = setIndex,
+        weightKg = seed.weightKg,
+        repsMin = seed.repsMin,
+        repsMax = seed.repsMax,
+        timeSeconds = seed.timeSeconds,
+        timeUnit = seed.timeUnit,
+        difficulty = seed.difficulty,
+    )
+}
 
 @Composable
 fun SessionPlayerScreen(
@@ -196,61 +241,117 @@ fun SessionPlayerScreen(
 
     // Convert planned exercises and sets to mutable player states. A resumed draft wins
     // over the routine, because it holds what was actually entered rather than targets.
+    // A snapshot list so exercises can be added mid-session and the UI follows.
     val exerciseStates = remember(initialDraft?.id, routine?.id) {
-        if (initialDraft != null && initialDraft.exercises.isNotEmpty()) {
-            initialDraft.exercises.map { ex ->
-                PlayerExerciseState(
-                    exerciseId = ex.exerciseId,
-                    exerciseName = ex.exerciseName,
-                    restSeconds = ex.restSeconds,
-                    isTimed = ex.isTimed,
-                    sets = ex.sets.mapIndexed { idx, s ->
-                        PlayerSetState(
-                            setIndex = idx,
-                            initialWeightKg = s.weightKg,
-                            initialRepsMin = s.repsMin,
-                            initialRepsMax = s.repsMax,
-                            initialTimeSeconds = s.timeSeconds,
-                            initialTimeUnit = s.timeUnit,
-                            initialDifficulty = s.difficulty,
-                        )
-                    }
-                )
-            }
-        } else if (routine != null) {
-            routine.exercises.map { ex ->
-                PlayerExerciseState(
-                    exerciseId = ex.exerciseId,
-                    exerciseName = ex.displayName,
-                    restSeconds = ex.restSeconds,
-                    isTimed = ex.isTimed,
-                    sets = ex.sets.mapIndexed { idx, s ->
-                        PlayerSetState(
-                            setIndex = idx,
-                            initialWeightKg = s.weightKg,
-                            initialRepsMin = s.repsMin,
-                            initialRepsMax = s.repsMax,
-                            initialTimeSeconds = s.timeSeconds,
-                            initialTimeUnit = s.timeUnit,
-                            initialDifficulty = null
-                        )
-                    }
-                )
-            }
-        } else {
+        when {
+            initialDraft != null && initialDraft.exercises.isNotEmpty() ->
+                initialDraft.exercises.map { ex ->
+                    PlayerExerciseState(
+                        exerciseId = ex.exerciseId,
+                        exerciseName = ex.exerciseName,
+                        restSeconds = ex.restSeconds,
+                        isTimed = ex.isTimed,
+                        sets = ex.sets.mapIndexed { idx, s ->
+                            playerSetFrom(
+                                setIndex = idx,
+                                weightKg = s.weightKg,
+                                repsMin = s.repsMin,
+                                repsMax = s.repsMax,
+                                timeSeconds = s.timeSeconds,
+                                timeUnit = s.timeUnit,
+                                difficulty = s.difficulty,
+                            ).also { it.isDone = s.done }
+                        }.toMutableStateList()
+                    )
+                }.toMutableStateList()
+
+            routine != null ->
+                routine.exercises.map { ex ->
+                    PlayerExerciseState(
+                        exerciseId = ex.exerciseId,
+                        exerciseName = ex.displayName,
+                        restSeconds = ex.restSeconds,
+                        isTimed = ex.isTimed,
+                        sets = ex.sets.mapIndexed { idx, s ->
+                            playerSetFrom(
+                                setIndex = idx,
+                                weightKg = s.weightKg,
+                                repsMin = s.repsMin,
+                                repsMax = s.repsMax,
+                                timeSeconds = s.timeSeconds,
+                                timeUnit = s.timeUnit,
+                                difficulty = null,
+                            )
+                        }.toMutableStateList()
+                    )
+                }.toMutableStateList()
+
             // Standalone session: single exercise wrapper
-            listOf(
+            else -> mutableStateListOf(
                 PlayerExerciseState(
                     exerciseId = "standalone-${UUID.randomUUID()}",
                     exerciseName = workoutTitle,
                     restSeconds = 0,
                     isTimed = false,
-                    sets = listOf(
-                        PlayerSetState(0, null, null, null, null, "sec", null)
+                    sets = mutableStateListOf(
+                        playerSetFrom(0, null, null, null, null, "sec", null)
                     )
                 )
             )
         }
+    }
+
+    // Mid-session additions: a set to an exercise, an exercise to the session, and the
+    // ability to take either back off after a mis-tap.
+    var showExercisePicker by remember { mutableStateOf(false) }
+    val exerciseLibrary = remember { ExerciseLibrary.load(context) }
+    val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+
+    // Set when a set or exercise is added or removed: a change of shape worth keeping
+    // even if no weight has been entered yet.
+    var hasStructuralEdit by remember { mutableStateOf(false) }
+
+    fun addSet(exState: PlayerExerciseState) {
+        val seed = exState.sets.lastOrNull()?.asAddedPlayerSet(exState.sets.size)
+            ?: playerSetFrom(0, null, null, null, null, "sec", null)
+        exState.sets.add(seed)
+        hasStructuralEdit = true
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    fun removeLastSet(exState: PlayerExerciseState) {
+        if (exState.sets.size > 1) {
+            exState.sets.removeAt(exState.sets.lastIndex)
+            hasStructuralEdit = true
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+
+    fun addExercise(ref: ExerciseRef) {
+        exerciseStates.add(
+            PlayerExerciseState(
+                exerciseId = ref.id,
+                exerciseName = ref.name,
+                restSeconds = ADDED_EXERCISE_REST_SECONDS,
+                isTimed = false,
+                sets = defaultSetsForAddedExercise().mapIndexed { idx, s ->
+                    playerSetFrom(
+                        setIndex = idx,
+                        weightKg = s.weightKg,
+                        repsMin = s.repsMin,
+                        repsMax = s.repsMax,
+                        timeSeconds = s.timeSeconds,
+                        timeUnit = s.timeUnit,
+                        difficulty = s.difficulty,
+                    )
+                }.toMutableStateList()
+            )
+        )
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        hasStructuralEdit = true
+        // The new exercise lands at the bottom: follow it so it isn't added invisibly.
+        scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
     }
 
     // Rest timer state. A resumed draft's still-live rest is restored too, so locking
@@ -308,7 +409,6 @@ fun SessionPlayerScreen(
     }
 
     var showAbandonConfirm by remember { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
 
     // Abandoning is deliberate, so the draft goes with it rather than lurking to be resumed.
     fun abandonSession() {
@@ -361,7 +461,10 @@ fun SessionPlayerScreen(
     fun persistDraft() {
         val storage = draftStorage ?: return
         val draft = snapshotDraft()
-        if (!isDraftUntouched(draft)) storage.save(draft)
+        // A structural edit (set or exercise added/removed) enters no values, so it would
+        // read as "untouched" and be discarded. Adding four exercises before a phone call
+        // is exactly the work that must survive, so it forces the save.
+        if (!isDraftUntouched(draft) || hasStructuralEdit) storage.save(draft)
     }
 
     LaunchedEffect(draftId) {
@@ -503,21 +606,46 @@ fun SessionPlayerScreen(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     exerciseStates.forEach { exState ->
-                        val previousExercise = remember(exState.exerciseId) {
-                            sessionRecordsStorage.latestForExercise(exState.exerciseId)
-                        }
-
-                        PlayerExerciseCard(
-                            exerciseState = exState,
-                            previousExercise = previousExercise,
-                            restTimer = restTimer,
-                            onSetDone = { set ->
-                                set.isDone = true
-                                if (exState.restSeconds > 0) {
-                                    restDoneBannerVisible = false
-                                    restTimer = startRestTimer(exState.restSeconds)
-                                }
+                        key(exState) {
+                            val previousExercise = remember(exState.exerciseId) {
+                                sessionRecordsStorage.latestForExercise(exState.exerciseId)
                             }
+
+                            PlayerExerciseCard(
+                                exerciseState = exState,
+                                previousExercise = previousExercise,
+                                restTimer = restTimer,
+                                onSetDone = { set ->
+                                    set.isDone = true
+                                    if (exState.restSeconds > 0) {
+                                        restDoneBannerVisible = false
+                                        restTimer = startRestTimer(exState.restSeconds)
+                                    }
+                                },
+                                onAddSet = { addSet(exState) },
+                                onRemoveLastSet = { removeLastSet(exState) },
+                                onRemoveExercise = { exerciseStates.remove(exState); hasStructuralEdit = true },
+                                // A session needs at least one exercise to be finisheable.
+                                canRemove = exerciseStates.size > 1,
+                            )
+                        }
+                    }
+
+                    // Adding mid-workout: the plan said 3 sets of leg press, your legs said 4.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                            .clickable { showExercisePicker = true }
+                            .padding(vertical = 13.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "+  Add exercise",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TealHighlight
                         )
                     }
 
@@ -546,6 +674,19 @@ fun SessionPlayerScreen(
             }
         }
     }
+
+    // Mid-session picker. Same sheet the routine editor uses, so the library and the
+    // custom-exercise escape hatch behave identically in both places.
+    if (showExercisePicker) {
+        ExercisePickerSheet(
+            library = exerciseLibrary,
+            onExerciseSelected = { ref ->
+                addExercise(ref)
+                showExercisePicker = false
+            },
+            onDismissRequest = { showExercisePicker = false }
+        )
+    }
 }
 
 @Composable
@@ -554,6 +695,10 @@ private fun PlayerExerciseCard(
     previousExercise: LoggedExerciseInSession?,
     restTimer: RestTimerState,
     onSetDone: (PlayerSetState) -> Unit,
+    onAddSet: () -> Unit,
+    onRemoveLastSet: () -> Unit,
+    onRemoveExercise: () -> Unit,
+    canRemove: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -851,6 +996,49 @@ private fun PlayerExerciseCard(
                         ) {
                             Text("✓", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (set.isDone) Color.Black else TextMuted.copy(alpha = 0.35f))
                         }
+                    }
+                }
+            }
+
+            // Footer: add a set, take one back off, or drop the whole exercise.
+            // Removing needs a second tap because the first one is easy to hit by accident
+            // mid-set, and there is no undo for a card of entered numbers.
+            var confirmRemoveExercise by remember { mutableStateOf(false) }
+            LaunchedEffect(confirmRemoveExercise) {
+                if (confirmRemoveExercise) {
+                    delay(4000L)
+                    confirmRemoveExercise = false
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                TextButton(onClick = onAddSet) {
+                    Text("+ Set", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TealHighlight)
+                }
+                if (exerciseState.sets.size > 1) {
+                    TextButton(onClick = onRemoveLastSet) {
+                        Text("− Set", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextMuted)
+                    }
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                if (canRemove) {
+                    TextButton(
+                        onClick = {
+                            if (confirmRemoveExercise) onRemoveExercise() else confirmRemoveExercise = true
+                        }
+                    ) {
+                        Text(
+                            text = if (confirmRemoveExercise) "Remove?" else "Remove",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (confirmRemoveExercise) StateBad else TextFaint
+                        )
                     }
                 }
             }

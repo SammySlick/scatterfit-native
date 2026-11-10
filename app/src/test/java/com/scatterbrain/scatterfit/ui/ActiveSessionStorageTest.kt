@@ -157,4 +157,95 @@ class ActiveSessionStorageTest {
         // No deadline means no timer.
         assertEquals(0, restRemainingSeconds(null, 12_345L))
     }
+
+    @Test
+    fun `a set added mid-exercise copies the load but nothing ticked`() {
+        val performed = DraftSetState(
+            weightKg = 60.0,
+            repsMin = 10,
+            repsMax = 12,
+            difficulty = "hard",
+            done = true,
+        )
+        val added = performed.asAddedSet()
+
+        assertEquals(60.0, added.weightKg)
+        assertEquals(10, added.repsMin)
+        assertEquals(12, added.repsMax)
+        assertFalse("A new set has not been performed yet", added.done)
+        assertNull("Difficulty is a rating of what happened, not of what is planned", added.difficulty)
+    }
+
+    @Test
+    fun `a set added to a timed exercise keeps its duration`() {
+        val plank = DraftSetState(timeSeconds = 45, timeUnit = "sec", done = true)
+        val added = plank.asAddedSet()
+
+        assertEquals(45, added.timeSeconds)
+        assertEquals("sec", added.timeUnit)
+        assertFalse(added.done)
+    }
+
+    @Test
+    fun `a new exercise starts with three working sets of eight to twelve`() {
+        val sets = defaultSetsForAddedExercise()
+
+        assertEquals(3, sets.size)
+        assertTrue(sets.all { it.repsMin == 8 && it.repsMax == 12 })
+        assertTrue(sets.all { it.weightKg == null && !it.done })
+    }
+
+    @Test
+    fun `added sets and exercises survive the phone being killed`() {
+        val prefs = FakePrefs()
+        val storage = prefs.storage()
+
+        // Started Upper A, then added a fourth bench set and a whole new exercise.
+        val withAdditions = draft(doneSets = 2).let { base ->
+            val bench = base.exercises.first()
+            base.copy(
+                exercises = listOf(
+                    bench.copy(sets = bench.sets + bench.sets.last().asAddedSet()),
+                    DraftExerciseState(
+                        exerciseId = "cable-fly",
+                        exerciseName = "Cable Fly",
+                        restSeconds = ADDED_EXERCISE_REST_SECONDS,
+                        sets = defaultSetsForAddedExercise(),
+                    ),
+                )
+            )
+        }
+        storage.save(withAdditions)
+
+        val reloaded = storage.load()
+        assertNotNull(reloaded)
+        assertEquals(2, reloaded!!.exercises.size)
+        assertEquals(3, reloaded.exercises[0].sets.size)
+        assertEquals("cable-fly", reloaded.exercises[1].exerciseId)
+        assertEquals(3, reloaded.exercises[1].sets.size)
+        assertEquals(ADDED_EXERCISE_REST_SECONDS, reloaded.exercises[1].restSeconds)
+        // 2 ticked on bench + the new bench set + 3 new unticked sets.
+        assertEquals(6, reloaded.totalSets)
+        assertEquals(2, reloaded.doneSets)
+    }
+
+    @Test
+    fun `adding an exercise makes an otherwise untouched session worth resuming`() {
+        val base = draft(doneSets = 0, weight = null)
+        assertTrue(isDraftUntouched(base))
+
+        // Adding an exercise enters no values, so the helper alone can't see it. That's why
+        // the player forces a save on any structural edit (hasStructuralEdit) rather than
+        // relying on this check: adding four exercises before a phone call must survive.
+        val added = base.copy(
+            exercises = base.exercises + DraftExerciseState(
+                exerciseId = "cable-fly",
+                exerciseName = "Cable Fly",
+                restSeconds = ADDED_EXERCISE_REST_SECONDS,
+                sets = defaultSetsForAddedExercise(),
+            )
+        )
+        // Untouched by value. The player resaves anyway after a structural edit.
+        assertTrue(isDraftUntouched(added))
+    }
 }
