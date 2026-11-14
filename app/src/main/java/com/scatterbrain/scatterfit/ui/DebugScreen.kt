@@ -47,10 +47,15 @@ import com.scatterbrain.scatterfit.data.RecordMethod
 import com.scatterbrain.scatterfit.data.SleepNight
 import com.scatterbrain.scatterfit.sync.SyncEngine
 import com.scatterbrain.scatterfit.sync.SyncHub
+import com.scatterbrain.scatterfit.sync.SyncRunLog
 import com.scatterbrain.scatterfit.sync.SyncStore
+import com.scatterbrain.scatterfit.sync.backgroundSyncVerdict
+import com.scatterbrain.scatterfit.sync.isBackgroundSyncStalled
+import com.scatterbrain.scatterfit.sync.relativeAge
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
+import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
@@ -424,6 +429,40 @@ fun DebugScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+            }
+
+            // Background sync health — the worker's own record of whether Android is
+            // delivering the job at all. Distinguishes "never ran" from "ran and found
+            // nothing", which the record counts below cannot tell apart.
+            val runSummary = remember(refreshKey, context) { SyncRunLog(context).summary() }
+            val runNow = remember(refreshKey) { System.currentTimeMillis() }
+            val runStalled = remember(runSummary, runNow) { isBackgroundSyncStalled(runSummary, runNow) }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = "background sync: attempt ${relativeAge(runNow, runSummary.lastAttemptMs)} · ok ${relativeAge(runNow, runSummary.lastSuccessMs)}",
+                    fontSize = 12.sp,
+                    color = TextMuted
+                )
+                if (runSummary.totalRuns > 0) {
+                    Text(
+                        text = "runs ${runSummary.totalRuns} · failures ${runSummary.totalFailures}" +
+                            (runSummary.lastDurationMs?.let { " · last took ${it / 1000}s" } ?: ""),
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
+                }
+                Text(
+                    text = backgroundSyncVerdict(runSummary, runNow),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    color = if (runStalled) JudgementWarn else TextMuted
+                )
             }
 
             // Scrollable method cards
