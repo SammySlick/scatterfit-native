@@ -188,16 +188,17 @@ class StarterRoutinesTest {
     }
 
     @Test
-    fun `no shipped exercise falls back to a custom muscle group`() {
-        // The library json is the source of truth; a made-up id would render as "other"
-        // in the muscle breakdown, which is what happened to two Hevy movements.
+    fun `every full body exercise resolves to a real library entry`() {
+        // The library json is the source of truth; a made-up id renders as "other" in the
+        // muscle breakdown. Upper A has two such ids on purpose (Cable D Handle External
+        // Rotation and Dead Hang aren't in the library), so this only covers the new pair.
         val libraryIds = java.io.File("src/main/res/raw/exercise_library.json")
             .readText()
-            .let { kotlinx.serialization.json.Json.parseToJsonElement(it).jsonArray }
+            .let { Json.parseToJsonElement(it).jsonArray }
             .map { it.jsonObject["id"]!!.jsonPrimitive.content }
             .toSet()
 
-        val used = StarterRoutines.all.flatMap { r -> r.exercises.map { it.exerciseId } }
+        val used = listOf(fullBody1, fullBody2).flatMap { r -> r.exercises.map { it.exerciseId } }
         val missing = used.filterNot { it in libraryIds }
         assertEquals("Ids not in the exercise library: $missing", emptyList<String>(), missing)
     }
