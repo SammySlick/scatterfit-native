@@ -2,6 +2,9 @@ package com.scatterbrain.scatterfit.ui
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -116,5 +119,86 @@ class StarterRoutinesTest {
         assertEquals(11, decoded.first().exercises.size)
         assertEquals(26, decoded.first().exercises.sumOf { it.sets.size })
         assertEquals("2-0-2-1", decoded.first().exercises.first().tempo)
+    }
+
+    // ---- Full body pair (2026-11-14) ----
+
+    private val fullBody1 = StarterRoutines.fullBody1
+    private val fullBody2 = StarterRoutines.fullBody2
+
+    @Test
+    fun `full body routines keep the pasted structure`() {
+        assertEquals("Full Body 1 (ADHD-Friendly)", fullBody1.name)
+        assertEquals("Full Body 2 (ADHD-Friendly)", fullBody2.name)
+        assertEquals(4, fullBody1.exercises.size)
+        assertEquals(4, fullBody2.exercises.size)
+        assertEquals(11, fullBody1.exercises.sumOf { it.sets.size })
+        assertEquals(11, fullBody2.exercises.sumOf { it.sets.size })
+    }
+
+    @Test
+    fun `exercise order matches the pasted workouts`() {
+        assertEquals(
+            listOf(
+                "Leg Press (Machine)",
+                "Seated Chest Press (Machine)",
+                "Seated Cable Row",
+                "Cable Tricep Pushdowns",
+            ),
+            fullBody1.exercises.map { it.displayName }
+        )
+        assertEquals(
+            listOf(
+                "Seated Leg Curl (Machine)",
+                "Lat Pulldown (Machine)",
+                "Overhead Shoulder Press",
+                "Dumbbell Bicep Curls",
+            ),
+            fullBody2.exercises.map { it.displayName }
+        )
+    }
+
+    @Test
+    fun `every working set is 8 to 12 reps at 90 seconds except the arm finishers`() {
+        val finishers = setOf("Cable Tricep Pushdowns", "Dumbbell Bicep Curls")
+
+        for (routine in listOf(fullBody1, fullBody2)) {
+            for (exercise in routine.exercises) {
+                assertEquals(exercise.displayName, 90, exercise.restSeconds)
+                assertTrue(exercise.displayName, exercise.sets.isNotEmpty())
+                if (exercise.displayName in finishers) {
+                    assertEquals(exercise.displayName, 2, exercise.sets.size)
+                    assertTrue(exercise.displayName, exercise.sets.all { it.repsMin == 12 && it.repsMax == 15 })
+                } else {
+                    assertEquals(exercise.displayName, 3, exercise.sets.size)
+                    assertTrue(exercise.displayName, exercise.sets.all { it.repsMin == 8 && it.repsMax == 12 })
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `leg press carries the 94 kg starting load on all three sets`() {
+        val legPress = fullBody1.exercises.first { it.displayName == "Leg Press (Machine)" }
+        assertEquals(listOf(94.0, 94.0, 94.0), legPress.sets.map { it.weightKg })
+
+        // Only the leg press is preloaded — nothing else should guess a weight.
+        val others = fullBody1.exercises.filterNot { it === legPress }
+        assertTrue(others.none { ex -> ex.sets.any { it.weightKg != null } })
+    }
+
+    @Test
+    fun `no shipped exercise falls back to a custom muscle group`() {
+        // The library json is the source of truth; a made-up id would render as "other"
+        // in the muscle breakdown, which is what happened to two Hevy movements.
+        val libraryIds = java.io.File("src/main/res/raw/exercise_library.json")
+            .readText()
+            .let { kotlinx.serialization.json.Json.parseToJsonElement(it).jsonArray }
+            .map { it.jsonObject["id"]!!.jsonPrimitive.content }
+            .toSet()
+
+        val used = StarterRoutines.all.flatMap { r -> r.exercises.map { it.exerciseId } }
+        val missing = used.filterNot { it in libraryIds }
+        assertEquals("Ids not in the exercise library: $missing", emptyList<String>(), missing)
     }
 }
