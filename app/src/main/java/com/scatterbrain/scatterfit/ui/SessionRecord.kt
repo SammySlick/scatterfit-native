@@ -33,6 +33,10 @@ data class SessionRecord(
     val durationMinutes: Int? = null,
     val startedAt: Long,
     val endedAt: Long? = null,
+    /** Id of the LoggedSession this record was created from, when it came from the
+     *  planner's quick-log. Lets the two be removed together — otherwise deleting a
+     *  logged session left its record behind and the day still showed the workout. */
+    val sourceId: String? = null,
 )
 
 class SessionRecordsStorage(
@@ -74,6 +78,13 @@ class SessionRecordsStorage(
 
     fun loadByDay(dayKey: String): List<SessionRecord> {
         return loadAll().filter { it.dayKey == dayKey }
+    }
+
+    /** Removes any record created from the given LoggedSession. */
+    fun removeBySourceId(sourceId: String) {
+        val current = loadAll()
+        val kept = current.filterNot { it.sourceId == sourceId }
+        if (kept.size != current.size) save(kept)
     }
 
     fun latestForExercise(exerciseId: String): LoggedExerciseInSession? {

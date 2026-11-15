@@ -68,6 +68,7 @@ import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import androidx.lifecycle.Lifecycle
+import com.scatterbrain.scatterfit.data.DailyRepository
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.scatterbrain.scatterfit.data.WorkoutProposal
 import com.scatterbrain.scatterfit.data.WorkoutProposalsStorage
@@ -153,6 +154,10 @@ fun TrainingScreen(
                 activePlayingDraft = null
                 activeDraft = draftStorage.load()
                 loggedSessions = loggedStorage.loadAll()
+                // SessionPlayerScreen already wrote the record to storage, but storage is
+                // only read when the next Health Connect emission rebuilds the daily. Until
+                // then the My Day card showed nothing for a workout just finished.
+                DailyRepository.notifySessionRecorded(record)
                 sessionConfirmationMessage = "Session logged!"
             },
             onAbandon = {
@@ -329,19 +334,54 @@ fun TrainingScreen(
                         onAddLoggedSession = { session ->
                             loggedStorage.add(session)
                             loggedSessions = loggedStorage.loadAll()
+                            // Quick-logging a session used to write only a LoggedSession, which
+                            // the My Day card never reads. A SessionRecord is the bridge into the
+                            // assembled daily (minutes + session list), so the day actually shows
+                            // the workout. sourceId links it back for deletion.
+                            val rec = SessionRecord(
+                                dayKey = session.dayKey,
+                                name = session.name,
+                                durationMinutes = session.durationMinutes,
+                                startedAt = session.createdAt,
+                                sourceId = session.id,
+                            )
+                            sessionRecordsStorage.add(rec)
+                            DailyRepository.notifySessionRecorded(rec)
                         },
                         onRemoveLoggedSession = { id ->
+                            // Remove the bridge record too, or the workout stays on My Day
+                            // after the user has deleted it from the planner.
+                            loggedStorage.loadAll()
+                                .firstOrNull { it.id == id }
+                                ?.let { gone ->
+                                    sessionRecordsStorage.removeBySourceId(id)
+                                    DailyRepository.notifySessionRemoved(
+                                        dayKey = gone.dayKey,
+                                        title = gone.name,
+                                        durationMinutes = gone.durationMinutes,
+                                    )
+                                }
                             loggedStorage.remove(id)
                             loggedSessions = loggedStorage.loadAll()
                         },
                         onConfirmProposal = { proposal, chosenType ->
-                            loggedStorage.add(
-                                LoggedSession(
-                                    dayKey = proposal.dayKey,
-                                    name = chosenType,
-                                    durationMinutes = proposal.durationMin
-                                )
+                            val logged = LoggedSession(
+                                dayKey = proposal.dayKey,
+                                name = chosenType,
+                                durationMinutes = proposal.durationMin
                             )
+                            loggedStorage.add(logged)
+                            // Same bridge as the quick-log path above: confirming a detected
+                            // session has to reach the daily, or it stays invisible on My Day.
+                            val rec = SessionRecord(
+                                dayKey = proposal.dayKey,
+                                name = chosenType,
+                                durationMinutes = proposal.durationMin,
+                                startedAt = System.currentTimeMillis(),
+                                sourceId = logged.id,
+                            )
+                            sessionRecordsStorage.add(rec)
+                            DailyRepository.notifySessionRecorded(rec)
                             proposalsStorage.remove(proposal.id)
                             loggedSessions = loggedStorage.loadAll()
                             proposals = proposalsStorage.load().filterNot { it.dismissed }

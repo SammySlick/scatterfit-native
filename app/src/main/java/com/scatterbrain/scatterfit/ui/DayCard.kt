@@ -81,8 +81,16 @@ fun computeDayCardTicks(
     consumedKcal: Double? = null,
     consumedProtein: Double? = null,
     totalSteps: Double? = null,
+    /** True when a session was logged on this day by any path — the session player,
+     *  a quick-log from the planner, or a confirmed detected session. Defaults to false
+     *  so a rest day does not tick on Health Connect minutes alone: those include a brisk
+     *  walk, and "Rest day / No session planned" turning into a tick is worse than useless. */
+    trainingOverrideCompleted: Boolean = false,
 ): DayCardTicks {
-    val totalM = if (isTrainingDay) 5 else 4
+    // A logged session makes the day a five-target day even if nothing was planned:
+    // you trained, so training is one of the things there was to do.
+    val trained = trainingOverrideCompleted
+    val totalM = if (isTrainingDay || trained) 5 else 4
     if (daily == null && consumedKcal == null && consumedProtein == null && totalSteps == null) {
         return DayCardTicks(completedCount = 0, totalTarget = totalM)
     }
@@ -101,8 +109,9 @@ fun computeDayCardTicks(
     val weightCompleted = weightVal != null && weightVal > 0.0
 
     val trainMins = daily?.trainingMinutes?.get(todayKey) ?: 0.0
-    // Training days only! Rest days never auto-tick training.
-    val trainCompleted = isTrainingDay && trainMins > 0.0
+    // Training days only! Rest days never auto-tick training — but a session you
+    // actually logged ticks on any day (see trainingOverrideCompleted).
+    val trainCompleted = trained || (isTrainingDay && trainMins > 0.0)
 
     val baseCount = listOf(calCompleted, stepCompleted, protCompleted, weightCompleted).count { it }
     val totalCount = baseCount + if (trainCompleted) 1 else 0
@@ -172,6 +181,10 @@ fun DayCard(
     deviceSteps: Double? = null,
     estimatedSteps: Int = 0,
     onAdjustStepsClick: (() -> Unit)? = null,
+    /** Name of a session logged on [dayKey], from any logging path. Null when none. */
+    loggedSessionName: String? = null,
+    /** Duration of that session in minutes. Null or 0 when none. */
+    loggedSessionMinutes: Int? = null,
 ) {
     val context = LocalContext.current
     val effectiveSettings = remember(settings) {
@@ -179,10 +192,21 @@ fun DayCard(
     }
 
     val isTrainingDay = planName != null && !planName.equals("Rest day", ignoreCase = true)
+    // A session recorded on this day: the session player's Finish, a quick-log from the
+    // planner, a confirmed detected session, or an exercise record Health Connect already
+    // carried. Deliberately NOT driven by trainingMinutes alone — HR-zone minutes include
+    // a brisk walk, which must not turn a rest day into a training day.
+    val hasLoggedSession = loggedSessionName != null ||
+        (loggedSessionMinutes != null && loggedSessionMinutes > 0)
+    val sessionMinutesShown = loggedSessionMinutes?.takeIf { it > 0 }
+    val sessionTitleShown = loggedSessionName ?: planName ?: "Session"
+    // Ticking is about whether you trained, not whether the plan said you would. Gating on
+    // isTrainingDay meant a finished workout on an unscheduled day never ticked at all.
+    val trainingCountsAsDone = hasLoggedSession
     val deviceStepsVal = deviceSteps ?: daily?.steps?.get(dayKey) ?: 0.0
     val totalSteps = deviceStepsVal + estimatedSteps.toDouble()
 
-    val ticks = remember(daily, effectiveSettings, dayKey, isTrainingDay, consumedKcal, consumedProtein, totalSteps) {
+    val ticks = remember(daily, effectiveSettings, dayKey, isTrainingDay, consumedKcal, consumedProtein, totalSteps, trainingCountsAsDone) {
         computeDayCardTicks(
             daily = daily,
             settings = effectiveSettings,
@@ -190,7 +214,8 @@ fun DayCard(
             isTrainingDay = isTrainingDay,
             consumedKcal = consumedKcal,
             consumedProtein = consumedProtein,
-            totalSteps = totalSteps
+            totalSteps = totalSteps,
+            trainingOverrideCompleted = trainingCountsAsDone,
         )
     }
 
@@ -374,6 +399,8 @@ fun DayCard(
             DayCardTrainingRow(
                 isTrainingDay = isTrainingDay,
                 planName = planName,
+                sessionName = if (hasLoggedSession) sessionTitleShown else null,
+                sessionMinutes = sessionMinutesShown,
                 onClick = onPlanEditorClick
             )
 
@@ -595,13 +622,16 @@ private fun DayCardBarRow(
 private fun DayCardTrainingRow(
     isTrainingDay: Boolean,
     planName: String?,
+    sessionName: String?,
+    sessionMinutes: Int?,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
+    val hasSession = sessionName != null
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val alpha by animateFloatAsState(
-        targetValue = if (isPressed && isTrainingDay) 0.70f else 1f,
+        targetValue = if (isPressed && (isTrainingDay || hasSession) && onClick != null) 0.70f else 1f,
         animationSpec = tween(80),
         label = "trainingRowAlpha"
     )
@@ -612,7 +642,7 @@ private fun DayCardTrainingRow(
             .heightIn(min = 44.dp)
             .graphicsLayer { this.alpha = alpha }
             .then(
-                if (isTrainingDay && onClick != null) {
+                if ((isTrainingDay || hasSession) && onClick != null) {
                     Modifier.clickable(
                         interactionSource = interactionSource,
                         indication = null,
@@ -629,7 +659,22 @@ private fun DayCardTrainingRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            if (isTrainingDay) {
+            if (hasSession) {
+                // Done: solid teal ring, filled dumbbell — the same "complete" language
+                // as the metric rows above, so the card reads at a glance.
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(TealHighlight.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    DumbbellIcon(
+                        modifier = Modifier.size(16.dp),
+                        tint = TealHighlight
+                    )
+                }
+            } else if (isTrainingDay) {
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -663,7 +708,11 @@ private fun DayCardTrainingRow(
 
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 Text(
-                    text = if (isTrainingDay) (planName ?: "Training") else "Rest day",
+                    text = when {
+                        hasSession -> sessionName ?: "Session logged"
+                        isTrainingDay -> (planName ?: "Training")
+                        else -> "Rest day"
+                    },
                     fontSize = 14.sp,
                     lineHeight = 18.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -672,15 +721,20 @@ private fun DayCardTrainingRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (isTrainingDay) "Tap to log your session" else "No session planned",
+                    text = when {
+                        hasSession -> if (sessionMinutes != null && sessionMinutes > 1)
+                            "Done · $sessionMinutes min" else "Done"
+                        isTrainingDay -> "Tap to log your session"
+                        else -> "No session planned"
+                    },
                     fontSize = 11.sp,
                     lineHeight = 14.sp,
-                    color = TextMuted
+                    color = if (hasSession) TealHighlight else TextMuted
                 )
             }
         }
 
-        if (isTrainingDay) {
+        if (isTrainingDay || hasSession) {
             ChevronRightIcon(
                 modifier = Modifier.size(16.dp),
                 tint = TextMuted.copy(alpha = 0.6f)

@@ -409,16 +409,74 @@ object Daily {
     fun todayKeyFor(zone: ZoneId, nowMs: Long): String =
         Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate().toString()
 
+    /** Fold in-app logged sessions into the assembled day.
+     *
+     *  Two rules, both deliberate:
+     *
+     *  1. MINUTES ARE TAKEN AS A MAXIMUM, NEVER A SUM. The phone usually records the
+     *     same workout the app just logged (Samsung Health writes an exercise record and
+     *     HR-zone time), so adding the two together reports the session twice over. The
+     *     larger of "what Health Connect saw" and "what the app logged" is the honest
+     *     answer for the day.
+     *
+     *  2. THE SESSION LIST IS MERGED TOO, not just the minutes. Anything that displays
+     *     "what did I do today" (the My Day training row, session lists) reads
+     *     [AssembledDaily.sessions]; merging only trainingMinutes left that view empty.
+     *     Entries are de-duplicated on day + title + minutes so a re-merge is idempotent.
+     */
     fun mergeSessionRecordsIntoDaily(daily: AssembledDaily, sessionRecords: List<com.scatterbrain.scatterfit.ui.SessionRecord>): AssembledDaily {
         if (sessionRecords.isEmpty()) return daily
         val mergedTrainingMinutes = daily.trainingMinutes.toMutableMap()
+        val mergedSessions = daily.sessions.toMutableList()
         val byDay = sessionRecords.groupBy { it.dayKey }
         for ((dayKey, recs) in byDay) {
-            val sessionMinutes = recs.sumOf { (it.durationMinutes ?: 1).toDouble() }
-            val currentMins = mergedTrainingMinutes[dayKey] ?: 0.0
-            mergedTrainingMinutes[dayKey] = currentMins + sessionMinutes
+            val loggedMinutes = recs.sumOf { (it.durationMinutes ?: 1).toDouble() }
+            val currentMins = daily.trainingMinutes[dayKey] ?: 0.0
+            mergedTrainingMinutes[dayKey] = maxOf(currentMins, loggedMinutes)
+
+            for (r in recs) {
+                val mins = (r.durationMinutes ?: 1).toDouble()
+                val alreadyThere = mergedSessions.any {
+                    it.day == dayKey && it.title == r.name && kotlin.math.abs(it.minutes - mins) < 0.001
+                }
+                if (!alreadyThere) {
+                    mergedSessions.add(
+                        ExerciseSession(
+                            day = dayKey,
+                            minutes = mins,
+                            title = r.name,
+                            start = runCatching { java.time.Instant.ofEpochMilli(r.startedAt).toString() }
+                                .getOrDefault(dayKey + "T00:00:00Z"),
+                        )
+                    )
+                }
+            }
         }
-        return daily.copy(trainingMinutes = mergedTrainingMinutes)
+        return daily.copy(
+            trainingMinutes = mergedTrainingMinutes,
+            sessions = mergedSessions.sortedBy { parseMillis(it.start) ?: 0L },
+        )
+    }
+
+    /** Drops a single logged session from the day.
+     *
+     *  Matched on day + title + minutes because [ExerciseSession] carries no record id. That
+     *  is enough for the delete flow: the entry was built from these exact three values when
+     *  it was merged in. Training minutes are left alone — they are max(Health Connect,
+     *  logged) and the next rebuild from records reconciles them.
+     */
+    fun removeSessionFromDaily(
+        daily: AssembledDaily,
+        dayKey: String,
+        title: String,
+        durationMinutes: Int?,
+    ): AssembledDaily {
+        val mins = (durationMinutes ?: 1).toDouble()
+        val kept = daily.sessions.filterNot {
+            it.day == dayKey && it.title == title && kotlin.math.abs(it.minutes - mins) < 0.001
+        }
+        if (kept.size == daily.sessions.size) return daily
+        return daily.copy(sessions = kept)
     }
 }
 
