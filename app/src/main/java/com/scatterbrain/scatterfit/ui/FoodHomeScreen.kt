@@ -49,6 +49,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.input.KeyboardType
 import com.scatterbrain.scatterfit.data.DailyRepository
+import com.scatterbrain.scatterfit.data.FoodRanking
+import com.scatterbrain.scatterfit.data.RestaurantFoods
+import com.scatterbrain.scatterfit.data.toProductResult
 import com.scatterbrain.scatterfit.data.OffNutriments
 import com.scatterbrain.scatterfit.data.OpenFoodFactsClient
 import com.scatterbrain.scatterfit.data.ProductResult
@@ -224,7 +227,7 @@ fun FoodHomeScreen(
             isSearchingOff = true
             when (val outcome = OpenFoodFactsClient.searchWithFallback(canonicalQuery)) {
                 is com.scatterbrain.scatterfit.data.OffSearchOutcome.Results -> {
-                    offResults = outcome.items.take(8)
+                    offResults = FoodRanking.rankOff(canonicalQuery, outcome.items, limit = 8)
                     offUnavailable = false
                 }
                 is com.scatterbrain.scatterfit.data.OffSearchOutcome.NoMatches -> {
@@ -1769,6 +1772,10 @@ private fun LiveFoodSearchResults(
     val q = com.scatterbrain.scatterfit.data.normaliseQuery(query).lowercase()
     val context = androidx.compose.ui.platform.LocalContext.current
     val genericFoodsList = remember(context) { OpenFoodFactsClient.loadGenericFoods(context) }
+    val restaurantResults = remember(context, q) {
+        FoodRanking.rankRestaurants(q, RestaurantFoods.load(context), limit = 5)
+            .map { it.toProductResult() }
+    }
 
     val matchedPresets = filterFuzzy(
         presets, q, limit = 8,
@@ -1850,6 +1857,53 @@ private fun LiveFoodSearchResults(
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Text("${r.name} · ${r.perPortionKcal} kcal", fontSize = 11.sp, color = TealHighlight)
+                        }
+                    }
+                }
+            }
+
+            if (restaurantResults.isNotEmpty()) {
+                Text("RESTAURANTS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    restaurantResults.forEach { product: ProductResult ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectOffProduct(product) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                            border = BorderStroke(1.dp, TealHighlight.copy(alpha = 0.5f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = product.productName ?: "Item",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextForeground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = product.brands ?: "",
+                                        fontSize = 11.sp,
+                                        color = TextMuted,
+                                        maxLines = 1
+                                    )
+                                }
+                                Text(
+                                    text = "${product.kcalPerServing} kcal",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TealHighlight
+                                )
+                            }
                         }
                     }
                 }
