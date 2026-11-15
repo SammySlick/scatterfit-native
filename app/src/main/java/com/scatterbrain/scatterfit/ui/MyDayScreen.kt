@@ -101,6 +101,7 @@ import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 import kotlinx.coroutines.launch
+import com.scatterbrain.scatterfit.data.parseMillis
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -108,6 +109,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun MyDayScreen(
@@ -228,6 +230,14 @@ fun MyDayScreen(
     }
     val todayPlan = remember(selectedDate, routines) {
         plannedStorage.getPlanForDate(selectedDate, routines)
+    }
+    // The session recorded on the selected day, from any path. Read from the assembled
+    // daily (which merges logged SessionRecords) rather than storage, so the row updates
+    // the moment a session is finished without a separate refresh.
+    val daySession = remember(repoDaily, selectedDay) {
+        repoDaily?.sessions
+            ?.filter { it.day == selectedDay }
+            ?.maxByOrNull { parseMillis(it.start) ?: 0L }
     }
 
     val streak = remember(repoDaily, selectedDay) {
@@ -545,6 +555,8 @@ fun MyDayScreen(
             deviceSteps = repoDaily?.steps?.get(selectedDay),
             estimatedSteps = dayEstimatedSteps,
             onAdjustStepsClick = { showAdjustStepsSheet = true },
+            loggedSessionName = daySession?.title,
+            loggedSessionMinutes = daySession?.minutes?.roundToInt(),
             modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()
         )
 

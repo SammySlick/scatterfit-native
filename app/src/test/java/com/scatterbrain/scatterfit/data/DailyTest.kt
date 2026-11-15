@@ -2,6 +2,7 @@ package com.scatterbrain.scatterfit.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlinx.serialization.json.*
@@ -151,10 +152,10 @@ class DailyTest {
         }
     }
 
-    @Test fun `mergeSessionRecordsIntoDaily aggregates durations and falls back to 1 min`() {
+    @Test fun `mergeSessionRecordsIntoDaily takes the larger of logged and Health Connect minutes`() {
         val base = built()
         val testDay = "2026-10-07"
-        val initialMins = base.trainingMinutes[testDay] ?: 0.0
+        val hcMins = base.trainingMinutes[testDay] ?: 0.0
 
         val rec1 = com.scatterbrain.scatterfit.ui.SessionRecord(
             dayKey = testDay,
@@ -171,9 +172,48 @@ class DailyTest {
             endedAt = nowMs + 60000L
         )
 
+        // Logged total is 45 + 1 (null durations fall back to a minute). The day's minutes
+        // become max(Health Connect, logged) — never the sum, which double-counts when the
+        // phone recorded the same workout.
         val merged = Daily.mergeSessionRecordsIntoDaily(base, listOf(rec1, rec2))
-        val expectedMins = initialMins + 45.0 + 1.0
+        val expectedMins = maxOf(hcMins, 46.0)
         assertEquals(expectedMins, merged.trainingMinutes[testDay]!!, 0.0001)
+    }
+
+    @Test fun `mergeSessionRecordsIntoDaily merges the session list, not just minutes`() {
+        val base = built()
+        val testDay = "2026-10-07"
+        val rec = com.scatterbrain.scatterfit.ui.SessionRecord(
+            dayKey = testDay,
+            name = "Push Day",
+            durationMinutes = 52,
+            startedAt = nowMs,
+        )
+
+        val merged = Daily.mergeSessionRecordsIntoDaily(base, listOf(rec))
+        val entry = merged.sessions.find { it.day == testDay && it.title == "Push Day" }
+        assertNotNull("logged session must appear in the day's session list", entry)
+        assertEquals(52.0, entry!!.minutes, 0.0001)
+    }
+
+    @Test fun `mergeSessionRecordsIntoDaily is idempotent`() {
+        val base = built()
+        val testDay = "2026-10-07"
+        val rec = com.scatterbrain.scatterfit.ui.SessionRecord(
+            dayKey = testDay,
+            name = "Push Day",
+            durationMinutes = 52,
+            startedAt = nowMs,
+        )
+
+        val once = Daily.mergeSessionRecordsIntoDaily(base, listOf(rec))
+        val twice = Daily.mergeSessionRecordsIntoDaily(once, listOf(rec))
+
+        assertEquals(once.trainingMinutes[testDay], twice.trainingMinutes[testDay])
+        assertEquals(
+            once.sessions.count { it.day == testDay && it.title == "Push Day" },
+            twice.sessions.count { it.day == testDay && it.title == "Push Day" },
+        )
     }
 
     @Test fun `isDailyEquivalent - identical records return true (skip recompute)`() {

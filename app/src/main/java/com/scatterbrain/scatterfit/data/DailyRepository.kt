@@ -37,6 +37,11 @@ fun isDailyEquivalent(current: AssembledDaily?, candidate: AssembledDaily?): Boo
     val candidateSleep = candidate.sleep.mapValues { it.value.totalMin }
     if (currentSleep != candidateSleep) return false
 
+    // Compare logged sessions. Minutes alone are not enough to spot a change now that
+    // trainingMinutes takes max(Health Connect, logged): deleting a logged session can
+    // leave the minutes untouched while the session list shrinks, and the UI reads the list.
+    if (current.sessions != candidate.sessions) return false
+
     return true
 }
 
@@ -140,5 +145,12 @@ object DailyRepository {
     fun notifySessionRecorded(record: SessionRecord) {
         val current = _daily.value ?: return
         _daily.value = Daily.mergeSessionRecordsIntoDaily(current, listOf(record))
+    }
+
+    /** Removes a session the user deleted, so the day stops showing it before the
+     *  next Health Connect emission rebuilds the daily from storage. */
+    fun notifySessionRemoved(dayKey: String, title: String, durationMinutes: Int?) {
+        val current = _daily.value ?: return
+        _daily.value = Daily.removeSessionFromDaily(current, dayKey, title, durationMinutes)
     }
 }

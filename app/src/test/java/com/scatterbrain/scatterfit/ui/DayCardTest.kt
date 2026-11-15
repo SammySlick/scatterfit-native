@@ -126,6 +126,56 @@ class DayCardTest {
     }
 
     @Test
+    fun `tick count maths - a logged session ticks on a rest day and makes it a five-item day`() {
+        // The complaint this fixes: finish a workout on a day with nothing planned and the
+        // card said "Rest day / No session planned" with no tick. A session you actually
+        // logged is training, so it counts and the day becomes a five-target day.
+        val daily = AssembledDaily(
+            caloriesEaten = mapOf(today to 2000.0),
+            steps = mapOf(today to 10500.0),
+            protein = mapOf(today to 160.0),
+            weight = mapOf(today to 82.4),
+            zoneBounds = defaultBounds,
+            zone = defaultZone
+        )
+
+        val ticks = computeDayCardTicks(
+            daily = daily,
+            settings = defaultSettings,
+            todayKey = today,
+            isTrainingDay = false,
+            trainingOverrideCompleted = true,
+        )
+        assertEquals(5, ticks.totalTarget)
+        assertEquals(5, ticks.completedCount)
+        assertEquals("5 / 5", ticks.counterText)
+    }
+
+    @Test
+    fun `tick count maths - an explicit false override ignores Health Connect minutes`() {
+        // HR-zone minutes include a brisk walk, so rest days must not tick on them alone.
+        val daily = AssembledDaily(
+            caloriesEaten = mapOf(today to 2000.0),
+            steps = mapOf(today to 10500.0),
+            protein = mapOf(today to 160.0),
+            weight = mapOf(today to 82.4),
+            trainingMinutes = mapOf(today to 45.0),
+            zoneBounds = defaultBounds,
+            zone = defaultZone
+        )
+
+        val ticks = computeDayCardTicks(
+            daily = daily,
+            settings = defaultSettings,
+            todayKey = today,
+            isTrainingDay = false,
+            trainingOverrideCompleted = false,
+        )
+        assertEquals(4, ticks.totalTarget)
+        assertEquals(4, ticks.completedCount)
+    }
+
+    @Test
     fun `tick count maths - null daily reports 0 and counter is never negative`() {
         val ticksTraining = computeDayCardTicks(null, defaultSettings, today, isTrainingDay = true)
         assertEquals(5, ticksTraining.totalTarget)
