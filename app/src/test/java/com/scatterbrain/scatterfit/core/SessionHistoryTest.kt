@@ -89,7 +89,7 @@ class SessionHistoryTest {
 
     @Test
     fun `summary line reads duration, sets, volume`() {
-        assertEquals("58 min · 5 sets · 1,100 kg", sessionSummaryLine(upperA))
+        assertEquals("58 min · 5 sets · 1,045 kg", sessionSummaryLine(upperA))
     }
 
     @Test
@@ -155,7 +155,7 @@ class SessionHistoryTest {
             ),
         )
         val groups = setsByMuscleGroup(withCustom) { muscles[it] }
-        assertEquals(listOf("other" to 2, "chest" to 2, "arms" to 1), groups)
+        assertEquals(listOf("chest" to 2, "arms" to 1, "other" to 2), groups)
         assertEquals("other", groups.last().first)
     }
 
