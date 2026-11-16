@@ -774,7 +774,7 @@ class OpenFoodFactsTest {
             paniniScore > beanScore)
         assertTrue("Joining fields must score higher than the field max",
             paniniScore > maxOf(
-                fuzzyScore(query, panini.productName),
+                fuzzyScore(query, panini.productName ?: ""),
                 fuzzyScore(query, panini.brands ?: ""),
             ))
     }
