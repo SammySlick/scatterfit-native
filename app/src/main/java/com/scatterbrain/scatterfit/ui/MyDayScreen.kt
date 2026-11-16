@@ -627,35 +627,7 @@ fun MyDayScreen(
             }
         }
 
-        // Syncing indicator
-        if (isSyncing && hasData == null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RefreshIcon(
-                    modifier = Modifier.size(12.dp),
-                    tint = TextMuted
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Syncing…",
-                    fontSize = 11.sp,
-                    color = TextMuted
-                )
-            }
-        } else if (isSyncing) {
-            Text(
-                text = "Updating…",
-                fontSize = 11.sp,
-                color = TextMuted,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                textAlign = TextAlign.Center
-            )
-        }
+        SyncAgeLabel(isSyncing = isSyncing, hasData = hasData != null)
 
         Spacer(modifier = Modifier.height(100.dp))
         }

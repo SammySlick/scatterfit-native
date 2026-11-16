@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,12 +47,16 @@ import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.data.HcReaders
 import com.scatterbrain.scatterfit.data.RecordMethod
 import com.scatterbrain.scatterfit.data.SleepNight
+import com.scatterbrain.scatterfit.sync.SyncDiagnostics
 import com.scatterbrain.scatterfit.sync.SyncEngine
 import com.scatterbrain.scatterfit.sync.SyncHub
 import com.scatterbrain.scatterfit.sync.SyncStore
+import com.scatterbrain.scatterfit.sync.SyncWorker
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
+import com.scatterbrain.scatterfit.ui.theme.JudgementBad
+import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.TealHighlight
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
@@ -130,6 +136,74 @@ fun formatSdkStatus(status: Int): String = when (status) {
 
 /** Human age of a gap in ms: "12m ago", "3h ago", "2d ago". Clamps negative
  *  gaps (clock skew / emulator time jumps) to "just now". */
+/**
+ * Background-sync health: last worker run, its outcome, and whether the OS is
+ * allowed to run it at all. The button enqueues the same worker the scheduler
+ * would, so the machinery can be proven in ten seconds instead of two hours.
+ */
+@Composable
+private fun BackgroundSyncCard(refreshKey: Int) {
+    val context = LocalContext.current
+    val nowMs = remember(refreshKey) { System.currentTimeMillis() }
+    val diag = remember(refreshKey) { SyncDiagnostics.snapshot(context) }
+    val restricted = remember(refreshKey) { SyncDiagnostics.batteryRestricted(context) }
+    val bucket = remember(refreshKey) { SyncDiagnostics.standbyBucket(context) }
+    var launchedAt by remember { mutableStateOf(0L) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .background(DarkCardSurface)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = "Background sync",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TextForeground
+        )
+        val lastRun = when {
+            diag.neverRan -> "never run on this phone"
+            else -> "${formatAge(nowMs - diag.lastStartMs)} (${diag.outcome.ifBlank { "?" }}${diag.note?.let { ", $it" } ?: ""})"
+        }
+        Text(
+            text = "last worker run: $lastRun",
+            fontSize = 11.sp,
+            color = if (diag.neverRan) JudgementBad else TextMuted,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+        Text(
+            text = "battery restricted: ${if (restricted) "yes — the OS may defer or skip the job" else "no"} · standby bucket: $bucket",
+            fontSize = 11.sp,
+            color = if (restricted) JudgementWarn else TextMuted,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+        if (launchedAt > 0L) {
+            Text(
+                text = "manual sync enqueued ${formatAge(nowMs - launchedAt)} — pull Refresh",
+                fontSize = 11.sp,
+                color = TealHighlight,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+        TextButton(
+            onClick = {
+                SyncWorker.runNow(context)
+                launchedAt = System.currentTimeMillis()
+            },
+            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = "Run background sync now",
+                color = TealHighlight,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
 internal fun formatAge(gapMs: Long): String = when {
     gapMs < 60_000L -> "just now"
     gapMs < 3_600_000L -> "${gapMs / 60_000L}m ago"
@@ -425,6 +499,12 @@ fun DebugScreen(
                     )
                 }
             }
+
+            // Background sync: did the scheduled job actually run on THIS phone?
+            // Without this, "never scheduled" and "quietly killed by the OEM"
+            // look identical, which is how a two-hourly job can be dead for weeks
+            // without anyone noticing.
+            BackgroundSyncCard(refreshKey = refreshKey)
 
             // Scrollable method cards
             Column(
