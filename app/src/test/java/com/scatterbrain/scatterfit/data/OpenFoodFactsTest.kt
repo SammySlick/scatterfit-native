@@ -722,4 +722,107 @@ class OpenFoodFactsTest {
         )
         assertTrue("Item with protein should have hasNutritionData = true", proteinOnly.hasNutritionData)
     }
+
+    // ---- Ranking (added 2026-11-03, [#] Costa tuna melt returned nothing) ----
+
+    /**
+     * Real shape of the OFF answer to "costa coffee tuna melt", trimmed to 5 noise
+     * hits, with the correct product LAST — exactly as OFF buries it. Ranking has to
+     * pull it out on its own merits, not because the API happened to list it first.
+     */
+    private val costaNoisePageJson = """
+    {
+      "count": 6,
+      "hits": [
+        { "code": "0667888478200", "product_name": "Café costa Rica", "brands": [], "categories": "Coffees, Café du Costa Rica" },
+        { "code": "3245414143081", "product_name": "Costa rica", "brands": ["Carrefour"], "categories": "Coffees, Café du Costa Rica" },
+        { "code": "8711000852903", "product_name": "costa coffee", "brands": ["Tassimo"], "categories": null },
+        { "code": "5039303005011", "product_name": "Costa coffee", "brands": ["Costa"], "categories": "en:coffees" },
+        { "code": "5060321252309", "product_name": "Tuna Melt", "brands": ["Real Wrap Co"], "categories": null },
+        { "code": "5022452002482", "product_name": "Tuna Melt Panini", "brands": ["Costa"], "categories": "Sandwiches" }
+      ]
+    }
+    """.trimIndent()
+
+    private fun costaNoisePage(): List<ProductResult> =
+        OpenFoodFactsClient.parseSaSearchJson(costaNoisePageJson)!!
+
+    @Test
+    fun `rankProducts surfaces the Costa Tuna Melt Panini from the bottom of a noise page`() {
+        val ranked = rankProducts("costa coffee tuna melt", costaNoisePage())
+
+        assertEquals("Tuna Melt Panini", ranked.first().productName)
+        assertEquals("Costa", ranked.first().brands)
+        // The other genuine tuna melt outranks the Costa Rican coffee that OFF put first.
+        val paniniAt = ranked.indexOfFirst { it.productName == "Tuna Melt Panini" }
+        val wrapAt = ranked.indexOfFirst { it.productName == "Tuna Melt" }
+        val beansAt = ranked.indexOfFirst { it.productName == "Café costa Rica" }
+        assertTrue("Real Wrap tuna melt should beat the coffee beans", wrapAt in 0 until beansAt)
+        assertTrue(paniniAt < beansAt)
+    }
+
+    @Test
+    fun `ranking scores name and brand as one document so brand-plus-name beats name alone`() {
+        val panini = costaNoisePage().first { it.code == "5022452002482" }
+        val beans = costaNoisePage().first { it.code == "5039303005011" }
+        val query = "costa coffee tuna melt"
+
+        val paniniScore = fuzzyScore(query, productSearchText(panini))
+        val beanScore = fuzzyScore(query, productSearchText(beans))
+
+        assertTrue("Joined doc: panini $paniniScore should outrank coffee $beanScore",
+            paniniScore > beanScore)
+        assertTrue("Joining fields must score higher than the field max",
+            paniniScore > maxOf(
+                fuzzyScore(query, panini.productName),
+                fuzzyScore(query, panini.brands ?: ""),
+            ))
+    }
+
+    @Test
+    fun `rankProducts returns empty for a page of pure noise so the fallback ladder can advance`() {
+        val unrelated = listOf(
+            ProductResult(code = "1", productName = "Strawberry Jam", brands = "Wilkin & Sons"),
+            ProductResult(code = "2", productName = "Sourdough Loaf", brands = "Bertinet")
+        )
+        assertTrue("No relevant hits must come back empty, not as a fake match",
+            rankProducts("costa coffee tuna melt", unrelated).isEmpty())
+    }
+
+    @Test
+    fun `a coffee-only page shows why the relevance floor alone could not fix this`() {
+        // The bug was that OFF answered "costa coffee tuna melt" with 20 coffee products and
+        // a non-empty page was treated as success, so the reduced-query ladder never ran.
+        // Coffee scores ~0.69 on this query - over any sane floor, because it genuinely
+        // matches two of four tokens. So the floor is a safety net only; pulling 100 hits
+        // and re-ranking them is what actually puts the panini on screen.
+        val coffeeOnly = costaNoisePage().filter { it.productName?.contains("coffee", true) == true }
+        assertTrue("Sanity: the fixture must still contain coffee hits", coffeeOnly.isNotEmpty())
+        val ranked = rankProducts("costa coffee tuna melt", coffeeOnly)
+        assertEquals(coffeeOnly.size, ranked.size)
+        assertTrue("Half-matching coffee is allowed through as a weak result",
+            ranked.all { (it.productName ?: "").contains("coffee", true) })
+        assertTrue("...but never above the relevance floor",
+            ranked.all { fuzzyScore("costa coffee tuna melt", productSearchText(it)) >= MIN_RELEVANCE })
+    }
+
+    @Test
+    fun `rankProducts still catches typos after reranking`() {
+        val foods = listOf(
+            ProductResult(code = "1", productName = "Chicken Breast Fillets", brands = "Tesco"),
+            ProductResult(code = "2", productName = "Greek Yogurt", brands = "Fage"),
+        )
+        val ranked = rankProducts("cicken", foods)
+        assertEquals("1", ranked.first().code)
+    }
+
+    @Test
+    fun `rankProducts caps the list and keeps source order within equal scores`() {
+        val many = costaNoisePage() + (1..20).map {
+            ProductResult(code = "bulk$it", productName = "Costa coffee", brands = "Costa")
+        }
+        val ranked = rankProducts("costa coffee tuna melt", many, limit = 4)
+        assertEquals(4, ranked.size)
+        assertEquals("Tuna Melt Panini", ranked.first().productName)
+    }
 }

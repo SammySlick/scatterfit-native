@@ -417,6 +417,44 @@ fun <T> filterFuzzy(
         .map { it.first }
 }
 
+const val DEFAULT_RANK_LIMIT = 12
+const val MIN_RELEVANCE = 0.6
+
+fun productSearchText(p: ProductResult): String = listOfNotNull(
+    p.productName?.takeIf { it.isNotBlank() },
+    p.brands?.takeIf { it.isNotBlank() },
+    p.categories?.takeIf { it.isNotBlank() },
+).joinToString(" ")
+
+/**
+ * Re-rank a loose page of OFF results by relevance to the WHOLE query.
+ *
+ * OFF's search service is Elasticsearch-shaped: a multi-word query is an OR match
+ * ordered by word statistics, not by how well an item answers the question, and it
+ * only partly honours operators (verified against the live API 2026-11-03:
+ * brands:"Costa" AND tuna works, brands:"Costa" AND tuna melt returns 0, and a bare
+ * "costa AND tuna" is ignored). So relevance has to be decided on the client: score
+ * the full query against name + brand + categories as ONE string and let the good
+ * answers float up.
+ *
+ * Joined, not per-field, is the point. filterFuzzy takes the max over separate
+ * fields, which scores "Costa coffee" (name hit) level with "Tuna Melt Panini"
+ * (name + brand hit). As one document the panini wins on token coverage:
+ * "costa coffee tuna melt" scores it 1.06, against 0.75 for Costa coffee pods and
+ * 0.69 for Costa Rican coffee beans.
+ */
+fun rankProducts(
+    query: String,
+    items: List<ProductResult>,
+    limit: Int = DEFAULT_RANK_LIMIT,
+    minScore: Double = MIN_RELEVANCE,
+): List<ProductResult> = items
+    .map { it to fuzzyScore(query, productSearchText(it)) }
+    .filter { it.second >= minScore }
+    .sortedByDescending { it.second }
+    .take(limit)
+    .map { it.first }
+
 fun reducedQueries(query: String): List<String> {
     val qClean = normaliseQuery(query)
     if (qClean.isBlank()) return emptyList()
@@ -691,6 +729,12 @@ object OpenFoodFactsClient {
     private const val FIELDS = "code,product_name,brands,quantity,nutriments,images_url,serving_size,serving_quantity,categories"
     private const val USER_AGENT = "ScatterFit - Android - Version 1.0"
 
+    // Ranking happens client-side (see rankProducts), so the page has to be big
+    // enough to contain the right answer wherever OFF happened to bury it:
+    // "costa coffee tuna melt" puts the Costa Tuna Melt Panini at index 63.
+    // Cost is ~26-42 KB of JSON per uncached query.
+    private const val SEARCH_PAGE_SIZE = 100
+
     val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -734,12 +778,13 @@ object OpenFoodFactsClient {
         if (cached != null) return@withContext cached
 
         val encoded = URLEncoder.encode(q, "UTF-8")
-        val urlStr = "$SEARCH_URL?q=$encoded&page_size=20&fields=code,product_name,brands,quantity,nutriments,serving_size,serving_quantity,categories"
+        val urlStr = "$SEARCH_URL?q=$encoded&page_size=$SEARCH_PAGE_SIZE&fields=$FIELDS"
         val responseText = executeGet(urlStr) ?: return@withContext emptyList()
         val results = parseSaSearchJson(responseText) ?: emptyList()
         val filtered = results.filter { !it.productName.isNullOrBlank() && it.hasNutritionData }
-        queryCache[key] = filtered
-        filtered
+        val ranked = rankProducts(q, filtered)
+        queryCache[key] = ranked
+        ranked
     }
 
     suspend fun searchLegacy(query: String): List<ProductResult> = withContext(Dispatchers.IO) {
@@ -754,8 +799,9 @@ object OpenFoodFactsClient {
         val responseText = executeGet(urlStr) ?: return@withContext emptyList()
         val results = parseSearchJson(responseText) ?: emptyList()
         val filtered = results.filter { !it.productName.isNullOrBlank() && it.hasNutritionData }
-        queryCache[key] = filtered
-        filtered
+        val ranked = rankProducts(q, filtered)
+        queryCache[key] = ranked
+        ranked
     }
 
     suspend fun search(query: String): List<ProductResult> {

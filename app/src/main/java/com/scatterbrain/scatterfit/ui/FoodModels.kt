@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.data.HealthRecord
+import com.scatterbrain.scatterfit.data.RestaurantMenuItem
 import com.scatterbrain.scatterfit.sync.SyncHub
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -280,6 +281,42 @@ class FoodTrackerViewModel(
             timestamp = timestamp,
             dayKey = activeDayKey,
             mealType = targetMealType
+        )
+        if (storage != null) {
+            storage.saveMeal(meal)
+            syncStorageToPipeline()
+        } else {
+            val list = inMemoryStorage.getOrPut(activeDayKey) { mutableListOf() }
+            list.add(meal)
+        }
+        setDayKey(activeDayKey)
+        refreshPresets()
+    }
+
+    /**
+     * One-tap log of a chain menu item. No confirm sheet on purpose: the whole
+     * point is that a café lunch is one tap, and the portion is already exact
+     * because the figures are published per portion. Undo still lives on the
+     * meal row for the times it's the wrong item.
+     */
+    fun logRestaurantItem(item: RestaurantMenuItem, targetMealType: String = mealTypeInput) {
+        val zone = java.time.ZoneId.systemDefault()
+        val timestamp = if (activeDayKey == todayKey(zone)) {
+            System.currentTimeMillis()
+        } else {
+            val date = runCatching { java.time.LocalDate.parse(activeDayKey) }.getOrDefault(java.time.LocalDate.now(zone))
+            date.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        }
+        val meal = LoggedMeal(
+            name = item.displayName,
+            kcal = item.kcal,
+            protein = item.protein,
+            carbs = item.carbs,
+            fat = item.fat,
+            timestamp = timestamp,
+            dayKey = activeDayKey,
+            mealType = targetMealType,
+            portionLabel = item.serving
         )
         if (storage != null) {
             storage.saveMeal(meal)

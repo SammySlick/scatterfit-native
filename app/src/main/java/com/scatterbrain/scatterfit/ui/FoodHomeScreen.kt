@@ -769,6 +769,13 @@ fun FoodHomeScreen(
                         offUnavailable = offUnavailable,
                         isSearchingOff = isSearchingOff,
                         searchHasExecuted = searchHasExecuted,
+                        onSelectMenuItem = { item ->
+                            val targetMeal = activeBottomSheetMealType ?: viewModel.mealTypeInput
+                            viewModel.logRestaurantItem(item, targetMeal)
+                            expandedSections = expandedSections + targetMeal.lowercase()
+                            activeBottomSheetMealType = null
+                            searchQuery = ""
+                        },
                         onSelectPreset = { preset ->
                             pendingConfirmProduct = preset.toProductResult()
                             activeBottomSheetMealType = null
@@ -1764,11 +1771,22 @@ private fun LiveFoodSearchResults(
     onSelectFavourite: (FavouriteFood) -> Unit,
     onSelectRecipe: (Recipe) -> Unit,
     onSelectOffProduct: (ProductResult) -> Unit,
+    onSelectMenuItem: (com.scatterbrain.scatterfit.data.RestaurantMenuItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val q = com.scatterbrain.scatterfit.data.normaliseQuery(query).lowercase()
     val context = androidx.compose.ui.platform.LocalContext.current
     val genericFoodsList = remember(context) { OpenFoodFactsClient.loadGenericFoods(context) }
+
+    // Chain menus ship inside the APK: instant, offline, and the only way to know
+    // what a Costa tuna melt actually is (it has no barcode for OFF to hold).
+    val restaurantMenu = remember(context) {
+        com.scatterbrain.scatterfit.data.RestaurantMenu.load(context)
+    }
+    val menuMatches = remember(restaurantMenu, q) {
+        if (q.length < 2) emptyList()
+        else com.scatterbrain.scatterfit.data.RestaurantMenu.search(restaurantMenu, q, limit = 5)
+    }
 
     val matchedPresets = filterFuzzy(
         presets, q, limit = 8,
@@ -1914,7 +1932,63 @@ private fun LiveFoodSearchResults(
             // Open Food Facts results
             val offFallbackLevel = offResults.firstOrNull()?.fallbackLevel ?: 1
             val isWidened = offFallbackLevel > 1
-            val hasLocalMatches = matchedFavourites.isNotEmpty() || matchedPresets.isNotEmpty() || matchedRecipes.isNotEmpty() || genericSearchResults.isNotEmpty()
+            val hasLocalMatches = matchedFavourites.isNotEmpty() || matchedPresets.isNotEmpty() || matchedRecipes.isNotEmpty() || genericSearchResults.isNotEmpty() || menuMatches.isNotEmpty()
+
+            // Chain menus first: they answer "I'm in a Costa" better than anything
+            // Open Food Facts can, and they're already on the device.
+            if (menuMatches.isNotEmpty()) {
+                Text("RESTAURANT MENUS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    menuMatches.forEach { item ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectMenuItem(item) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+                            border = BorderStroke(1.dp, TealHighlight.copy(alpha = 0.5f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.name,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextForeground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${item.brand} · ${item.serving}",
+                                        fontSize = 11.sp,
+                                        color = TextMuted,
+                                        maxLines = 1
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "${item.kcal.toInt()} kcal",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TealHighlight
+                                    )
+                                    Text(
+                                        text = item.protein?.let { String.format(Locale.US, "%.0f", it) + "g P" } ?: "tap to log",
+                                        fontSize = 10.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             if (isSearchingOff) {
                 Text("Searching Open Food Facts…", color = TextMuted, fontSize = 12.sp)

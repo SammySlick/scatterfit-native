@@ -1,0 +1,2812 @@
+{
+  "version": 1,
+  "note": "Chain menus for the places Sam actually eats. Figures are per portion as the chain publishes them; macro columns are null where the chain doesn't publish that value, never 0, so a day's totals can't be quietly wrong.",
+  "items": [
+    {
+      "brand": "Costa",
+      "name": "All Day Breakfast Wrap",
+      "serving": "1 wrap",
+      "kcal": 604,
+      "protein": 23,
+      "carbs": 53,
+      "fat": 33,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-all-day-breakfast-wrap"
+    },
+    {
+      "brand": "Costa",
+      "name": "Almond Croissant",
+      "serving": "1 croissant",
+      "kcal": 318,
+      "protein": 7.9,
+      "carbs": 35,
+      "fat": 16,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-almond-croissant"
+    },
+    {
+      "brand": "Costa",
+      "name": "Americano",
+      "serving": "1 medium",
+      "kcal": 18,
+      "protein": 1.2,
+      "carbs": 3,
+      "fat": 0.2,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-americano"
+    },
+    {
+      "brand": "Costa",
+      "name": "BLT Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 419,
+      "protein": 21,
+      "carbs": 45,
+      "fat": 16,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-blt-sandwich"
+    },
+    {
+      "brand": "Costa",
+      "name": "Blueberry Muffin",
+      "serving": "1 muffin",
+      "kcal": 403,
+      "protein": 4.8,
+      "carbs": 53,
+      "fat": 19,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-blueberry-muffin"
+    },
+    {
+      "brand": "Costa",
+      "name": "Cappuccino",
+      "serving": "1 medium",
+      "kcal": 190,
+      "protein": 9.6,
+      "carbs": 16,
+      "fat": 10,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-cappuccino"
+    },
+    {
+      "brand": "Costa",
+      "name": "Chai Latte",
+      "serving": "1 medium",
+      "kcal": 276,
+      "protein": 11,
+      "carbs": 28,
+      "fat": 13,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-chai-latte"
+    },
+    {
+      "brand": "Costa",
+      "name": "Chicken Gyros Style Flatbread",
+      "serving": "1 flatbread",
+      "kcal": 339,
+      "protein": 20,
+      "carbs": 43,
+      "fat": 9.4,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-chicken-gyros-style-flatbread"
+    },
+    {
+      "brand": "Costa",
+      "name": "Chicken Salad Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 386,
+      "protein": 20,
+      "carbs": 40,
+      "fat": 13,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-chicken-salad-sandwich"
+    },
+    {
+      "brand": "Costa",
+      "name": "Cinnamon Bun",
+      "serving": "1 bun",
+      "kcal": 447,
+      "protein": 7.2,
+      "carbs": 64.6,
+      "fat": 17.2,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-cinnamon-bun"
+    },
+    {
+      "brand": "Costa",
+      "name": "Croissant",
+      "serving": "1 croissant",
+      "kcal": 246,
+      "protein": 5.4,
+      "carbs": 25,
+      "fat": 15,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-croissant"
+    },
+    {
+      "brand": "Costa",
+      "name": "Egg & Mushroom Bap",
+      "serving": "1 bap",
+      "kcal": 339,
+      "protein": 12,
+      "carbs": 46,
+      "fat": 11,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-egg-and-mushroom-bap"
+    },
+    {
+      "brand": "Costa",
+      "name": "Flat White",
+      "serving": "1 regular",
+      "kcal": 164,
+      "protein": 8.4,
+      "carbs": 12,
+      "fat": 9.2,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-flat-white"
+    },
+    {
+      "brand": "Costa",
+      "name": "Free Range Egg Mayo Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 400,
+      "protein": 15,
+      "carbs": 46,
+      "fat": 16,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-free-range-egg-mayo-sandwich"
+    },
+    {
+      "brand": "Costa",
+      "name": "Greek Style Yogurt with Mixed Berry Compote",
+      "serving": "1 pot",
+      "kcal": 249,
+      "protein": 9.8,
+      "carbs": 36,
+      "fat": 6.9,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-greek-style-yogurt-with-mixed-berry-compote"
+    },
+    {
+      "brand": "Costa",
+      "name": "Ham & Cheese Toastie",
+      "serving": "1 toastie",
+      "kcal": 356,
+      "protein": 19,
+      "carbs": 44,
+      "fat": 11,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-ham-and-cheese-toastie"
+    },
+    {
+      "brand": "Costa",
+      "name": "Heinz Beanz & Cheese Toastie",
+      "serving": "1 toastie",
+      "kcal": 321,
+      "protein": 14,
+      "carbs": 46,
+      "fat": 7.6,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-heinz-beanz-and-cheese-toastie"
+    },
+    {
+      "brand": "Costa",
+      "name": "Hot Chocolate",
+      "serving": "1 medium",
+      "kcal": 305,
+      "protein": 11,
+      "carbs": 36,
+      "fat": 12,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-hot-chocolate"
+    },
+    {
+      "brand": "Costa",
+      "name": "Iced Latte",
+      "serving": "1 medium",
+      "kcal": 167,
+      "protein": 8.5,
+      "carbs": 12,
+      "fat": 9.3,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-iced-latte"
+    },
+    {
+      "brand": "Costa",
+      "name": "Latte",
+      "serving": "1 medium",
+      "kcal": 204,
+      "protein": 10,
+      "carbs": 15,
+      "fat": 12,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-latte"
+    },
+    {
+      "brand": "Costa",
+      "name": "Lemon Drizzle Loaf Cake",
+      "serving": "1 slice",
+      "kcal": 402,
+      "protein": 4.8,
+      "carbs": 53.3,
+      "fat": 18.7,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-lemon-drizzle-loaf-cake"
+    },
+    {
+      "brand": "Costa",
+      "name": "Matcha Latte",
+      "serving": "1 medium",
+      "kcal": 207,
+      "protein": 11,
+      "carbs": 15,
+      "fat": 12,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-matcha-latte"
+    },
+    {
+      "brand": "Costa",
+      "name": "Mature Cheddar & Roasted Tomato Toastie",
+      "serving": "1 toastie",
+      "kcal": 430,
+      "protein": 19,
+      "carbs": 46,
+      "fat": 18,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-mature-cheddar-and-roasted-tomato-toastie"
+    },
+    {
+      "brand": "Costa",
+      "name": "Millionaire's Shortbread",
+      "serving": "1 piece",
+      "kcal": 279,
+      "protein": 1.5,
+      "carbs": 36,
+      "fat": 14,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-millionaires-shortbread"
+    },
+    {
+      "brand": "Costa",
+      "name": "Mocha",
+      "serving": "1 medium",
+      "kcal": 329,
+      "protein": 12,
+      "carbs": 41,
+      "fat": 12,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-mocha"
+    },
+    {
+      "brand": "Costa",
+      "name": "Mozzarella & Tomato Panini",
+      "serving": "1 panini",
+      "kcal": 493,
+      "protein": 21,
+      "carbs": 54,
+      "fat": 21,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-mozzarella-and-tomato-panini"
+    },
+    {
+      "brand": "Costa",
+      "name": "Oaty Flapjack",
+      "serving": "1 flapjack",
+      "kcal": 256,
+      "protein": 3,
+      "carbs": 34,
+      "fat": 11,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-oaty-flapjack"
+    },
+    {
+      "brand": "Costa",
+      "name": "Pain aux Raisins",
+      "serving": "1 pain",
+      "kcal": 324,
+      "protein": 6.5,
+      "carbs": 42,
+      "fat": 14,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-pain-aux-raisins"
+    },
+    {
+      "brand": "Costa",
+      "name": "Pork & Apple Sausage Roll",
+      "serving": "1 roll",
+      "kcal": 384,
+      "protein": 13,
+      "carbs": 28,
+      "fat": 23,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-pork-and-apple-sausage-roll"
+    },
+    {
+      "brand": "Costa",
+      "name": "Pork Sausage Bap",
+      "serving": "1 bap",
+      "kcal": 515,
+      "protein": 18,
+      "carbs": 45,
+      "fat": 29,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-pork-sausage-bap"
+    },
+    {
+      "brand": "Costa",
+      "name": "Prawn Mayo Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 280,
+      "protein": 19,
+      "carbs": 36,
+      "fat": 5.8,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-prawn-mayo-sandwich"
+    },
+    {
+      "brand": "Costa",
+      "name": "Salted Caramel Brownie",
+      "serving": "1 brownie",
+      "kcal": 352,
+      "protein": 3.8,
+      "carbs": 39,
+      "fat": 20,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-salted-caramel-brownie"
+    },
+    {
+      "brand": "Costa",
+      "name": "Smoked Bacon Bap",
+      "serving": "1 bap",
+      "kcal": 343,
+      "protein": 18,
+      "carbs": 41,
+      "fat": 12,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-smoked-bacon-bap"
+    },
+    {
+      "brand": "Costa",
+      "name": "Tuna Melt Panini",
+      "serving": "1 panini",
+      "kcal": 462,
+      "protein": 26,
+      "carbs": 51,
+      "fat": 16,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-tuna-melt-panini"
+    },
+    {
+      "brand": "Costa",
+      "name": "Wiltshire Ham & Mature Cheddar Toastie",
+      "serving": "1 toastie",
+      "kcal": 393,
+      "protein": 22,
+      "carbs": 44,
+      "fat": 13,
+      "source": "Costa Coffee nutrition (official)",
+      "id": "costa-wiltshire-ham-and-mature-cheddar-toastie"
+    },
+    {
+      "brand": "Greggs",
+      "name": "All Butter Croissant",
+      "serving": "1 croissant",
+      "kcal": 292,
+      "protein": 7.1,
+      "carbs": 35,
+      "fat": 13,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-all-butter-croissant"
+    },
+    {
+      "brand": "Greggs",
+      "name": "All Day Breakfast Baguette",
+      "serving": "1 baguette",
+      "kcal": 535,
+      "protein": 27,
+      "carbs": 65,
+      "fat": 18,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-all-day-breakfast-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Americano Regular",
+      "serving": "1 regular",
+      "kcal": 11,
+      "protein": 0.6,
+      "carbs": 1.7,
+      "fat": 0,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-americano-regular"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Apple & Cinnamon Porridge",
+      "serving": "1 pot",
+      "kcal": 232,
+      "protein": 8,
+      "carbs": 37,
+      "fat": 4.4,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-apple-and-cinnamon-porridge"
+    },
+    {
+      "brand": "Greggs",
+      "name": "BLT",
+      "serving": "1 sandwich",
+      "kcal": 406,
+      "protein": 19,
+      "carbs": 45,
+      "fat": 16,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-blt"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Bacon & Lorne Breakfast Baguette",
+      "serving": "1 baguette",
+      "kcal": 607,
+      "protein": 33,
+      "carbs": 66,
+      "fat": 22,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-bacon-and-lorne-breakfast-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Bacon & Omelette Breakfast Roll",
+      "serving": "1 roll",
+      "kcal": 363,
+      "protein": 22,
+      "carbs": 34,
+      "fat": 15,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-bacon-and-omelette-breakfast-roll"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Bacon & Sausage Breakfast Roll",
+      "serving": "1 roll",
+      "kcal": 405,
+      "protein": 22,
+      "carbs": 39,
+      "fat": 17,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-bacon-and-sausage-breakfast-roll"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Bacon Breakfast Baguette",
+      "serving": "1 baguette",
+      "kcal": 462,
+      "protein": 26,
+      "carbs": 56,
+      "fat": 14,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-bacon-breakfast-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Bacon Breakfast Roll",
+      "serving": "1 roll",
+      "kcal": 321,
+      "protein": 19,
+      "carbs": 33,
+      "fat": 12,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-bacon-breakfast-roll"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Big Breakfast Wrap",
+      "serving": "1 wrap",
+      "kcal": 607,
+      "protein": 24,
+      "carbs": 67,
+      "fat": 26,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-big-breakfast-wrap"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Cappuccino Large",
+      "serving": "1 large",
+      "kcal": 114,
+      "protein": 8.2,
+      "carbs": 13,
+      "fat": 3.3,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-cappuccino-large"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Cappuccino Regular",
+      "serving": "1 regular",
+      "kcal": 94,
+      "protein": 6.6,
+      "carbs": 12,
+      "fat": 2.2,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-cappuccino-regular"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Caramel Latte Regular",
+      "serving": "1 regular",
+      "kcal": 204,
+      "protein": 8,
+      "carbs": 26,
+      "fat": 7.3,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-caramel-latte-regular"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Cheese & Onion Bake",
+      "serving": "1 bake",
+      "kcal": 436,
+      "protein": 8.6,
+      "carbs": 33,
+      "fat": 30,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-cheese-and-onion-bake"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Cheese & Onion Roll",
+      "serving": "1 roll",
+      "kcal": 359,
+      "protein": 15,
+      "carbs": 42,
+      "fat": 13,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-cheese-and-onion-roll"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Cheese Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 308,
+      "protein": 14,
+      "carbs": 36,
+      "fat": 11,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-cheese-sandwich"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Chicken Bake",
+      "serving": "1 bake",
+      "kcal": 426,
+      "protein": 13,
+      "carbs": 32,
+      "fat": 27,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-chicken-bake"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Chicken and Cheese Baguette",
+      "serving": "1 baguette",
+      "kcal": 618,
+      "protein": 31,
+      "carbs": 82,
+      "fat": 18,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-chicken-and-cheese-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Corned Beef Bake",
+      "serving": "1 bake",
+      "kcal": 417,
+      "protein": 11,
+      "carbs": 32,
+      "fat": 27,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-corned-beef-bake"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Crispy Chicken Bites (6 pieces)",
+      "serving": "6 pieces",
+      "kcal": 256,
+      "protein": 19,
+      "carbs": 19,
+      "fat": 11,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-crispy-chicken-bites-6-pieces"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Double-Up Mayo Crispy Chicken Burger",
+      "serving": "1 burger",
+      "kcal": 873,
+      "protein": 56,
+      "carbs": 99,
+      "fat": 27,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-double-up-mayo-crispy-chicken-burger"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Egg Mayonnaise Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 317,
+      "protein": 15,
+      "carbs": 39,
+      "fat": 10,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-egg-mayonnaise-sandwich"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Flat White",
+      "serving": "1 regular",
+      "kcal": 71,
+      "protein": 5.3,
+      "carbs": 8.7,
+      "fat": 1.8,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-flat-white"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Fruit Scones",
+      "serving": "1 scone",
+      "kcal": 299,
+      "protein": 6.3,
+      "carbs": 48,
+      "fat": 8.6,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-fruit-scones"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Glazed Ring Doughnut",
+      "serving": "1 doughnut",
+      "kcal": 201,
+      "protein": 1.9,
+      "carbs": 35,
+      "fat": 5.8,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-glazed-ring-doughnut"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Ham & Cheese Baguette",
+      "serving": "1 baguette",
+      "kcal": 482,
+      "protein": 27,
+      "carbs": 57,
+      "fat": 15,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-ham-and-cheese-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Ham Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 258,
+      "protein": 15,
+      "carbs": 37,
+      "fat": 4.9,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-ham-sandwich"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Hash Browns",
+      "serving": "1 portion",
+      "kcal": 154,
+      "protein": 1.1,
+      "carbs": 22,
+      "fat": 6.3,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-hash-browns"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Hot & Spicy Chicken Wrap",
+      "serving": "1 wrap",
+      "kcal": 537,
+      "protein": 21,
+      "carbs": 75,
+      "fat": 16,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-hot-and-spicy-chicken-wrap"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Hot Chocolate Regular",
+      "serving": "1 regular",
+      "kcal": 219,
+      "protein": 6.7,
+      "carbs": 36,
+      "fat": 5.2,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-hot-chocolate-regular"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Jam Doughnut",
+      "serving": "1 doughnut",
+      "kcal": 236,
+      "protein": 4,
+      "carbs": 37,
+      "fat": 7.6,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-jam-doughnut"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Latte Large",
+      "serving": "1 large",
+      "kcal": 133,
+      "protein": 9.9,
+      "carbs": 14,
+      "fat": 3.8,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-latte-large"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Latte Regular",
+      "serving": "1 regular",
+      "kcal": 114,
+      "protein": 7.8,
+      "carbs": 13,
+      "fat": 3.3,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-latte-regular"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Lorne Breakfast Roll",
+      "serving": "1 roll",
+      "kcal": 369,
+      "protein": 17,
+      "carbs": 42,
+      "fat": 14,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-lorne-breakfast-roll"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Mac & Cheese",
+      "serving": "1 pot",
+      "kcal": 616,
+      "protein": 27,
+      "carbs": 45,
+      "fat": 36,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-mac-and-cheese"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Mayo Chicken Wrap",
+      "serving": "1 wrap",
+      "kcal": 533,
+      "protein": 21,
+      "carbs": 63,
+      "fat": 20,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-mayo-chicken-wrap"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Mayo Crispy Chicken Burger",
+      "serving": "1 burger",
+      "kcal": 566,
+      "protein": 31,
+      "carbs": 68,
+      "fat": 18,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-mayo-crispy-chicken-burger"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Mexican Chicken Baguette",
+      "serving": "1 baguette",
+      "kcal": 492,
+      "protein": 28,
+      "carbs": 73,
+      "fat": 8.7,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-mexican-chicken-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Mocha Regular",
+      "serving": "1 regular",
+      "kcal": 233,
+      "protein": 7.1,
+      "carbs": 39,
+      "fat": 5.3,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-mocha-regular"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Overnight Oats with Seeds & Dried Fruit",
+      "serving": "1 pot",
+      "kcal": 285,
+      "protein": 12,
+      "carbs": 41,
+      "fat": 7.4,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-overnight-oats-with-seeds-and-dried-fruit"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Pain au Chocolat",
+      "serving": "1 pain au chocolat",
+      "kcal": 299,
+      "protein": 6.6,
+      "carbs": 35,
+      "fat": 14,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-pain-au-chocolat"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Roast Chicken & Bacon Club Baguette",
+      "serving": "1 baguette",
+      "kcal": 457,
+      "protein": 24,
+      "carbs": 62,
+      "fat": 12,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-roast-chicken-and-bacon-club-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Roast Chicken Mayonnaise Baguette",
+      "serving": "1 baguette",
+      "kcal": 458,
+      "protein": 24,
+      "carbs": 62,
+      "fat": 12,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-roast-chicken-mayonnaise-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Roast Chicken Salad",
+      "serving": "1 salad",
+      "kcal": 349,
+      "protein": 19,
+      "carbs": 45,
+      "fat": 9.5,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-roast-chicken-salad"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Sausage Breakfast Baguette",
+      "serving": "1 baguette",
+      "kcal": 543,
+      "protein": 24,
+      "carbs": 67,
+      "fat": 19,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-sausage-breakfast-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Sausage Breakfast Roll",
+      "serving": "1 roll",
+      "kcal": 377,
+      "protein": 17,
+      "carbs": 42,
+      "fat": 15,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-sausage-breakfast-roll"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Sausage Roll",
+      "serving": "1 roll",
+      "kcal": 348,
+      "protein": 9.2,
+      "carbs": 24,
+      "fat": 24,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-sausage-roll"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Sausage, Bean & Cheese Melt",
+      "serving": "1 melt",
+      "kcal": 456,
+      "protein": 11,
+      "carbs": 37,
+      "fat": 28,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-sausage-bean-and-cheese-melt"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Savoury Mince Pie",
+      "serving": "1 pie",
+      "kcal": 860,
+      "protein": 11,
+      "carbs": 61,
+      "fat": 56,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-savoury-mince-pie"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Side Salad",
+      "serving": "1 side",
+      "kcal": 16,
+      "protein": 1.1,
+      "carbs": 1.7,
+      "fat": 0,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-side-salad"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Southern Fried Chicken Baguette",
+      "serving": "1 baguette",
+      "kcal": 557,
+      "protein": 25,
+      "carbs": 83,
+      "fat": 13,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-southern-fried-chicken-baguette"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Southern Fried Chicken Goujons",
+      "serving": "1 portion",
+      "kcal": 400,
+      "protein": 27,
+      "carbs": 32,
+      "fat": 18,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-southern-fried-chicken-goujons"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Southern Fried Potato Wedges",
+      "serving": "1 portion",
+      "kcal": 279,
+      "protein": 4.1,
+      "carbs": 42,
+      "fat": 9.6,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-southern-fried-potato-wedges"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Spicy Crispy Chicken Burger",
+      "serving": "1 burger",
+      "kcal": 571,
+      "protein": 31,
+      "carbs": 67,
+      "fat": 19,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-spicy-crispy-chicken-burger"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Steak Bake",
+      "serving": "1 bake",
+      "kcal": 428,
+      "protein": 15,
+      "carbs": 30,
+      "fat": 27,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-steak-bake"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Sweet Chilli Chicken Wrap",
+      "serving": "1 wrap",
+      "kcal": 503,
+      "protein": 21,
+      "carbs": 68,
+      "fat": 15,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-sweet-chilli-chicken-wrap"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Tandoori Chicken",
+      "serving": "1 portion",
+      "kcal": 350,
+      "protein": 18,
+      "carbs": 47,
+      "fat": 8.9,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-tandoori-chicken"
+    },
+    {
+      "brand": "Greggs",
+      "name": "Tandoori Chicken Baguette",
+      "serving": "1 baguette",
+      "kcal": 459,
+      "protein": 25,
+      "carbs": 65,
+      "fat": 11,
+      "source": "Greggs nutrition (official, Apr 2026)",
+      "id": "greggs-tandoori-chicken-baguette"
+    },
+    {
+      "brand": "KFC",
+      "name": "BBQ Fillet Tower Burger",
+      "serving": "1 burger",
+      "kcal": 612,
+      "protein": 32.1,
+      "carbs": 57,
+      "fat": 27.2,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-bbq-fillet-tower-burger"
+    },
+    {
+      "brand": "KFC",
+      "name": "BBQ Mini Wrap",
+      "serving": "1 wrap",
+      "kcal": 294,
+      "protein": 17.6,
+      "carbs": 30.9,
+      "fat": 10.8,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-bbq-mini-wrap"
+    },
+    {
+      "brand": "KFC",
+      "name": "Corn Cob (1 pc)",
+      "serving": "1 cob",
+      "kcal": 57,
+      "protein": 2.2,
+      "carbs": 8.1,
+      "fat": 1.3,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-corn-cob-1-pc"
+    },
+    {
+      "brand": "KFC",
+      "name": "Dirty Loaded Fries",
+      "serving": "1 portion",
+      "kcal": 485,
+      "protein": 12,
+      "carbs": 53,
+      "fat": 24,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-dirty-loaded-fries"
+    },
+    {
+      "brand": "KFC",
+      "name": "Fillet Burger",
+      "serving": "1 burger",
+      "kcal": 463,
+      "protein": 28.8,
+      "carbs": 43,
+      "fat": 18.7,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-fillet-burger"
+    },
+    {
+      "brand": "KFC",
+      "name": "Fillet Tower Burger",
+      "serving": "1 burger",
+      "kcal": 604,
+      "protein": 32.1,
+      "carbs": 55.5,
+      "fat": 27,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-fillet-tower-burger"
+    },
+    {
+      "brand": "KFC",
+      "name": "Flamin' Mini Wrap",
+      "serving": "1 wrap",
+      "kcal": 325,
+      "protein": 17.6,
+      "carbs": 28.5,
+      "fat": 15.3,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-flamin-mini-wrap"
+    },
+    {
+      "brand": "KFC",
+      "name": "Garlic Parmesan Loaded Fries",
+      "serving": "1 portion",
+      "kcal": 535,
+      "protein": 11.8,
+      "carbs": 49.5,
+      "fat": 31.1,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-garlic-parmesan-loaded-fries"
+    },
+    {
+      "brand": "KFC",
+      "name": "Garlic Parmesan Sub",
+      "serving": "1 sub",
+      "kcal": 668,
+      "protein": 36.8,
+      "carbs": 60.2,
+      "fat": 30.2,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-garlic-parmesan-sub"
+    },
+    {
+      "brand": "KFC",
+      "name": "Kansas BBQ Drip'd Bites",
+      "serving": "1 portion",
+      "kcal": 301,
+      "protein": 15.8,
+      "carbs": 34.7,
+      "fat": 10.8,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-kansas-bbq-dripd-bites"
+    },
+    {
+      "brand": "KFC",
+      "name": "Large Popcorn Chicken",
+      "serving": "1 large",
+      "kcal": 478,
+      "protein": 28,
+      "carbs": 28,
+      "fat": 28,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-large-popcorn-chicken"
+    },
+    {
+      "brand": "KFC",
+      "name": "Large Signature Fries",
+      "serving": "1 large",
+      "kcal": 372,
+      "protein": 4.4,
+      "carbs": 54,
+      "fat": 14,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-large-signature-fries"
+    },
+    {
+      "brand": "KFC",
+      "name": "Mini Fillet",
+      "serving": "1 fillet",
+      "kcal": 125,
+      "protein": 13.1,
+      "carbs": 5.8,
+      "fat": 5.4,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-mini-fillet"
+    },
+    {
+      "brand": "KFC",
+      "name": "Mini Fillet Burger",
+      "serving": "1 burger",
+      "kcal": 277,
+      "protein": 18,
+      "carbs": 28,
+      "fat": 10,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-mini-fillet-burger"
+    },
+    {
+      "brand": "KFC",
+      "name": "Original Ranch Rice Bowl",
+      "serving": "1 bowl",
+      "kcal": 558,
+      "protein": 28.8,
+      "carbs": 62.8,
+      "fat": 19.7,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-original-ranch-rice-bowl"
+    },
+    {
+      "brand": "KFC",
+      "name": "Regular Beans",
+      "serving": "1 regular",
+      "kcal": 93,
+      "protein": 4.7,
+      "carbs": 15,
+      "fat": 0.6,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-regular-beans"
+    },
+    {
+      "brand": "KFC",
+      "name": "Regular Cajun Rice",
+      "serving": "1 regular",
+      "kcal": 217,
+      "protein": 3.8,
+      "carbs": 43,
+      "fat": 2.6,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-regular-cajun-rice"
+    },
+    {
+      "brand": "KFC",
+      "name": "Regular Coleslaw",
+      "serving": "1 regular",
+      "kcal": 150,
+      "protein": 1.1,
+      "carbs": 6.1,
+      "fat": 13,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-regular-coleslaw"
+    },
+    {
+      "brand": "KFC",
+      "name": "Regular Creamy Mash",
+      "serving": "1 regular",
+      "kcal": 124,
+      "protein": 2.4,
+      "carbs": 20,
+      "fat": 3.4,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-regular-creamy-mash"
+    },
+    {
+      "brand": "KFC",
+      "name": "Regular Gravy",
+      "serving": "1 regular",
+      "kcal": 73,
+      "protein": 1.7,
+      "carbs": 8.4,
+      "fat": 3.5,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-regular-gravy"
+    },
+    {
+      "brand": "KFC",
+      "name": "Regular Popcorn Chicken",
+      "serving": "1 regular",
+      "kcal": 307,
+      "protein": 18,
+      "carbs": 18,
+      "fat": 18,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-regular-popcorn-chicken"
+    },
+    {
+      "brand": "KFC",
+      "name": "Regular Side Salad",
+      "serving": "1 regular",
+      "kcal": 56,
+      "protein": 0.8,
+      "carbs": 4.7,
+      "fat": 3.6,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-regular-side-salad"
+    },
+    {
+      "brand": "KFC",
+      "name": "Regular Signature Fries",
+      "serving": "1 regular",
+      "kcal": 261,
+      "protein": 3.1,
+      "carbs": 38,
+      "fat": 9.8,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-regular-signature-fries"
+    },
+    {
+      "brand": "KFC",
+      "name": "Supercharger Sub",
+      "serving": "1 sub",
+      "kcal": 664,
+      "protein": 36.8,
+      "carbs": 61,
+      "fat": 29.4,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-supercharger-sub"
+    },
+    {
+      "brand": "KFC",
+      "name": "Sweet Chilli Drip'd Bites",
+      "serving": "1 portion",
+      "kcal": 348,
+      "protein": 19.1,
+      "carbs": 36.8,
+      "fat": 13.5,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-sweet-chilli-dripd-bites"
+    },
+    {
+      "brand": "KFC",
+      "name": "Vegan Burger",
+      "serving": "1 burger",
+      "kcal": 396,
+      "protein": 15,
+      "carbs": 41,
+      "fat": 17,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-vegan-burger"
+    },
+    {
+      "brand": "KFC",
+      "name": "White Chocolate Cookie",
+      "serving": "1 cookie",
+      "kcal": 283,
+      "protein": 2.7,
+      "carbs": 36,
+      "fat": 14,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-white-chocolate-cookie"
+    },
+    {
+      "brand": "KFC",
+      "name": "Zinger Burger",
+      "serving": "1 burger",
+      "kcal": 468,
+      "protein": 23,
+      "carbs": 43,
+      "fat": 22,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-zinger-burger"
+    },
+    {
+      "brand": "KFC",
+      "name": "Zinger Ranch Rice Bowl",
+      "serving": "1 bowl",
+      "kcal": 543,
+      "protein": 23,
+      "carbs": 61.6,
+      "fat": 21.3,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-zinger-ranch-rice-bowl"
+    },
+    {
+      "brand": "KFC",
+      "name": "Zinger Stacker",
+      "serving": "1 burger",
+      "kcal": 813,
+      "protein": 45.1,
+      "carbs": 60.9,
+      "fat": 42.3,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-zinger-stacker"
+    },
+    {
+      "brand": "KFC",
+      "name": "Zinger Supercharger Tower Burger",
+      "serving": "1 burger",
+      "kcal": 652,
+      "protein": 26.2,
+      "carbs": 53.5,
+      "fat": 35.9,
+      "source": "KFC UK nutrition (official)",
+      "id": "kfc-zinger-supercharger-tower-burger"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "9 Chicken McNuggets",
+      "serving": "9 pieces",
+      "kcal": 391,
+      "protein": 22,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-9-chicken-mcnuggets"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Bacon & Egg McMuffin",
+      "serving": "1 muffin",
+      "kcal": 336,
+      "protein": 19,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-bacon-and-egg-mcmuffin"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Big Mac",
+      "serving": "1 burger",
+      "kcal": 509,
+      "protein": 27,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-big-mac"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Breakfast Wrap with Brown Sauce",
+      "serving": "1 wrap",
+      "kcal": 666,
+      "protein": 35,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-breakfast-wrap-with-brown-sauce"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Cheeseburger",
+      "serving": "1 burger",
+      "kcal": 303,
+      "protein": 15,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-cheeseburger"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Cheesy Bacon Flatbread",
+      "serving": "1 flatbread",
+      "kcal": 280,
+      "protein": 14,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-cheesy-bacon-flatbread"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Chicken Big Tasty with Bacon",
+      "serving": "1 burger",
+      "kcal": 652,
+      "protein": 34,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-chicken-big-tasty-with-bacon"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Chicken McNuggets (4 pieces)",
+      "serving": "4 pieces",
+      "kcal": 174,
+      "protein": 10,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-chicken-mcnuggets-4-pieces"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Crispy BBQ & Bacon Wrap",
+      "serving": "1 wrap",
+      "kcal": 477,
+      "protein": 23,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-crispy-bbq-and-bacon-wrap"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Crispy Sweet Chilli Chicken Wrap",
+      "serving": "1 wrap",
+      "kcal": 453,
+      "protein": 21,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-crispy-sweet-chilli-chicken-wrap"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Double Cheeseburger",
+      "serving": "1 burger",
+      "kcal": 452,
+      "protein": 25,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-double-cheeseburger"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Double Quarter Pounder with Cheese",
+      "serving": "1 burger",
+      "kcal": 749,
+      "protein": 48,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-double-quarter-pounder-with-cheese"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Double Sausage & Egg McMuffin",
+      "serving": "1 muffin",
+      "kcal": 552,
+      "protein": 36,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-double-sausage-and-egg-mcmuffin"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Egg McMuffin",
+      "serving": "1 muffin",
+      "kcal": 296,
+      "protein": 17,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-egg-mcmuffin"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Filet-O-Fish",
+      "serving": "1 burger",
+      "kcal": 316,
+      "protein": 14,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-filet-o-fish"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Flat White",
+      "serving": "1 regular",
+      "kcal": 86,
+      "protein": 6.3,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-flat-white"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Grilled BBQ & Bacon Wrap",
+      "serving": "1 wrap",
+      "kcal": 364,
+      "protein": 32,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-grilled-bbq-and-bacon-wrap"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Grilled Chicken & Bacon Salad",
+      "serving": "1 salad",
+      "kcal": 245,
+      "protein": 26,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-grilled-chicken-and-bacon-salad"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Grilled Sweet Chilli Chicken Wrap",
+      "serving": "1 wrap",
+      "kcal": 340,
+      "protein": 29,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-grilled-sweet-chilli-chicken-wrap"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Hamburger",
+      "serving": "1 burger",
+      "kcal": 255,
+      "protein": 13,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-hamburger"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Hash Brown",
+      "serving": "1 hash brown",
+      "kcal": 127,
+      "protein": 1.4,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-hash-brown"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Hot Honey McCrispy",
+      "serving": "1 burger",
+      "kcal": 624,
+      "protein": 36,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-hot-honey-mccrispy"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Large Fries",
+      "serving": "1 large",
+      "kcal": 444,
+      "protein": 5,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-large-fries"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Latte Large",
+      "serving": "1 large",
+      "kcal": 197,
+      "protein": 14,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-latte-large"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Latte Regular",
+      "serving": "1 regular",
+      "kcal": 145,
+      "protein": 11,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-latte-regular"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Mayo Chicken",
+      "serving": "1 burger",
+      "kcal": 282,
+      "protein": 12,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-mayo-chicken"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "McChicken Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 371,
+      "protein": 17,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-mcchicken-sandwich"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "McCrispy",
+      "serving": "1 burger",
+      "kcal": 484,
+      "protein": 26,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-mccrispy"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "McPlant",
+      "serving": "1 burger",
+      "kcal": 426,
+      "protein": 19,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-mcplant"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Medium Fries",
+      "serving": "1 medium",
+      "kcal": 337,
+      "protein": 4,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-medium-fries"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Porridge",
+      "serving": "1 pot",
+      "kcal": 154,
+      "protein": 5,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-porridge"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Quarter Pounder with Cheese",
+      "serving": "1 burger",
+      "kcal": 514,
+      "protein": 30,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-quarter-pounder-with-cheese"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Regular Americano",
+      "serving": "1 regular",
+      "kcal": 6,
+      "protein": 0.4,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-regular-americano"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Regular Cappuccino",
+      "serving": "1 regular",
+      "kcal": 97,
+      "protein": 6,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-regular-cappuccino"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Regular Hot Chocolate",
+      "serving": "1 regular",
+      "kcal": 173,
+      "protein": 4,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-regular-hot-chocolate"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Regular Mango & Pineapple Smoothie",
+      "serving": "1 regular",
+      "kcal": 200,
+      "protein": 1,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-regular-mango-and-pineapple-smoothie"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Sausage & Egg McMuffin",
+      "serving": "1 muffin",
+      "kcal": 424,
+      "protein": 25,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-sausage-and-egg-mcmuffin"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Shaker Side Salad",
+      "serving": "1 side",
+      "kcal": 58,
+      "protein": 1.2,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-shaker-side-salad"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Small Fries",
+      "serving": "1 small",
+      "kcal": 237,
+      "protein": 2.3,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-small-fries"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Smarties McFlurry",
+      "serving": "1 McFlurry",
+      "kcal": 273,
+      "protein": 5.2,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-smarties-mcflurry"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Spicy McCrispy",
+      "serving": "1 burger",
+      "kcal": 486,
+      "protein": 26,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-spicy-mccrispy"
+    },
+    {
+      "brand": "McDonald's",
+      "name": "Triple Chocolate Cookie",
+      "serving": "1 cookie",
+      "kcal": 320,
+      "protein": 3.9,
+      "carbs": null,
+      "fat": null,
+      "source": "McDonald's UK nutrition (official; fat/carbs not stated in source)",
+      "id": "mcdonalds-triple-chocolate-cookie"
+    },
+    {
+      "id": "nandos-1-2-avocado",
+      "brand": "Nando's",
+      "name": "1/2 Avocado",
+      "serving": "1 portion",
+      "kcal": 149.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-1-2-chicken",
+      "brand": "Nando's",
+      "name": "1/2 Chicken",
+      "serving": "1 portion",
+      "kcal": 579.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-1-4-chicken",
+      "brand": "Nando's",
+      "name": "1/4 Chicken",
+      "serving": "1 portion",
+      "kcal": 289.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-10-chicken-wings",
+      "brand": "Nando's",
+      "name": "10 Chicken Wings",
+      "serving": "serves 2-3",
+      "kcal": 786.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-10-extra-saucy-wings",
+      "brand": "Nando's",
+      "name": "10 Extra Saucy Wings",
+      "serving": "serves 2-3",
+      "kcal": 958.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-2-boneless-chicken-thighs",
+      "brand": "Nando's",
+      "name": "2 Boneless Chicken Thighs",
+      "serving": "1 portion",
+      "kcal": 353.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-3-chicken-wings",
+      "brand": "Nando's",
+      "name": "3 Chicken Wings",
+      "serving": "1 portion",
+      "kcal": 236.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-3-extra-saucy-wings",
+      "brand": "Nando's",
+      "name": "3 Extra Saucy Wings",
+      "serving": "1 portion",
+      "kcal": 299.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-4-boneless-chicken-thighs",
+      "brand": "Nando's",
+      "name": "4 Boneless Chicken Thighs",
+      "serving": "1 portion",
+      "kcal": 706.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-5-chicken-wings",
+      "brand": "Nando's",
+      "name": "5 Chicken Wings",
+      "serving": "1 portion",
+      "kcal": 393.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-5-extra-saucy-wings",
+      "brand": "Nando's",
+      "name": "5 Extra Saucy Wings",
+      "serving": "1 portion",
+      "kcal": 513.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-beanie-burger",
+      "brand": "Nando's",
+      "name": "Beanie Burger",
+      "serving": "1 portion",
+      "kcal": 562.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-beanie-patty",
+      "brand": "Nando's",
+      "name": "Beanie Patty",
+      "serving": "1 portion",
+      "kcal": 261.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-beanie-pitta",
+      "brand": "Nando's",
+      "name": "Beanie Pitta",
+      "serving": "1 portion",
+      "kcal": 632.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-beanie-wrap",
+      "brand": "Nando's",
+      "name": "Beanie Wrap",
+      "serving": "1 portion",
+      "kcal": 644.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-butterfly-burger",
+      "brand": "Nando's",
+      "name": "Butterfly Burger",
+      "serving": "1 portion",
+      "kcal": 651.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-caesar-salad",
+      "brand": "Nando's",
+      "name": "Caesar Salad",
+      "serving": "1 portion",
+      "kcal": 477.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-charred-corn",
+      "brand": "Nando's",
+      "name": "Charred Corn",
+      "serving": "1 portion",
+      "kcal": 255.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-cheddar-cheese",
+      "brand": "Nando's",
+      "name": "Cheddar Cheese",
+      "serving": "1 portion",
+      "kcal": 79.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-cheesy-garlic-pitta",
+      "brand": "Nando's",
+      "name": "Cheesy Garlic Pitta",
+      "serving": "serves 2",
+      "kcal": 597.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-chicken-breast",
+      "brand": "Nando's",
+      "name": "Chicken Breast",
+      "serving": "1 portion",
+      "kcal": 138.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-chicken-butterfly",
+      "brand": "Nando's",
+      "name": "Chicken Butterfly",
+      "serving": "1 portion",
+      "kcal": 332.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-chicken-chorizo",
+      "brand": "Nando's",
+      "name": "Chicken Chorizo",
+      "serving": "serves 2",
+      "kcal": 340.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-chicken-livers-rustic-portuguese-roll",
+      "brand": "Nando's",
+      "name": "Chicken Livers & Rustic Portuguese Roll",
+      "serving": "1 portion",
+      "kcal": 653.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-chilli-jam",
+      "brand": "Nando's",
+      "name": "Chilli Jam",
+      "serving": "1 portion",
+      "kcal": 61.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-chips",
+      "brand": "Nando's",
+      "name": "Chips",
+      "serving": "1 portion",
+      "kcal": 248.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-choc-a-lot-cake",
+      "brand": "Nando's",
+      "name": "Choc-A-Lot Cake",
+      "serving": "1 portion",
+      "kcal": 425.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-cloudy-lemonade",
+      "brand": "Nando's",
+      "name": "Cloudy Lemonade",
+      "serving": "1 portion",
+      "kcal": 51.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-coca-cola-classic",
+      "brand": "Nando's",
+      "name": "Coca-Cola Classic",
+      "serving": "1 portion",
+      "kcal": 126.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-coleslaw",
+      "brand": "Nando's",
+      "name": "Coleslaw",
+      "serving": "1 portion",
+      "kcal": 233.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-corn-on-the-cob",
+      "brand": "Nando's",
+      "name": "Corn on the Cob",
+      "serving": "1 portion",
+      "kcal": 46.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-creamy-mash",
+      "brand": "Nando's",
+      "name": "Creamy Mash",
+      "serving": "1 portion",
+      "kcal": 308.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-double-chicken-burger",
+      "brand": "Nando's",
+      "name": "Double Chicken Burger",
+      "serving": "1 portion",
+      "kcal": 586.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-double-chicken-pitta",
+      "brand": "Nando's",
+      "name": "Double Chicken Pitta",
+      "serving": "1 portion",
+      "kcal": 691.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-double-chicken-wrap",
+      "brand": "Nando's",
+      "name": "Double Chicken Wrap",
+      "serving": "1 portion",
+      "kcal": 742.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-fino-pitta",
+      "brand": "Nando's",
+      "name": "Fino Pitta",
+      "serving": "1 portion",
+      "kcal": 838.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-four-toffee-apple-pastel-de-natas",
+      "brand": "Nando's",
+      "name": "Four Toffee Apple Pastel de Natas",
+      "serving": "1 portion",
+      "kcal": 912.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-fully-loaded-chips",
+      "brand": "Nando's",
+      "name": "Fully Loaded Chips",
+      "serving": "serves 2-3",
+      "kcal": 1174.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-garlic-bread",
+      "brand": "Nando's",
+      "name": "Garlic Bread",
+      "serving": "1 portion",
+      "kcal": 372.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-garlic-churrasco-burger",
+      "brand": "Nando's",
+      "name": "Garlic Churrasco Burger",
+      "serving": "1 portion",
+      "kcal": 787.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-garlic-perinaise",
+      "brand": "Nando's",
+      "name": "Garlic PERinaise",
+      "serving": "1 portion",
+      "kcal": 176.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-gooey-caramel-cheesecake",
+      "brand": "Nando's",
+      "name": "Gooey Caramel Cheesecake",
+      "serving": "1 portion",
+      "kcal": 464.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-grilled-chicken-breast",
+      "brand": "Nando's",
+      "name": "Grilled Chicken Breast",
+      "serving": "1 portion",
+      "kcal": 138.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-grilled-chicken-burger",
+      "brand": "Nando's",
+      "name": "Grilled Chicken Burger",
+      "serving": "1 portion",
+      "kcal": 448.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-grilled-chicken-pitta",
+      "brand": "Nando's",
+      "name": "Grilled Chicken Pitta",
+      "serving": "1 portion",
+      "kcal": 508.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-grilled-chicken-wrap",
+      "brand": "Nando's",
+      "name": "Grilled Chicken Wrap",
+      "serving": "1 portion",
+      "kcal": 514.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-grilled-halloumi-cheese",
+      "brand": "Nando's",
+      "name": "Grilled Halloumi Cheese",
+      "serving": "1 portion",
+      "kcal": 267.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-grilled-pineapple",
+      "brand": "Nando's",
+      "name": "Grilled Pineapple",
+      "serving": "1 portion",
+      "kcal": 39.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-halloumi-sticks-chilli-jam",
+      "brand": "Nando's",
+      "name": "Halloumi Sticks & Chilli Jam",
+      "serving": "serves 2",
+      "kcal": 458.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-halloumi-sticks-peri-honey",
+      "brand": "Nando's",
+      "name": "Halloumi Sticks & PERi-Honey",
+      "serving": "serves 2",
+      "kcal": 526.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-hearty-bowl",
+      "brand": "Nando's",
+      "name": "Hearty Bowl",
+      "serving": "1 portion",
+      "kcal": 432.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-hearty-grains",
+      "brand": "Nando's",
+      "name": "Hearty Grains",
+      "serving": "1 portion",
+      "kcal": 245.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-herby-pickle-bowl",
+      "brand": "Nando's",
+      "name": "Herby Pickle Bowl",
+      "serving": "1 portion",
+      "kcal": 33.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-houmous-with-peri-peri-drizzle",
+      "brand": "Nando's",
+      "name": "Houmous with PERi-PERi Drizzle",
+      "serving": "serves 2-3",
+      "kcal": 792.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-irn-bru",
+      "brand": "Nando's",
+      "name": "Irn Bru",
+      "serving": "1 portion",
+      "kcal": 95.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-karma-drinks-gingerella",
+      "brand": "Nando's",
+      "name": "Karma Drinks Gingerella",
+      "serving": "1 portion",
+      "kcal": 60.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-little-pitta",
+      "brand": "Nando's",
+      "name": "Little Pitta",
+      "serving": "1 portion",
+      "kcal": 302.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-loaded-peri-mac",
+      "brand": "Nando's",
+      "name": "Loaded PERi-Mac",
+      "serving": "1 portion",
+      "kcal": 621.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-momo-elderflower-kombucha",
+      "brand": "Nando's",
+      "name": "MOMO Elderflower Kombucha",
+      "serving": "1 portion",
+      "kcal": 63.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-mac-cheese",
+      "brand": "Nando's",
+      "name": "Mac & Cheese",
+      "serving": "1 portion",
+      "kcal": 435.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-macho-peas",
+      "brand": "Nando's",
+      "name": "Macho Peas",
+      "serving": "1 portion",
+      "kcal": 155.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-mango-gelado",
+      "brand": "Nando's",
+      "name": "Mango Gelado",
+      "serving": "1 portion",
+      "kcal": 93.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-mediterranean-salad",
+      "brand": "Nando's",
+      "name": "Mediterranean Salad",
+      "serving": "1 portion",
+      "kcal": 350.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-nandino-burger",
+      "brand": "Nando's",
+      "name": "Nandino Burger",
+      "serving": "1 portion",
+      "kcal": 285.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-peri-chicken-gravy",
+      "brand": "Nando's",
+      "name": "PERi-Chicken Gravy",
+      "serving": "1 portion",
+      "kcal": 39.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-peri-honey",
+      "brand": "Nando's",
+      "name": "PERi-Honey",
+      "serving": "1 portion",
+      "kcal": 132.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-peri-mac-cheese",
+      "brand": "Nando's",
+      "name": "PERi-Mac & Cheese",
+      "serving": "1 portion",
+      "kcal": 494.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-peri-peri-drizzle",
+      "brand": "Nando's",
+      "name": "PERi-PERi Drizzle",
+      "serving": "1 portion",
+      "kcal": 97.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-peri-peri-nuts",
+      "brand": "Nando's",
+      "name": "PERi-PERi Nuts",
+      "serving": "serves 2-3",
+      "kcal": 793.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-peri-plant-fillet",
+      "brand": "Nando's",
+      "name": "PERi-Plant Fillet",
+      "serving": "1 portion",
+      "kcal": 100.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-peri-salted-chips",
+      "brand": "Nando's",
+      "name": "PERi-Salted Chips",
+      "serving": "1 portion",
+      "kcal": 498.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-perinaise",
+      "brand": "Nando's",
+      "name": "PERinaise",
+      "serving": "1 portion",
+      "kcal": 159.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-pip-organic-cloudy-apple-juice",
+      "brand": "Nando's",
+      "name": "Pip Organic Cloudy Apple Juice",
+      "serving": "1 portion",
+      "kcal": 77.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-pip-organic-pineapple-mango-smoothie",
+      "brand": "Nando's",
+      "name": "Pip Organic Pineapple & Mango Smoothie",
+      "serving": "1 portion",
+      "kcal": 95.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-portuguese-roll",
+      "brand": "Nando's",
+      "name": "Portuguese Roll",
+      "serving": "1 portion",
+      "kcal": 278.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-portuguese-tomato-salad",
+      "brand": "Nando's",
+      "name": "Portuguese Tomato Salad",
+      "serving": "1 portion",
+      "kcal": 136.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-rubro-berry-iced-tea",
+      "brand": "Nando's",
+      "name": "RUBRO Berry Iced Tea",
+      "serving": "1 portion",
+      "kcal": 51.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-rubro-lemon-iced-tea",
+      "brand": "Nando's",
+      "name": "RUBRO Lemon Iced Tea",
+      "serving": "1 portion",
+      "kcal": 51.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-rubro-peach-iced-tea",
+      "brand": "Nando's",
+      "name": "RUBRO Peach Iced Tea",
+      "serving": "1 portion",
+      "kcal": 51.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-rainbow-slaw",
+      "brand": "Nando's",
+      "name": "Rainbow Slaw",
+      "serving": "1 portion",
+      "kcal": 132.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-sol-bowl",
+      "brand": "Nando's",
+      "name": "Sol Bowl",
+      "serving": "1 portion",
+      "kcal": 583.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-spicy-mixed-olives",
+      "brand": "Nando's",
+      "name": "Spicy Mixed Olives",
+      "serving": "serves 2",
+      "kcal": 138.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-spicy-rice",
+      "brand": "Nando's",
+      "name": "Spicy Rice",
+      "serving": "1 portion",
+      "kcal": 123.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-spicy-rice-bowl",
+      "brand": "Nando's",
+      "name": "Spicy Rice Bowl",
+      "serving": "1 portion",
+      "kcal": 600.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-sunset-burger",
+      "brand": "Nando's",
+      "name": "Sunset Burger",
+      "serving": "1 portion",
+      "kcal": 723.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-sweet-potato-wedges",
+      "brand": "Nando's",
+      "name": "Sweet Potato Wedges",
+      "serving": "serves 2",
+      "kcal": 398.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-tenderstem-broccoli",
+      "brand": "Nando's",
+      "name": "Tenderstem® Broccoli",
+      "serving": "1 portion",
+      "kcal": 32.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-the-big-cheese",
+      "brand": "Nando's",
+      "name": "The Big Cheese",
+      "serving": "1 portion",
+      "kcal": 748.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-the-great-imitator-wrap",
+      "brand": "Nando's",
+      "name": "The Great Imitator Wrap",
+      "serving": "1 portion",
+      "kcal": 486.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-toasted-pitta",
+      "brand": "Nando's",
+      "name": "Toasted Pitta",
+      "serving": "1 portion",
+      "kcal": 246.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-toffee-apple-pastel-de-nata",
+      "brand": "Nando's",
+      "name": "Toffee Apple Pastel de Nata",
+      "serving": "1 portion",
+      "kcal": 228.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-tortilla-wrap",
+      "brand": "Nando's",
+      "name": "Tortilla Wrap",
+      "serving": "1 portion",
+      "kcal": 275.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-ultimate-chocolate-brownie",
+      "brand": "Nando's",
+      "name": "Ultimate Chocolate Brownie",
+      "serving": "1 portion",
+      "kcal": 635.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-whole-chicken",
+      "brand": "Nando's",
+      "name": "Whole Chicken",
+      "serving": "serves 2-3",
+      "kcal": 1159.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "id": "nandos-wing-roulette",
+      "brand": "Nando's",
+      "name": "Wing Roulette",
+      "serving": "serves 2-3",
+      "kcal": 893.0,
+      "source": "Nando's menu (official, nandos.co.uk)"
+    },
+    {
+      "brand": "Pret",
+      "name": "All Butter Croissant",
+      "serving": "1 croissant",
+      "kcal": 340,
+      "protein": 6,
+      "carbs": 34,
+      "fat": 20,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-all-butter-croissant"
+    },
+    {
+      "brand": "Pret",
+      "name": "Almond Croissant",
+      "serving": "1 croissant",
+      "kcal": 183,
+      "protein": 4,
+      "carbs": 17,
+      "fat": 11,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-almond-croissant"
+    },
+    {
+      "brand": "Pret",
+      "name": "BLT Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 493,
+      "protein": 21,
+      "carbs": 38,
+      "fat": 29,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-blt-sandwich"
+    },
+    {
+      "brand": "Pret",
+      "name": "Cappuccino",
+      "serving": "1 regular",
+      "kcal": 102,
+      "protein": 6,
+      "carbs": 7,
+      "fat": 6,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-cappuccino"
+    },
+    {
+      "brand": "Pret",
+      "name": "Chicken & Avocado Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 456,
+      "protein": 22,
+      "carbs": 40,
+      "fat": 24,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-chicken-and-avocado-sandwich"
+    },
+    {
+      "brand": "Pret",
+      "name": "Chicken Caesar Baguette",
+      "serving": "1 baguette",
+      "kcal": 517,
+      "protein": 25,
+      "carbs": 50,
+      "fat": 24,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-chicken-caesar-baguette"
+    },
+    {
+      "brand": "Pret",
+      "name": "Chicken Caesar Salad",
+      "serving": "1 salad",
+      "kcal": 319,
+      "protein": 25,
+      "carbs": 4,
+      "fat": 22,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-chicken-caesar-salad"
+    },
+    {
+      "brand": "Pret",
+      "name": "Egg Florentine Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 504,
+      "protein": 23,
+      "carbs": 40,
+      "fat": 28,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-egg-florentine-sandwich"
+    },
+    {
+      "brand": "Pret",
+      "name": "Egg Mayo Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 360,
+      "protein": 17,
+      "carbs": 37,
+      "fat": 16,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-egg-mayo-sandwich"
+    },
+    {
+      "brand": "Pret",
+      "name": "Fruit Salad",
+      "serving": "1 pot",
+      "kcal": 98,
+      "protein": 2,
+      "carbs": 22,
+      "fat": 1,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-fruit-salad"
+    },
+    {
+      "brand": "Pret",
+      "name": "Hot Chocolate",
+      "serving": "1 regular",
+      "kcal": 296,
+      "protein": 10,
+      "carbs": 38,
+      "fat": 12,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-hot-chocolate"
+    },
+    {
+      "brand": "Pret",
+      "name": "Latte",
+      "serving": "1 regular",
+      "kcal": 194,
+      "protein": 11,
+      "carbs": 13,
+      "fat": 11,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-latte"
+    },
+    {
+      "brand": "Pret",
+      "name": "Mocha",
+      "serving": "1 regular",
+      "kcal": 233,
+      "protein": 9,
+      "carbs": 25,
+      "fat": 11,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-mocha"
+    },
+    {
+      "brand": "Pret",
+      "name": "Posh Bacon Baguette",
+      "serving": "1 baguette",
+      "kcal": 579,
+      "protein": 31,
+      "carbs": 68,
+      "fat": 20,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-posh-bacon-baguette"
+    },
+    {
+      "brand": "Pret",
+      "name": "Posh Cheddar & Pickle Baguette",
+      "serving": "1 baguette",
+      "kcal": 779,
+      "protein": 30,
+      "carbs": 77,
+      "fat": 39,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-posh-cheddar-and-pickle-baguette"
+    },
+    {
+      "brand": "Pret",
+      "name": "Sausage Roll",
+      "serving": "1 roll",
+      "kcal": 482,
+      "protein": 19,
+      "carbs": 29,
+      "fat": 32,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-sausage-roll"
+    },
+    {
+      "brand": "Pret",
+      "name": "Super Club Sandwich",
+      "serving": "1 sandwich",
+      "kcal": 542,
+      "protein": 32,
+      "carbs": 47,
+      "fat": 25,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-super-club-sandwich"
+    },
+    {
+      "brand": "Pret",
+      "name": "Tuna Baguette",
+      "serving": "1 baguette",
+      "kcal": 474,
+      "protein": 20,
+      "carbs": 48,
+      "fat": 22,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-tuna-baguette"
+    },
+    {
+      "brand": "Pret",
+      "name": "Tuna Nicoise Salad",
+      "serving": "1 salad",
+      "kcal": 381,
+      "protein": 24,
+      "carbs": 11,
+      "fat": 27,
+      "source": "Pret nutrition (Pret published values)",
+      "id": "pret-tuna-nicoise-salad"
+    }
+  ]
+}
