@@ -88,7 +88,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
-enum class TrainingTab { PLAN, ROUTINES }
+enum class TrainingTab { PLAN, ROUTINES, HISTORY }
 
 @Composable
 fun TrainingScreen(
@@ -124,6 +124,15 @@ fun TrainingScreen(
     var isCreatingNew by remember { mutableStateOf(false) }
 
     val sessionRecordsStorage = remember { SessionRecordsStorage(context) }
+    var sessionRecords by remember { mutableStateOf(sessionRecordsStorage.loadAll()) }
+    var historySelection by remember { mutableStateOf<SessionRecord?>(null) }
+
+    // A session finished on another screen (or the process was reclaimed) must
+    // show up when the tab comes back, not on the next cold start.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        sessionRecords = sessionRecordsStorage.loadAll()
+    }
+
     var activePlayingRoutine by remember { mutableStateOf<Routine?>(null) }
     var activePlayingSessionName by remember { mutableStateOf<String?>(null) }
     var activePlayingDayKey by remember { mutableStateOf(todayKey()) }
@@ -201,6 +210,18 @@ fun TrainingScreen(
             },
             onEditClick = { editingRoutine = viewingRoutine },
             onBackClick = { viewingRoutine = null }
+        )
+        return
+    }
+
+    // Opening a session from HISTORY takes over the whole screen: the summary is
+    // its own full-screen Scaffold and must not be nested in a scrolling column.
+    val historyViewing = historySelection
+    if (historyViewing != null) {
+        WorkoutSummaryScreen(
+            record = historyViewing,
+            previousHistory = sessionRecords.filter { it.id != historyViewing.id },
+            onDone = { historySelection = null },
         )
         return
     }
@@ -302,6 +323,23 @@ fun TrainingScreen(
                         color = if (activeTab == TrainingTab.ROUTINES) Color.Black else TextMuted
                     )
                 }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (activeTab == TrainingTab.HISTORY) TealHighlight else Color.Transparent)
+                        .clickable { activeTab = TrainingTab.HISTORY }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "HISTORY",
+                        fontSize = 12.sp,
+                        fontWeight = if (activeTab == TrainingTab.HISTORY) FontWeight.Bold else FontWeight.Medium,
+                        color = if (activeTab == TrainingTab.HISTORY) Color.Black else TextMuted
+                    )
+                }
             }
 
             Column(
@@ -358,7 +396,7 @@ fun TrainingScreen(
                             activePlayingDayKey = dKey
                         }
                     )
-                } else {
+                } else if (activeTab == TrainingTab.ROUTINES) {
                     // ROUTINES tab: existing list + "+ New routine" card
                     if (routines.isEmpty()) {
                         Card(
@@ -410,6 +448,12 @@ fun TrainingScreen(
                             color = TealHighlight
                         )
                     }
+                } else {
+                    // HISTORY tab: every finished session, newest month first.
+                    SessionHistoryList(
+                        records = sessionRecords,
+                        onOpenSession = { historySelection = it }
+                    )
                 }
             }
         }
