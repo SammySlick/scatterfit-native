@@ -1,6 +1,5 @@
 package com.scatterbrain.scatterfit.sync
 
-import android.app.ActivityManager
 import android.content.Context
 import android.os.PowerManager
 
@@ -67,8 +66,9 @@ object SyncDiagnostics {
      *  "Deep sleeping apps" etc). App Standby buckets: 45+ means rarely used,
      *  50 is restricted. */
     fun standbyBucket(ctx: Context): Int {
-        val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        if (android.os.Build.VERSION.SDK_INT < 28) return -1
+        val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as? android.app.usage.UsageStatsManager
             ?: return -1
-        return am.currentStandbyBucket
+        return usm.appStandbyBucket
     }
 }
