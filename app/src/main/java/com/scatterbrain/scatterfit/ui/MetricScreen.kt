@@ -91,7 +91,7 @@ fun MetricScreen(
             SecondarySeries(
                 label = "Body fat",
                 unit = "%",
-                source = StoreDailySource.fromDaily(ad) { d, k -> d.bodyFat[k] },
+                source = StoreDailySource.fromDaily(ad, pick = { d, k -> d.bodyFat[k] }),
                 decimals = 1,
             )
         }
