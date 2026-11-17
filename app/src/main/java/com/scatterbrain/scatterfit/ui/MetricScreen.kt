@@ -82,6 +82,34 @@ fun MetricScreen(
         } ?: EmptyMetricSource()
     }
 
+    // Body Comp draws BOTH measures on one chart, each on its own axis.
+    // Body fat always exists as a series (weight and fat come from the same
+    // scale); a day with no reading stays a gap rather than a zero.
+    val secondary: SecondarySeries? = remember(currentId, repoDaily) {
+        if (currentId != MetricId.WEIGHT) null
+        else repoDaily?.let { ad ->
+            SecondarySeries(
+                label = "Body fat",
+                unit = "%",
+                source = StoreDailySource.fromDaily(ad) { d, k -> d.bodyFat[k] },
+                decimals = 1,
+            )
+        }
+    }
+
+    // Second number under the hero, so the page answers "what am I now?" for
+    // both measures without a second page or a scroll.
+    val heroSubLine: String? = remember(currentId, repoDaily) {
+        when (currentId) {
+            MetricId.WEIGHT -> repoDaily?.bodyFat?.entries?.maxByOrNull { it.key }?.let { e ->
+                val date = runCatching { LocalDate.parse(e.key) }.getOrNull()
+                    ?.format(DateTimeFormatter.ofPattern("d MMM", Locale.US))
+                "Body fat ${"%.1f".format(Locale.US, e.value)}%" + (date?.let { "  \u00b7  $it" } ?: "")
+            }
+            else -> null
+        }
+    }
+
     // Check if today has a logged record
     val todayValue = repoDaily?.let { ad ->
         when (currentId) {
@@ -147,9 +175,12 @@ fun MetricScreen(
         insightSentence = buildString {
             append(targetContext.comparison)
             targetContext.action?.let { append("  "); append(it) }
+            emptyDataNote(currentId, latest)?.let { append("  "); append(it) }
         },
         chartType = if (def.chart) MetricChartType.LINE else MetricChartType.BAR,
         metricSource = source,
+        secondary = secondary,
+        heroSubLine = heroSubLine,
         anchorDayKey = todayKey,
         today = todayKey,
         onBackClick = onBackClick,
@@ -206,6 +237,20 @@ fun MetricScreenPreview() {
             initialId = MetricId.STEPS,
             onBackClick = {}
         )
+    }
+}
+
+/**
+ * Honest empty: when a metric has no records at all, say WHY, rather than
+ * showing "Not enough data" and leaving Sam to guess whether the app is
+ * broken or the watch simply doesn't write that type.
+ */
+private fun emptyDataNote(id: MetricId, latest: MetricPoint?): String? {
+    if (latest?.value != null) return null
+    return when (id) {
+        MetricId.RESTING_HR ->
+            "No resting-HR records from Health Connect yet. Samsung Health doesn't share them, so this is derived from your heart-rate samples \u2014 it needs a full day of readings before that day appears."
+        else -> null
     }
 }
 

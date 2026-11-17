@@ -55,6 +55,7 @@ import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
+import com.scatterbrain.scatterfit.ui.theme.ChartBlue
 import com.scatterbrain.scatterfit.ui.theme.JudgementBad
 import com.scatterbrain.scatterfit.ui.theme.JudgementGood
 import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
@@ -64,6 +65,22 @@ import com.scatterbrain.scatterfit.ui.theme.TextForeground
 import com.scatterbrain.scatterfit.ui.theme.TextMuted
 
 enum class MetricChartType { BAR, LINE }
+
+/**
+ * A second measure drawn on the same chart with its OWN y-scale.
+ *
+ * Two series on one chart only works if each keeps its own axis: 84 kg and
+ * 17% have no shared unit, so a shared scale would flatten the percentage
+ * line into a flat line at the bottom. Both axes are hidden; the legend
+ * carries the colour and the tooltip carries both numbers.
+ */
+data class SecondarySeries(
+    val label: String,
+    val unit: String,
+    val source: MetricSource,
+    val decimals: Int = 1,
+    val color: Color = ChartBlue,
+)
 
 /**
  * Reusable Metric Detail Screen Template.
@@ -81,6 +98,10 @@ fun MetricPageScreen(
     insightSentence: String,
     chartType: MetricChartType = MetricChartType.BAR,
     metricSource: MetricSource,
+    /** Optional second measure on the same chart, with its own axis. */
+    secondary: SecondarySeries? = null,
+    /** Optional second number under the hero (e.g. body fat under weight). */
+    heroSubLine: String? = null,
     anchorDayKey: String = remember { todayKey() },
     today: String = remember { todayKey() },
     /** Optional slot between header and hero — metric-to-metric nav, special sections. */
@@ -257,6 +278,14 @@ fun MetricPageScreen(
                     }
                 }
 
+                if (!heroSubLine.isNullOrBlank()) {
+                    Text(
+                        text = heroSubLine,
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
+                }
+
                 // Trend line merged: "−4.4 from last week"
                 if (!trendText.isNullOrBlank()) {
                     val deltaFormatted = trendText
@@ -315,11 +344,27 @@ fun MetricPageScreen(
         }
 
         // 4. Chart area (~180dp tall)
+        val secondaryPoints = remember(secondary, dayKeys) {
+            secondary?.let { sec ->
+                SecondaryPoints(
+                    label = sec.label,
+                    unit = sec.unit,
+                    points = sec.source.series(dayKeys),
+                    color = sec.color,
+                    format = { v ->
+                        v?.let { String.format(java.util.Locale.US, "%.${sec.decimals}f", it) + (if (sec.unit.isEmpty()) "" else " " + sec.unit) }
+                            ?: "\u2014"
+                    },
+                )
+            }
+        }
+
         MetricChartCard(
             points = points,
             chartType = chartType,
             formatValue = formatValue,
-            today = today
+            today = today,
+            secondary = secondaryPoints,
         )
 
         // 5. Insight slot: 13sp foreground semibold call-to-action sentence
@@ -425,23 +470,42 @@ fun MetricPageScreen(
  * - Bars: rounded 4dp tops, BrandPrimaryLime 60% alpha; selected bar full opacity + tooltip
  * - Line: 2dp BrandPrimaryLime; sparse null points rendered as gaps
  */
+/** Second series resolved to the same day keys, with its own formatter. */
+private data class SecondaryPoints(
+    val label: String,
+    val unit: String,
+    val points: List<MetricPoint>,
+    val color: Color,
+    val format: (Double?) -> String,
+)
+
+/** Scale for one series: nulls ignored, so a gap never drags the axis to zero. */
+private fun scaleOf(values: List<Double>, line: Boolean): Pair<Double, Double> {
+    if (values.isEmpty()) return 0.0 to 100.0
+    val max = values.max()
+    val min = values.min()
+    return if (line) (min * 0.98) to max else 0.0 to max
+}
+
 @Composable
 private fun MetricChartCard(
     points: List<MetricPoint>,
     chartType: MetricChartType,
     formatValue: (Double?) -> String,
     today: String,
+    secondary: SecondaryPoints? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedIndex by remember(points) { mutableIntStateOf(-1) }
 
     val nonNullValues = points.mapNotNull { it.value }
-    val maxVal = if (nonNullValues.isNotEmpty()) nonNullValues.maxOrNull() ?: 100.0 else 100.0
-    val minVal = if (chartType == MetricChartType.LINE && nonNullValues.isNotEmpty()) {
-        (nonNullValues.minOrNull() ?: 0.0) * 0.98
-    } else 0.0
-
+    val (minVal, maxVal) = scaleOf(nonNullValues, chartType == MetricChartType.LINE)
     val range = (maxVal - minVal).coerceAtLeast(1.0)
+
+    // Secondary gets its own scale — kg and % share no unit.
+    val secValues = secondary?.points?.mapNotNull { it.value } ?: emptyList()
+    val (secMin, secMax) = scaleOf(secValues, line = true)
+    val secRange = (secMax - secMin).coerceAtLeast(0.1)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -453,9 +517,10 @@ private fun MetricChartCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Tooltip header on tap
+            // Tooltip header on tap — both measures for the same day.
             if (selectedIndex in points.indices) {
                 val pt = points[selectedIndex]
+                val secPt = secondary?.points?.getOrNull(selectedIndex)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -466,12 +531,22 @@ private fun MetricChartCard(
                         fontSize = 11.sp,
                         color = TextMuted
                     )
-                    Text(
-                        text = formatValue(pt.value),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AccentTeal
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = formatValue(pt.value),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AccentTeal
+                        )
+                        if (secondary != null && secPt != null) {
+                            Text(
+                                text = secondary.format(secPt.value),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = secondary.color
+                            )
+                        }
+                    }
                 }
             } else {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -495,6 +570,7 @@ private fun MetricChartCard(
                 val w = size.width
                 val h = size.height
                 val n = points.size
+                val inset = 8.dp.toPx()
 
                 // Reference lines: max and min (MutedFill 1dp)
                 drawLine(
@@ -517,7 +593,7 @@ private fun MetricChartCard(
                     val barWidth = (slotWidth * 0.70f).coerceIn(4f, 24f)
 
                     points.forEachIndexed { i, pt ->
-                        val v = pt.value ?: 0.0
+                        val v = pt.value ?: return@forEachIndexed // gap-fill rule: never plot a missing day as 0
                         val barHeight = ((v - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 8.dp.toPx())
                         val x = i * slotWidth + (slotWidth - barWidth) / 2f
                         val y = h - barHeight
@@ -533,18 +609,19 @@ private fun MetricChartCard(
                         )
                     }
                 } else {
-                    // LINE chart: sparse data -> gaps where value is null
+                    // LINE chart: sparse data -> gaps where value is null.
+                    // A segment is drawn only when BOTH neighbours are real, so
+                    // the line never bridges a missing day or runs off an edge.
                     val slotWidth = if (n > 1) w / (n - 1) else w
 
-                    // Draw connecting segments where adjacent points are both non-null
                     for (i in 0 until n - 1) {
                         val p1 = points[i]
                         val p2 = points[i + 1]
                         if (p1.value != null && p2.value != null) {
-                            val x1 = i * slotWidth
-                            val y1 = h - (((p1.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 16.dp.toPx()) + 8.dp.toPx())
+                            val x1 = if (n > 1) i * slotWidth else w / 2f
+                            val y1 = h - inset - (((p1.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
                             val x2 = (i + 1) * slotWidth
-                            val y2 = h - (((p2.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 16.dp.toPx()) + 8.dp.toPx())
+                            val y2 = h - inset - (((p2.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
 
                             drawLine(
                                 color = AccentTeal,
@@ -556,11 +633,40 @@ private fun MetricChartCard(
                         }
                     }
 
-                    // Draw data dots
+                    // Secondary line, own scale, behind the dots.
+                    secondary?.let { sec ->
+                        for (i in 0 until n - 1) {
+                            val p1 = sec.points.getOrNull(i)
+                            val p2 = sec.points.getOrNull(i + 1)
+                            if (p1?.value != null && p2?.value != null) {
+                                val x1 = if (n > 1) i * slotWidth else w / 2f
+                                val y1 = h - inset - (((p1.value - secMin) / secRange).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
+                                val x2 = (i + 1) * slotWidth
+                                val y2 = h - inset - (((p2.value - secMin) / secRange).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
+
+                                drawLine(
+                                    color = sec.color,
+                                    start = Offset(x1, y1),
+                                    end = Offset(x2, y2),
+                                    strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                        }
+                        if (n == 1) {
+                            val only = sec.points.getOrNull(0)?.value
+                            if (only != null) {
+                                val y = h - inset - (((only - secMin) / secRange).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
+                                drawCircle(color = sec.color, radius = 2.5.dp.toPx(), center = Offset(w / 2f, y))
+                            }
+                        }
+                    }
+
+                    // Primary dots on top.
                     points.forEachIndexed { i, pt ->
                         if (pt.value != null) {
                             val x = if (n > 1) i * slotWidth else w / 2f
-                            val y = h - (((pt.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 16.dp.toPx()) + 8.dp.toPx())
+                            val y = h - inset - (((pt.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
                             val isSelected = i == selectedIndex
 
                             drawCircle(
@@ -572,7 +678,38 @@ private fun MetricChartCard(
                     }
                 }
             }
+
+            // Legend: only when there are two lines. Each entry names its unit,
+            // because the axes are hidden and a colour alone means nothing.
+            secondary?.let { sec ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LegendDot(color = AccentTeal, label = secondaryPrimaryLabel(points, formatValue))
+                    LegendDot(color = sec.color, label = sec.label)
+                }
+            }
         }
+    }
+}
+
+/** The primary series has no name of its own in the chart — the page title is
+ *  "Body Comp", so the lime line is the weight. Falls back to the latest value
+ *  so the legend reads like a figure key rather than a second title. */
+private fun secondaryPrimaryLabel(points: List<MetricPoint>, formatValue: (Double?) -> String): String {
+    val latest = points.lastOrNull { it.value != null }?.value
+    return if (latest != null) formatValue(latest) else "Weight"
+}
+
+@Composable
+private fun LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Canvas(modifier = Modifier.size(6.dp)) {
+            drawCircle(color = color, radius = size.minDimension / 2f)
+        }
+        Text(text = label, fontSize = 10.sp, color = TextMuted)
     }
 }
 
