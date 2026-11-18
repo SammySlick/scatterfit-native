@@ -181,6 +181,8 @@ fun MetricScreen(
         metricSource = source,
         secondary = secondary,
         heroSubLine = heroSubLine,
+        // The teal line needs a name in the legend once there are three of them.
+        primaryLabel = if (currentId == MetricId.WEIGHT) "Weight" else def.label,
         anchorDayKey = todayKey,
         today = todayKey,
         onBackClick = onBackClick,

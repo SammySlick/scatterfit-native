@@ -39,7 +39,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
@@ -50,6 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scatterbrain.scatterfit.core.DayRows
+import com.scatterbrain.scatterfit.core.MovingAverage
 import com.scatterbrain.scatterfit.core.lastNDayKeys
 import com.scatterbrain.scatterfit.core.todayKey
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
@@ -102,6 +106,10 @@ fun MetricPageScreen(
     secondary: SecondarySeries? = null,
     /** Optional second number under the hero (e.g. body fat under weight). */
     heroSubLine: String? = null,
+    /** Name of the primary series for the legend (e.g. "Weight"). */
+    primaryLabel: String? = null,
+    /** Draw a trailing 7-day moving average over the primary series. */
+    showAverage: Boolean = true,
     anchorDayKey: String = remember { todayKey() },
     today: String = remember { todayKey() },
     /** Optional slot between header and hero — metric-to-metric nav, special sections. */
@@ -359,12 +367,26 @@ fun MetricPageScreen(
             }
         }
 
+        val average = remember(points, showAverage) {
+            if (!showAverage) emptyList() else {
+                val values = points.map { it.value }
+                if (!MovingAverage.hasEnough(values)) emptyList()
+                else MovingAverage.rollingPoints(
+                    points = points,
+                    key = { it.dayKey },
+                    value = { it.value },
+                ).map { it.value }
+            }
+        }
+
         MetricChartCard(
             points = points,
             chartType = chartType,
             formatValue = formatValue,
             today = today,
             secondary = secondaryPoints,
+            average = average,
+            primaryLabel = primaryLabel,
         )
 
         // 5. Insight slot: 13sp foreground semibold call-to-action sentence
@@ -397,9 +419,14 @@ fun MetricPageScreen(
             }
         }
 
-        // 6. List slot: optional vertical list of the most recent 7 daily values
-        if (showList && points.isNotEmpty()) {
-            val recentPoints = remember(points) { points.takeLast(7).reversed() }
+        // 6. Recent days. One row per DAY, not per reading: a skipped day is
+        //    shown as a skipped day, not deleted. Sam, 2026-11-18.
+        if (showList && dayKeys.isNotEmpty()) {
+            val rows = DayRows.build(
+                dayKeys = dayKeys,
+                values = points.map { it.value },
+                averages = average,
+            )
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -411,18 +438,30 @@ fun MetricPageScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = "RECENT DAYS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextMuted,
-                        letterSpacing = 1.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 10.sp
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "RECENT DAYS",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted,
+                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 10.sp
+                        )
+                        val logged = DayRows.loggedCount(rows)
+                        Text(
+                            text = if (logged == 0) "no readings" else "$logged of ${rows.size} logged",
+                            fontSize = 10.sp,
+                            color = TextMuted
+                        )
+                    }
 
-                    recentPoints.forEach { point ->
-                        val dayTitle = formatDayKeyTitle(point.dayKey, today)
-                        val dotColor = scoreToJudgementColor(point.score)
+                    rows.forEach { row ->
+                        val dayTitle = formatDayKeyTitle(row.dayKey, today)
+                        val hasValue = row.value != null
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -437,22 +476,34 @@ fun MetricPageScreen(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(dotColor)
+                                        .background(if (hasValue) AccentTeal else MutedFill)
                                 )
                                 Text(
                                     text = dayTitle,
                                     fontSize = 13.sp,
-                                    color = TextForeground,
+                                    color = if (hasValue) TextForeground else TextMuted,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
 
-                            Text(
-                                text = formatValue(point.value),
-                                fontSize = 13.sp,
-                                color = TextForeground,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (hasValue && row.average != null) {
+                                    Text(
+                                        text = "avg " + formatValue(row.average),
+                                        fontSize = 10.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                                Text(
+                                    text = if (hasValue) formatValue(row.value) else "no reading",
+                                    fontSize = 13.sp,
+                                    color = if (hasValue) TextForeground else TextMuted,
+                                    fontWeight = if (hasValue) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            }
                         }
                     }
                 }
@@ -487,6 +538,51 @@ private fun scaleOf(values: List<Double>, line: Boolean): Pair<Double, Double> {
     return if (line) (min * 0.98) to max else 0.0 to max
 }
 
+/**
+ * Draws one connected series, bridging missing days.
+ *
+ * Sam's rule (2026-11-18): every dot connects. A gap in the readings is a gap
+ * in the *measurements*, not a break in the trend, so leaving a hole in the
+ * line made three weigh-ins look like three unrelated events. Measured
+ * segments are solid; segments that cross a missing day are dashed, so the eye
+ * is not told a reading existed when it did not.
+ */
+private fun DrawScope.drawConnectedSeries(
+    n: Int,
+    valueAt: (Int) -> Double?,
+    yOf: (Double) -> Float,
+    color: Color,
+    strokeWidth: Float,
+    dashBridges: Boolean = true,
+    bridgeColor: Color = color,
+) {
+    if (n == 0) return
+    val slotWidth = if (n > 1) size.width / (n - 1) else size.width
+    fun xOf(i: Int): Float = if (n > 1) i * slotWidth else size.width / 2f
+
+    val real = (0 until n).filter { valueAt(it) != null }
+    if (real.isEmpty()) return
+    if (real.size == 1) {
+        drawCircle(color = color, radius = 2.5.dp.toPx(), center = Offset(xOf(real[0]), yOf(valueAt(real[0])!!)))
+        return
+    }
+    for (k in 0 until real.size - 1) {
+        val a = real[k]
+        val b = real[k + 1]
+        val bridged = b - a > 1
+        drawLine(
+            color = if (bridged) bridgeColor else color,
+            start = Offset(xOf(a), yOf(valueAt(a)!!)),
+            end = Offset(xOf(b), yOf(valueAt(b)!!)),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+            pathEffect = if (bridged && dashBridges) {
+                PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()), 0f)
+            } else null,
+        )
+    }
+}
+
 @Composable
 private fun MetricChartCard(
     points: List<MetricPoint>,
@@ -494,6 +590,8 @@ private fun MetricChartCard(
     formatValue: (Double?) -> String,
     today: String,
     secondary: SecondaryPoints? = null,
+    average: List<Double?> = emptyList(),
+    primaryLabel: String? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedIndex by remember(points) { mutableIntStateOf(-1) }
@@ -506,6 +604,9 @@ private fun MetricChartCard(
     val secValues = secondary?.points?.mapNotNull { it.value } ?: emptyList()
     val (secMin, secMax) = scaleOf(secValues, line = true)
     val secRange = (secMax - secMin).coerceAtLeast(0.1)
+
+    val hasAverage = average.size == points.size && average.any { it != null }
+    val latestAverage = average.lastOrNull { it != null }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -588,12 +689,21 @@ private fun MetricChartCard(
 
                 if (n == 0) return@Canvas
 
+                // One mapping per chart type, so the average line lands on the
+                // same scale as the thing it averages.
+                val yOf: (Double) -> Float =
+                    if (chartType == MetricChartType.BAR) {
+                        { v -> h - ((v - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 8.dp.toPx()) }
+                    } else {
+                        { v -> h - inset - ((v - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 2 * inset) }
+                    }
+
                 if (chartType == MetricChartType.BAR) {
                     val slotWidth = w / n
                     val barWidth = (slotWidth * 0.70f).coerceIn(4f, 24f)
 
                     points.forEachIndexed { i, pt ->
-                        val v = pt.value ?: return@forEachIndexed // gap-fill rule: never plot a missing day as 0
+                        val v = pt.value ?: return@forEachIndexed // never plot a missing day as 0
                         val barHeight = ((v - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 8.dp.toPx())
                         val x = i * slotWidth + (slotWidth - barWidth) / 2f
                         val y = h - barHeight
@@ -609,91 +719,81 @@ private fun MetricChartCard(
                         )
                     }
                 } else {
-                    // LINE chart: sparse data -> gaps where value is null.
-                    // A segment is drawn only when BOTH neighbours are real, so
-                    // the line never bridges a missing day or runs off an edge.
-                    val slotWidth = if (n > 1) w / (n - 1) else w
-
-                    for (i in 0 until n - 1) {
-                        val p1 = points[i]
-                        val p2 = points[i + 1]
-                        if (p1.value != null && p2.value != null) {
-                            val x1 = if (n > 1) i * slotWidth else w / 2f
-                            val y1 = h - inset - (((p1.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
-                            val x2 = (i + 1) * slotWidth
-                            val y2 = h - inset - (((p2.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
-
-                            drawLine(
-                                color = AccentTeal,
-                                start = Offset(x1, y1),
-                                end = Offset(x2, y2),
-                                strokeWidth = 2.dp.toPx(),
-                                cap = StrokeCap.Round
-                            )
-                        }
-                    }
-
-                    // Secondary line, own scale, behind the dots.
+                    // Secondary line first, behind: own scale, own colour.
                     secondary?.let { sec ->
-                        for (i in 0 until n - 1) {
-                            val p1 = sec.points.getOrNull(i)
-                            val p2 = sec.points.getOrNull(i + 1)
-                            if (p1?.value != null && p2?.value != null) {
-                                val x1 = if (n > 1) i * slotWidth else w / 2f
-                                val y1 = h - inset - (((p1.value - secMin) / secRange).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
-                                val x2 = (i + 1) * slotWidth
-                                val y2 = h - inset - (((p2.value - secMin) / secRange).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
-
-                                drawLine(
-                                    color = sec.color,
-                                    start = Offset(x1, y1),
-                                    end = Offset(x2, y2),
-                                    strokeWidth = 2.dp.toPx(),
-                                    cap = StrokeCap.Round
-                                )
-                            }
-                        }
-                        if (n == 1) {
-                            val only = sec.points.getOrNull(0)?.value
-                            if (only != null) {
-                                val y = h - inset - (((only - secMin) / secRange).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
-                                drawCircle(color = sec.color, radius = 2.5.dp.toPx(), center = Offset(w / 2f, y))
-                            }
-                        }
+                        drawConnectedSeries(
+                            n = n,
+                            valueAt = { i -> sec.points.getOrNull(i)?.value },
+                            yOf = { v -> h - inset - (((v - secMin) / secRange).toFloat().coerceIn(0f, 1f) * (h - 2 * inset)) },
+                            color = sec.color,
+                            strokeWidth = 2.dp.toPx(),
+                        )
                     }
 
-                    // Primary dots on top.
+                    // Primary: every real point connects; dashed across holes.
+                    drawConnectedSeries(
+                        n = n,
+                        valueAt = { i -> points.getOrNull(i)?.value },
+                        yOf = yOf,
+                        color = AccentTeal,
+                        strokeWidth = 2.dp.toPx(),
+                    )
+                }
+
+                // 7-day average: same scale as the primary, neutral grey so it
+                // reads as a summary and never as a warning (deficit rule).
+                if (hasAverage) {
+                    drawConnectedSeries(
+                        n = n,
+                        valueAt = { i -> average.getOrNull(i) },
+                        yOf = yOf,
+                        color = AverageLine,
+                        strokeWidth = 1.5.dp.toPx(),
+                        dashBridges = false,
+                    )
+                }
+
+                // Dots on top: a dot means "there is a reading here". The dashes
+                // between two dots mean "there is not".
+                if (chartType != MetricChartType.BAR) {
+                    val slotWidth = if (n > 1) w / (n - 1) else w
                     points.forEachIndexed { i, pt ->
                         if (pt.value != null) {
                             val x = if (n > 1) i * slotWidth else w / 2f
-                            val y = h - inset - (((pt.value - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 2 * inset))
                             val isSelected = i == selectedIndex
-
                             drawCircle(
                                 color = if (isSelected) TextForeground else AccentTeal,
                                 radius = if (isSelected) 5.dp.toPx() else 3.dp.toPx(),
-                                center = Offset(x, y)
+                                center = Offset(x, yOf(pt.value))
                             )
                         }
                     }
                 }
             }
 
-            // Legend: only when there are two lines. Each entry names its unit,
-            // because the axes are hidden and a colour alone means nothing.
-            secondary?.let { sec ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    LegendDot(color = AccentTeal, label = secondaryPrimaryLabel(points, formatValue))
-                    LegendDot(color = sec.color, label = sec.label)
+            // Legend. Names and units, because the axes are hidden: a colour on
+            // its own means nothing.
+            val legendPrimary = primaryLabel ?: secondaryPrimaryLabel(points, formatValue)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LegendDot(color = AccentTeal, label = legendPrimary)
+                secondary?.let { sec -> LegendDot(color = sec.color, label = sec.label) }
+                if (hasAverage && latestAverage != null) {
+                    LegendDot(
+                        color = AverageLine,
+                        label = "7-day avg " + formatValue(latestAverage),
+                    )
                 }
             }
         }
     }
 }
+
+/** Neutral, not a judgement colour: an average is a description, not a verdict. */
+private val AverageLine = TextForeground.copy(alpha = 0.45f)
 
 /** The primary series has no name of its own in the chart — the page title is
  *  "Body Comp", so the lime line is the weight. Falls back to the latest value
