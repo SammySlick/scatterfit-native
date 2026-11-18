@@ -20,8 +20,8 @@ class MovingAverageTest {
         // day 0..1 are below the min-point gate, day 2 onward report
         assertNull(avg[0])
         assertNull(avg[1])
-        assertEquals(2.0, avg[2]!!, 1e-9)      // 1,2,3
-        assertEquals(5.0, avg[6]!!, 1e-9)      // 1..7
+        assertEquals(2.0, avg[2]!!, 1e-9)      // (1+2+3)/3 = 2
+        assertEquals(4.0, avg[6]!!, 1e-9)      // (1+2+…+7)/7 = 4
     }
 
     @Test
