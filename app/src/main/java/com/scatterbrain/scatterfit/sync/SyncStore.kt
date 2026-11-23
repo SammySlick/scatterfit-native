@@ -107,10 +107,22 @@ class SyncStore(private val dir: File) {
             },
         )
 
-        /** Identity for dedupe: method + start + end. Two re-reads of the same
-         *  physical record share it; an edit (new content, extended end) also
-         *  shares it, so the fresh read must win over the stale cached row —
-         *  the engine inserts new records last so they overwrite on collision. */
-        fun key(method: RecordMethod, r: HealthRecord): String = "$method|${r.start}"
+        /** Identity for dedupe: method + DATA ORIGIN + start.
+         *
+         *  The origin MUST be part of the key. Aggregated types (steps,
+         *  distance, burned kcal) are synthesized as ONE RECORD PER ORIGIN PER
+         *  DAY, so every origin's record for a given day shares the same start
+         *  (local midnight) — with a method+start key they collided and only
+         *  the last origin written survived the merge. Live 2026-11-23: Hume
+         *  said ~8k steps, the app said 1.5k, because Samsung's daily record
+         *  overwrote Hume's in the cache and maxAcrossOrigins then had only one
+         *  origin to choose from.
+         *
+         *  Still true for raw records: two re-reads of the same physical record
+         *  share a key, and an edit (new content, extended end) shares it too, so
+         *  the fresh read wins over the stale cached row — the engine inserts new
+         *  records last so they overwrite on collision. */
+        fun key(method: RecordMethod, r: HealthRecord): String =
+            "$method|${r.app ?: ""}|${r.start}"
     }
 }

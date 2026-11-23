@@ -204,6 +204,51 @@ private fun BackgroundSyncCard(refreshKey: Int) {
     }
 }
 
+@Composable
+private fun StepsBySourceCard(refreshKey: Int) {
+    val rows = remember(refreshKey) { SyncHub.stepsByOriginToday() }
+    val records = SyncHub.records.value?.get(RecordMethod.STEPS)?.size ?: 0
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .background(DarkCardSurface)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = "Today's steps by source",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TextForeground
+        )
+        if (rows.isEmpty()) {
+            Text(
+                text = if (records == 0) "no step records cached at all"
+                else "$records step records cached, none dated today",
+                fontSize = 11.sp,
+                color = JudgementWarn,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        } else {
+            for (r in rows) {
+                Text(
+                    text = "${r.name}: ${r.steps} steps${if (r.won) "  ← used" else ""}",
+                    fontSize = 11.sp,
+                    color = if (r.won) TealHighlight else TextMuted,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Text(
+                text = "The app shows the highest source's count, never the sum.",
+                fontSize = 10.sp,
+                color = TextMuted,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
 internal fun formatAge(gapMs: Long): String = when {
     gapMs < 60_000L -> "just now"
     gapMs < 3_600_000L -> "${gapMs / 60_000L}m ago"
@@ -505,6 +550,10 @@ fun DebugScreen(
             // look identical, which is how a two-hourly job can be dead for weeks
             // without anyone noticing.
             BackgroundSyncCard(refreshKey = refreshKey)
+
+            // Which app supplied today's step count, and what the others claim.
+            // "Hume says 8k, the app says 1.5k" is unanswerable from a total.
+            StepsBySourceCard(refreshKey = refreshKey)
 
             // Scrollable method cards
             Column(

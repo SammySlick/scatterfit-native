@@ -27,6 +27,38 @@ class SyncEngineTest {
     )
 
     @Test
+    fun `two origins writing the same day both survive the merge`() = runTest {
+        val e = engine()
+        val dayStart = "2026-11-23T00:00:00.000Z"
+
+        e.sync { _, _, _, _ ->
+            mapOf(
+                RecordMethod.STEPS to listOf(
+                    // One aggregated record per origin per day: identical start,
+                    // identical end. Keyed on method+start they collided and the
+                    // last one written won — the 2026-11-23 undercount.
+                    HealthRecord(
+                        app = "com.elink.fittrackhealth.pro",
+                        start = dayStart,
+                        end = dayStart,
+                        data = buildJsonObject { put("count", JsonPrimitive(8000)) },
+                    ),
+                    HealthRecord(
+                        app = "com.sec.android.app.shealth",
+                        start = dayStart,
+                        end = dayStart,
+                        data = buildJsonObject { put("count", JsonPrimitive(1500)) },
+                    ),
+                ),
+            )
+        }
+
+        val cached = e.store.load(RecordMethod.STEPS).records
+        assertEquals(2, cached.size)
+        assertEquals(setOf("com.elink.fittrackhealth.pro", "com.sec.android.app.shealth"), cached.mapNotNull { it.app }.toSet())
+    }
+
+    @Test
     fun `killed sync commits per slice - next sync resumes from last slice cursor`() = runTest {
         val e = engine()
         val dayMs = 24L * 60 * 60 * 1000

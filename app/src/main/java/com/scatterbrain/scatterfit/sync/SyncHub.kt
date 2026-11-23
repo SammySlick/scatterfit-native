@@ -96,6 +96,31 @@ object SyncHub {
         return elapsed > 24 * 3600 * 1000L // > 24h
     }
 
+    /** One-off repair after the dedupe key gained the data origin (2026-11-23).
+     *
+     *  The old key was method+start, so for the aggregated types (one record per
+     *  ORIGIN per day) every origin's record for a day collided and only the last
+     *  one written survived the cache. Records for the losing origin are MISSING
+     *  from history, not merely mis-ranked — so fixing the key alone would only
+     *  repair the last two days (the overlap window). This flag triggers one
+     *  targeted re-read of the aggregated types over the full lookback.
+     *
+     *  It is deliberately narrow: aggregated types only, and it rides the fast
+     *  path, so cursors are untouched and no raw record type is re-read. One
+     *  aggregate call per origin for the whole window — cheap. */
+    private const val REPAIR_KEY = "origin_key_repair_v"
+    private const val REPAIR_VERSION = 2
+
+    /** Today's steps split by data origin, for the Debug screen. Answering
+     *  "Hume says 8k, the app says 1.5k" needs the split, not the total. */
+    fun stepsByOriginToday(
+        zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+        dayKey: String = com.scatterbrain.scatterfit.core.todayKey(zone),
+    ): List<com.scatterbrain.scatterfit.data.StepsOriginRow> {
+        val records = _records.value?.get(RecordMethod.STEPS) ?: return emptyList()
+        return com.scatterbrain.scatterfit.data.stepsByOriginForDay(records, zone, dayKey)
+    }
+
     fun init(context: Context, scope: CoroutineScope) {
         if (initJob != null) return
         val appContext = context.applicationContext
@@ -173,6 +198,51 @@ object SyncHub {
 
     /** Run one incremental sync against Health Connect. Safe to call from
      *  anywhere (service, activity) — concurrency-guarded, idempotent. */
+    private fun readerFor(c: HealthConnectClient): suspend (
+        Set<RecordMethod>,
+        Long,
+        Long,
+        suspend (RecordMethod, Long, List<HealthRecord>) -> Unit,
+    ) -> Map<RecordMethod, List<HealthRecord>> = { ms, fromMs, toMs, onSlice ->
+        var sliceN = 0
+        val read = HcReaders.readAll(c, fromMs, toMs, ms) { m, sliceEnd, sliceRecords ->
+            onSlice(m, sliceEnd, sliceRecords)
+            sliceN++
+            Log.d(TAG, "slice ${sliceN} committed: ${m.name} rows=${sliceRecords.size} cursor=${sliceEnd}")
+        }
+        read.forEach { (method, rows) ->
+            Log.d(TAG, "sync read: ${method.name} rows=${rows.size} window=${fromMs}..${toMs}")
+        }
+        Log.d(TAG, "sync read: methods=${ms.size} totalRows=${read.values.sumOf { it.size }}")
+        read
+    }
+
+    /** One-off re-read of the aggregated types after the dedupe key gained the
+     *  data origin (see REPAIR_VERSION). Runs BEFORE the sync proper, on the fast
+     *  path so cursors are untouched, and only once per install: the loses were
+     *  historical rows, and the ordinary overlap window would only have repaired
+     *  the last two days. Failure is not fatal — the flag stays unset and the next
+     *  sync tries again. */
+    private suspend fun repairOriginKeysIfNeeded(c: HealthConnectClient, now: Long) {
+        val prefs = syncPrefs ?: return
+        if (prefs.getInt(REPAIR_KEY, 0) >= REPAIR_VERSION) return
+        val e = engine ?: return
+        val aggregated = com.scatterbrain.scatterfit.data.HcAggregators.AGGREGATED
+        Log.d(TAG, "repair: re-reading ${aggregated.map { it.name }} over the lookback (origin key change)")
+        try {
+            e.sync(
+                methods = aggregated,
+                windowFromOverride = now - SyncEngine.LOOKBACK_MS,
+                reader = readerFor(c),
+                onProgress = { snapshot -> _records.value = publishFood(snapshot) },
+            )
+            prefs.edit().putInt(REPAIR_KEY, REPAIR_VERSION).apply()
+            Log.d(TAG, "repair: done, flag set to $REPAIR_VERSION")
+        } catch (ex: Exception) {
+            Log.w(TAG, "repair: failed (${ex.message ?: ex.javaClass.simpleName}) — will retry next sync")
+        }
+    }
+
     suspend fun syncNow(
         methods: Set<RecordMethod> = RecordMethod.entries.toSet(),
         windowFromOverride: Long? = null,
@@ -194,22 +264,11 @@ object SyncHub {
 
         Log.d(TAG, "syncNow: STARTING engine sync (effectiveWindowFrom=$effectiveWindowFrom, forceFull=$forceFull)")
         return try {
+            repairOriginKeysIfNeeded(c, now)
             val result = e.sync(
                 methods = methods,
                 windowFromOverride = effectiveWindowFrom,
-                reader = { ms, fromMs, toMs, onSlice ->
-                    var sliceN = 0
-                    val read = HcReaders.readAll(c, fromMs, toMs, ms) { m, sliceEnd, sliceRecords ->
-                        onSlice(m, sliceEnd, sliceRecords)
-                        sliceN++
-                        Log.d(TAG, "slice ${sliceN} committed: ${m.name} rows=${sliceRecords.size} cursor=${sliceEnd}")
-                    }
-                    read.forEach { (method, rows) ->
-                        Log.d(TAG, "sync read: ${method.name} rows=${rows.size} window=${fromMs}..${toMs}")
-                    }
-                    Log.d(TAG, "sync read: methods=${ms.size} totalRows=${read.values.sumOf { it.size }}")
-                    read
-                },
+                reader = readerFor(c),
                 // Stream each slice into the UI the moment it commits — the
                 // Today screen updates WHILE the sync runs, not after.
                 onProgress = { snapshot -> _records.value = publishFood(snapshot) },

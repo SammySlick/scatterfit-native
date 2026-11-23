@@ -174,6 +174,13 @@ object HcAggregators {
             }
             if (buckets.isEmpty()) continue
             Log.d(TAG, "aggregate: $origin buckets=${buckets.size} metrics=${mMethods.map { it.name }}")
+            // Per-origin totals in the log: the whole point of aggregating per
+            // origin is that origins disagree (Hume vs Samsung), and a merged
+            // total hides which app actually supplied the number.
+            if (RecordMethod.STEPS in mMethods) {
+                val sum = buckets.sumOf { b -> b.result[StepsRecord.COUNT_TOTAL] ?: 0L }
+                Log.d(TAG, "aggregate steps: origin=$origin total=$sum days=${buckets.size}")
+            }
 
             // Buckets oldest -> newest; synthesize one daily record per
             // (origin, day, metric). The LAST bucket may end at tomorrow's
