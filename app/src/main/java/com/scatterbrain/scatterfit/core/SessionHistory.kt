@@ -103,15 +103,16 @@ internal fun doneExerciseCount(record: SessionRecord): Int =
     record.exercises.count { it.doneSets().isNotEmpty() }
 
 /**
- * Volume in kg: weight x reps for every done set that has a weight. Uses
- * repsMin (the rep you actually logged) falling back to repsMax, matching
- * calculateTotalVolumeKg in the summary screen so the two can never disagree.
+ * Volume in kg: weight x reps for every done set that has a weight. Uses reps actually
+ * performed, falling back to repsMin then repsMax for sets logged before actual reps were
+ * recorded. Kept identical to calculateTotalVolumeKg in the summary screen so the two can
+ * never disagree.
  */
 internal fun volumeKg(record: SessionRecord): Double =
     record.exercises.sumOf { ex ->
         ex.doneSets().sumOf { s ->
             val w = s.weightKg ?: return@sumOf 0.0
-            val reps = (s.repsMin ?: s.repsMax ?: 0)
+            val reps = (s.actualReps ?: s.repsMin ?: s.repsMax ?: 0)
             w * reps
         }
     }

@@ -177,6 +177,43 @@ class ActiveSessionStorageTest {
     }
 
     @Test
+    fun `a session where only reps were typed is worth resuming`() {
+        val typedOnly = ActiveSessionDraft(
+            id = "draft-reps",
+            dayKey = "2026-11-10",
+            startedAt = 0L,
+            updatedAt = 1L,
+            exercises = listOf(
+                DraftExerciseState(
+                    exerciseId = "bench",
+                    exerciseName = "Bench",
+                    sets = listOf(DraftSetState(actualReps = 9)),
+                )
+            ),
+        )
+        assertFalse(
+            "Nine reps typed is work done, even with no weight and no tick",
+            isDraftUntouched(typedOnly)
+        )
+    }
+
+    @Test
+    fun `a set added mid-exercise does not inherit what was performed`() {
+        val performed = DraftSetState(
+            weightKg = 60.0,
+            repsMin = 10,
+            repsMax = 12,
+            actualReps = 11,
+            difficulty = "hard",
+            done = true,
+        )
+        val added = performed.asAddedSet()
+
+        assertNull("A new set has recorded no reps yet", added.actualReps)
+        assertEquals("The target still carries over", 10, added.repsMin)
+    }
+
+    @Test
     fun `a set added to a timed exercise keeps its duration`() {
         val plank = DraftSetState(timeSeconds = 45, timeUnit = "sec", done = true)
         val added = plank.asAddedSet()

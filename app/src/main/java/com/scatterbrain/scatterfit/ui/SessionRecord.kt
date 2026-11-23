@@ -9,8 +9,18 @@ import java.util.UUID
 @Serializable
 data class LoggedSetInSession(
     val weightKg: Double? = null,
+    /**
+     * The reps the prescription asked for. On a set logged before [actualReps] existed this
+     * doubles as the only rep count available, so readers must fall back to it.
+     */
     val repsMin: Int? = null,
     val repsMax: Int? = null,
+    /**
+     * Reps actually performed. Null means "not recorded" and must stay distinct from 0:
+     * an unticked set and a set of zero reps are different things, and collapsing them
+     * would drag every volume average down.
+     */
+    val actualReps: Int? = null,
     val timeSeconds: Int? = null,
     val difficulty: String? = null, // easy | medium | hard
     val done: Boolean = false,
@@ -91,13 +101,34 @@ class SessionRecordsStorage(
     }
 }
 
+/**
+ * The weight to prefill for [setIndex], read from the last time this exercise was performed.
+ *
+ * Deliberately the same "done sets only, indexed among done sets" rule as
+ * [formatPreviousSetSummary], because the box and the PREV column sit side by side on the
+ * phone: if they indexed differently the app would argue with itself on screen.
+ *
+ * Falls back to the last performed set for sets beyond last time's count — a fourth set is
+ * another one of the same lift, not an unknown quantity.
+ */
+fun performedWeightForSet(previousExercise: LoggedExerciseInSession?, setIndex: Int): Double? {
+    if (previousExercise == null) return null
+    val doneSets = previousExercise.sets.filter { it.done }
+    val exact = doneSets.getOrNull(setIndex)
+    if (exact != null) return exact.weightKg
+    return doneSets.lastOrNull()?.weightKg
+}
+
 fun formatPreviousSetSummary(previousExercise: LoggedExerciseInSession?, setIndex: Int): String {
     if (previousExercise == null) return "—"
     val doneSets = previousExercise.sets.filter { it.done }
     val prevSet = doneSets.getOrNull(setIndex) ?: return "—"
 
+    // What he DID beats what was asked for. Old records only carry the prescription, so
+    // they keep showing it rather than going blank.
     val targetStr = when {
         prevSet.timeSeconds != null -> formatClockTime(prevSet.timeSeconds)
+        prevSet.actualReps != null -> "${prevSet.actualReps}"
         prevSet.repsMin != null && prevSet.repsMax != null -> "${prevSet.repsMin}-${prevSet.repsMax}"
         prevSet.repsMin != null -> "${prevSet.repsMin}"
         else -> ""

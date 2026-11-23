@@ -45,6 +45,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -95,6 +96,11 @@ fun TrainingScreen(
     storage: RoutineStorage,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Bumped by the banner on another tab. Any increase means "open the running workout". */
+    resumeRequest: Int = 0,
+    onResumeRequestHandled: () -> Unit = {},
+    /** Lets the shell hide the banner while the player itself is on screen. */
+    onPlayerOpenChanged: (Boolean) -> Unit = {},
 ) {
     BackHandler(onBack = onBackClick)
 
@@ -139,6 +145,32 @@ fun TrainingScreen(
     var sessionConfirmationMessage by remember { mutableStateOf<String?>(null) }
 
     var activePlayingDraft by remember { mutableStateOf<ActiveSessionDraft?>(null) }
+
+    val isPlayerOpen = activePlayingRoutine != null || activePlayingSessionName != null || activePlayingDraft != null
+    LaunchedEffect(isPlayerOpen) { onPlayerOpenChanged(isPlayerOpen) }
+
+    // Leaving the tab uncomposes this screen, so "player is open" must be retracted on the
+    // way out. Without this the shell keeps believing a session is on screen and the banner
+    // never comes back.
+    DisposableEffect(Unit) {
+        onDispose { onPlayerOpenChanged(false) }
+    }
+
+    // Tapped from the banner on another tab: go straight into the running session rather
+    // than landing on a prompt card he then has to tap a second time.
+    LaunchedEffect(resumeRequest) {
+        if (resumeRequest <= 0) return@LaunchedEffect
+        val draft = draftStorage.load()
+        if (draft != null) {
+            activeDraft = draft
+            activePlayingDraft = draft
+            activePlayingRoutine = draft.routineId?.let { id -> routines.find { it.id == id } }
+            activePlayingSessionName = draft.sessionName
+            activePlayingDayKey = draft.dayKey
+        }
+        // Consumed, so returning to this tab later doesn't reopen a session he abandoned.
+        onResumeRequestHandled()
+    }
 
     LaunchedEffect(sessionConfirmationMessage) {
         if (sessionConfirmationMessage != null) {

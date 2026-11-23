@@ -22,6 +22,8 @@ data class DraftSetState(
     val weightKg: Double? = null,
     val repsMin: Int? = null,
     val repsMax: Int? = null,
+    /** Reps actually performed. Null = not recorded; never conflated with 0. */
+    val actualReps: Int? = null,
     val timeSeconds: Int? = null,
     val timeUnit: String = "sec",
     val difficulty: String? = null, // easy | medium | hard
@@ -75,21 +77,22 @@ fun draftProgressLabel(draft: ActiveSessionDraft, nowMillis: Long): String {
     return if (total == 0) elapsed else "$elapsed · $done of $total sets"
 }
 
-/** True when the draft has nothing worth resuming (no set ticked, no weight entered). */
+/** True when the draft has nothing worth resuming (no set ticked, nothing entered). */
 fun isDraftUntouched(draft: ActiveSessionDraft): Boolean = draft.exercises.all { ex ->
-    ex.sets.none { it.done || it.weightKg != null || it.difficulty != null }
+    ex.sets.none { it.done || it.weightKg != null || it.difficulty != null || it.actualReps != null }
 }
 
 /**
  * A set added mid-workout, seeded from the set before it.
  *
- * The load and the rep/time target carry over, because adding a set almost always means
- * "another one like that". The tick and the difficulty rating do not: nothing has been
- * performed yet.
+ * The load and the rep/time TARGET carry over, because adding a set almost always means
+ * "another one like that". What was performed does not: nothing has happened yet, so the
+ * tick, the difficulty rating and the rep count all start empty.
  */
 fun DraftSetState.asAddedSet(): DraftSetState = copy(
     difficulty = null,
     done = false,
+    actualReps = null,
 )
 
 /** Rest used for an exercise added mid-workout when nothing better is known. */

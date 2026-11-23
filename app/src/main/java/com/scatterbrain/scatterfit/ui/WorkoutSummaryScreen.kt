@@ -106,7 +106,8 @@ fun calculateTotalVolumeKg(session: SessionRecord): Double {
     return session.exercises.sumOf { ex ->
         ex.sets.filter { it.done && it.weightKg != null }.sumOf { s ->
             val weight = s.weightKg ?: 0.0
-            val reps = (s.repsMin ?: s.repsMax ?: 0).toDouble()
+            // Reps performed, falling back to the prescription for older records.
+            val reps = (s.actualReps ?: s.repsMin ?: s.repsMax ?: 0).toDouble()
             weight * reps
         }
     }
@@ -122,7 +123,9 @@ fun calculateTotalTimeUnderTensionSeconds(session: SessionRecord): Int {
 
 fun isTimedOnlySession(session: SessionRecord): Boolean {
     val hasVolume = session.exercises.any { ex ->
-        ex.sets.any { it.done && (it.weightKg != null || it.repsMin != null || it.repsMax != null) }
+        ex.sets.any {
+            it.done && (it.weightKg != null || it.repsMin != null || it.repsMax != null || it.actualReps != null)
+        }
     }
     val hasTime = session.exercises.any { ex ->
         ex.sets.any { it.done && it.timeSeconds != null }

@@ -52,13 +52,16 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -134,10 +137,14 @@ class PlayerSetState(
     initialTimeSeconds: Int?,
     initialTimeUnit: String,
     initialDifficulty: String?,
+    initialActualReps: Int? = null,
 ) {
     var weightKg by mutableStateOf(initialWeightKg)
     var repsMin by mutableStateOf(initialRepsMin)
     var repsMax by mutableStateOf(initialRepsMax)
+
+    /** Reps performed this session. Distinct from the repsMin/repsMax prescription. */
+    var actualReps by mutableStateOf(initialActualReps)
     var timeSeconds by mutableStateOf(initialTimeSeconds)
     var timeUnit by mutableStateOf(initialTimeUnit)
     var difficulty by mutableStateOf(initialDifficulty)
@@ -166,6 +173,7 @@ private fun playerSetFrom(
     timeSeconds: Int?,
     timeUnit: String,
     difficulty: String?,
+    actualReps: Int? = null,
 ): PlayerSetState = PlayerSetState(
     setIndex = setIndex,
     initialWeightKg = weightKg,
@@ -174,6 +182,7 @@ private fun playerSetFrom(
     initialTimeSeconds = timeSeconds,
     initialTimeUnit = timeUnit,
     initialDifficulty = difficulty,
+    initialActualReps = actualReps,
 )
 
 /** A set added mid-exercise: the previous set's load and target, nothing ticked. */
@@ -194,6 +203,8 @@ fun PlayerSetState.asAddedPlayerSet(setIndex: Int): PlayerSetState {
         timeSeconds = seed.timeSeconds,
         timeUnit = seed.timeUnit,
         difficulty = seed.difficulty,
+        // No actualReps: a set that hasn't happened has no reps to carry over.
+        actualReps = null,
     )
 }
 
@@ -260,6 +271,7 @@ fun SessionPlayerScreen(
                                 timeSeconds = s.timeSeconds,
                                 timeUnit = s.timeUnit,
                                 difficulty = s.difficulty,
+                                actualReps = s.actualReps,
                             ).also { it.isDone = s.done }
                         }.toMutableStateList()
                     )
@@ -267,6 +279,11 @@ fun SessionPlayerScreen(
 
             routine != null ->
                 routine.exercises.map { ex ->
+                    // The box starts at what he actually LIFTED last time, not at the
+                    // routine's authored plan. The plan said 120 and he did 125 meant he
+                    // retyped 125 every session to see what to beat. The routine's weight
+                    // is the fallback for a lift that has never been performed.
+                    val previous = sessionRecordsStorage.latestForExercise(ex.exerciseId)
                     PlayerExerciseState(
                         exerciseId = ex.exerciseId,
                         exerciseName = ex.displayName,
@@ -275,7 +292,7 @@ fun SessionPlayerScreen(
                         sets = ex.sets.mapIndexed { idx, s ->
                             playerSetFrom(
                                 setIndex = idx,
-                                weightKg = s.weightKg,
+                                weightKg = performedWeightForSet(previous, idx) ?: s.weightKg,
                                 repsMin = s.repsMin,
                                 repsMax = s.repsMax,
                                 timeSeconds = s.timeSeconds,
@@ -444,6 +461,7 @@ fun SessionPlayerScreen(
                         weightKg = s.weightKg,
                         repsMin = s.repsMin,
                         repsMax = s.repsMax,
+                        actualReps = s.actualReps,
                         timeSeconds = s.timeSeconds,
                         timeUnit = s.timeUnit,
                         difficulty = s.difficulty,
@@ -549,6 +567,7 @@ fun SessionPlayerScreen(
                                                     weightKg = s.weightKg,
                                                     repsMin = s.repsMin,
                                                     repsMax = s.repsMax,
+                                                    actualReps = s.actualReps,
                                                     timeSeconds = s.timeSeconds,
                                                     difficulty = s.difficulty,
                                                     done = s.isDone
@@ -689,6 +708,78 @@ fun SessionPlayerScreen(
     }
 }
 
+/**
+ * A set-row number box that selects what is already in it the moment it takes focus.
+ *
+ * Tapping into a box reading 120 used to mean three backspaces before typing 130. Mid-set,
+ * standing over a bench, that friction is the difference between logging the work and not
+ * bothering. Select-all rather than clear-on-tap, so tapping in and straight back out leaves
+ * a value he deliberately typed intact.
+ *
+ * [seed] is the set object itself, used as the remember key. Keying on identity rather than
+ * on the value is what lets a set be deleted without its neighbour's text sliding up a row,
+ * while still never reseeding mid-keystroke (which would fight the caret).
+ */
+@Composable
+private fun SelectAllOnFocusField(
+    seed: Any?,
+    initialText: String,
+    placeholder: String,
+    keyboardType: KeyboardType,
+    sanitize: (String) -> String,
+    onTextChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var field by remember(seed) {
+        mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length)))
+    }
+    var hadFocus by remember(seed) { mutableStateOf(false) }
+
+    BasicTextField(
+        value = field,
+        onValueChange = { value ->
+            val clean = sanitize(value.text)
+            // Only move the caret when characters were actually rejected, otherwise tapping
+            // mid-number would punt the cursor to the end.
+            field = if (clean == value.text) {
+                value
+            } else {
+                value.copy(text = clean, selection = TextRange(clean.length))
+            }
+            onTextChange(clean)
+        },
+        singleLine = true,
+        textStyle = LocalTextStyle.current.copy(
+            color = TextForeground,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        ),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        cursorBrush = SolidColor(TealHighlight),
+        decorationBox = { inner ->
+            if (field.text.isEmpty()) {
+                Text(
+                    placeholder,
+                    color = TextFaint,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            inner()
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { state ->
+                if (state.isFocused && !hadFocus) {
+                    field = field.copy(selection = TextRange(0, field.text.length))
+                }
+                hadFocus = state.isFocused
+            }
+    )
+}
+
 @Composable
 private fun PlayerExerciseCard(
     exerciseState: PlayerExerciseState,
@@ -698,6 +789,10 @@ private fun PlayerExerciseCard(
     onAddSet: () -> Unit,
     onRemoveLastSet: () -> Unit,
     onRemoveExercise: () -> Unit,
+    onMoveUp: () -> Unit = {},
+    onMoveDown: () -> Unit = {},
+    canMoveUp: Boolean = false,
+    canMoveDown: Boolean = false,
     canRemove: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
@@ -778,17 +873,14 @@ private fun PlayerExerciseCard(
             exerciseState.sets.forEachIndexed { setIdx, set ->
                 val prevSummary = formatPreviousSetSummary(previousExercise, setIdx)
 
-                var kgText by remember(set.weightKg) {
-                    mutableStateOf(set.weightKg?.let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() } ?: "")
-                }
-                var targetText by remember(set.repsMin, set.repsMax, set.timeSeconds, set.timeUnit) {
-                    mutableStateOf(
-                        if (exerciseState.isTimed) {
-                            formatTimeEntry(set.timeSeconds, set.timeUnit)
-                        } else {
-                            formatRepsTargetEntry(set.repsMin, set.repsMax)
-                        }
-                    )
+                // What the plan asks for. Sits in the REPS box as faint hint text, so the
+                // field can hold what he actually did without hiding the target.
+                val prescribedReps = formatRepsTargetEntry(set.repsMin, set.repsMax)
+
+                // Timed sets keep the old behaviour: for a hold, the time field IS the
+                // record of the work, so it stays a prescription he fills in.
+                var timeText by remember(set.timeSeconds, set.timeUnit) {
+                    mutableStateOf(formatTimeEntry(set.timeSeconds, set.timeUnit))
                 }
 
                 // Stopwatch hold timer for timed sets
@@ -840,29 +932,15 @@ private fun PlayerExerciseCard(
                             .padding(horizontal = 4.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        BasicTextField(
-                            value = kgText,
-                            onValueChange = { input ->
-                                val clean = input.filter { ch -> ch.isDigit() || ch == '.' }
-                                kgText = clean
-                                set.weightKg = clean.toDoubleOrNull()
-                            },
-                            singleLine = true,
-                            textStyle = LocalTextStyle.current.copy(
-                                color = TextForeground,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
-                            ),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            cursorBrush = SolidColor(TealHighlight),
-                            decorationBox = { inner ->
-                                if (kgText.isEmpty()) {
-                                    Text("—", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                                }
-                                inner()
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                        SelectAllOnFocusField(
+                            seed = set,
+                            initialText = set.weightKg?.let {
+                                if (it % 1.0 == 0.0) it.toInt().toString() else it.toString()
+                            } ?: "",
+                            placeholder = "—",
+                            keyboardType = KeyboardType.Decimal,
+                            sanitize = { input -> input.filter { ch -> ch.isDigit() || ch == '.' } },
+                            onTextChange = { clean -> set.weightKg = clean.toDoubleOrNull() }
                         )
                     }
 
@@ -880,9 +958,9 @@ private fun PlayerExerciseCard(
                         if (exerciseState.isTimed) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                                 BasicTextField(
-                                    value = if (set.isHolding) formatClockTime(set.holdSeconds) else targetText,
+                                    value = if (set.isHolding) formatClockTime(set.holdSeconds) else timeText,
                                     onValueChange = { input ->
-                                        targetText = input
+                                        timeText = input
                                         set.timeSeconds = parseTimeEntry(input, set.timeUnit)
                                     },
                                     singleLine = true,
@@ -895,7 +973,7 @@ private fun PlayerExerciseCard(
                                     keyboardOptions = KeyboardOptions(keyboardType = if (set.timeUnit == "sec") KeyboardType.Number else KeyboardType.Text),
                                     cursorBrush = SolidColor(TealHighlight),
                                     decorationBox = { inner ->
-                                        if (targetText.isEmpty() && !set.isHolding) {
+                                        if (timeText.isEmpty() && !set.isHolding) {
                                             Text("00:30", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                                         }
                                         inner()
@@ -915,30 +993,16 @@ private fun PlayerExerciseCard(
                                 }
                             }
                         } else {
-                            BasicTextField(
-                                value = targetText,
-                                onValueChange = { input ->
-                                    targetText = input
-                                    val parsed = parseTargetField(input)
-                                    set.repsMin = parsed?.first
-                                    set.repsMax = parsed?.second
-                                },
-                                singleLine = true,
-                                textStyle = LocalTextStyle.current.copy(
-                                    color = TextForeground,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center
-                                ),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                                cursorBrush = SolidColor(TealHighlight),
-                                decorationBox = { inner ->
-                                    if (targetText.isEmpty()) {
-                                        Text("8-12", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                                    }
-                                    inner()
-                                },
-                                modifier = Modifier.fillMaxWidth()
+                            // REPS means reps PERFORMED. The prescription is the faint hint,
+                            // because the old behaviour — editing the target range — silently
+                            // rewrote the plan instead of recording the work.
+                            SelectAllOnFocusField(
+                                seed = set,
+                                initialText = set.actualReps?.toString() ?: "",
+                                placeholder = prescribedReps.ifBlank { "—" },
+                                keyboardType = KeyboardType.Number,
+                                sanitize = { input -> input.filter { it.isDigit() }.take(3) },
+                                onTextChange = { clean -> set.actualReps = clean.toIntOrNull() }
                             )
                         }
                     }
@@ -1026,6 +1090,31 @@ private fun PlayerExerciseCard(
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
+
+                // Reorder: matches the routine editor's ▲▼ so the app has one way of doing
+                // this. Hidden at the ends rather than greyed out, as the editor does.
+                if (canMoveUp) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable(onClick = onMoveUp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("▲", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                    }
+                }
+                if (canMoveDown) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable(onClick = onMoveDown),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("▼", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                    }
+                }
 
                 if (canRemove) {
                     TextButton(
