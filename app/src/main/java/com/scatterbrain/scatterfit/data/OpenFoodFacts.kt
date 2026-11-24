@@ -62,13 +62,25 @@ fun flexibleText(element: JsonElement?): String? {
             (item as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
         }
         return parts
-            .map { it.removePrefix("en:") }
+            .map { stripTaxonomyPrefix(it) }
             .filter { it.isNotBlank() }
             .joinToString(", ")
             .takeIf { it.isNotBlank() }
     }
     return (element as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 }
+
+/**
+ * OFF's new search index prefixes every tag with its language: `en:chorizos`, but also
+ * `xx:Gusto del sol` (xx = no language stated) and `es:...` for Spanish-only entries.
+ * We used to strip only `en:`, so brands reached the screen as "xx:Gusto del sol".
+ * Stripping the prefix rather than a fixed list of languages because the set is open -
+ * there is one per language OFF is translated into - and it is a fixed shape: two
+ * lowercase letters, a colon, then the value.
+ */
+private val TAXONOMY_PREFIX = Regex("^[a-z]{2}:")
+
+private fun stripTaxonomyPrefix(value: String): String = value.replaceFirst(TAXONOMY_PREFIX, "")
 
 @Serializable
 data class OffNutriments(

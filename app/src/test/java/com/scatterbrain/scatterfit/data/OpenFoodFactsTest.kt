@@ -706,6 +706,13 @@ class OpenFoodFactsTest {
         assertNull(flexibleText(JsonArray(emptyList())))
         // A blank tag must not leave a stray separator behind.
         assertEquals("chorizos", flexibleText(JsonArray(listOf(JsonPrimitive("en:chorizos"), JsonPrimitive("")))))
+        // Language prefixes are not only "en:". Recorded live 2026-11-24: brands came
+        // back as "xx:..." (no language stated) and some tags as "es:...". Stripping
+        // only "en:" put "xx:Gusto del sol" on the screen.
+        assertEquals("Gusto del sol", flexibleText(JsonArray(listOf(JsonPrimitive("xx:Gusto del sol")))))
+        assertEquals("pimenton", flexibleText(JsonArray(listOf(JsonPrimitive("es:pimenton")))))
+        // A colon that is not a language prefix is part of the name and stays.
+        assertEquals("7up: free", flexibleText(JsonArray(listOf(JsonPrimitive("7up: free")))))
     }
 
     @Test
