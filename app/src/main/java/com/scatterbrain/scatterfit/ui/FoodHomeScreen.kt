@@ -141,6 +141,11 @@ fun FoodHomeScreen(
     }
 
     val storedMeals by viewModel.mealsForDay.collectAsState()
+    val mealHistory by viewModel.mealHistory.collectAsState()
+    // A single timestamp per composition. Recomputed from System.currentTimeMillis()
+    // inside the item loop it would drift mid-scroll and shuffle the list under the
+    // finger; sampled once, the ages are consistent until the screen is reopened.
+    val nowMs = remember { System.currentTimeMillis() }
     val presets by viewModel.presets.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
     val favourites by viewModel.favourites.collectAsState()
@@ -804,7 +809,11 @@ fun FoodHomeScreen(
                             .weight(1f)
                     )
                 } else {
-                    // "Recents"
+                    // "Recents" - ranked by how often AND how recently each food was
+                    // logged. See rankRecentFoods: this used to be the first five saved
+                    // presets, which is why only a couple of them were ever actually
+                    // recent. Rows rather than chips, because a row has space to say
+                    // why it is there ("3x - yesterday") and chips do not.
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -812,31 +821,79 @@ fun FoodHomeScreen(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text("Recents", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextForeground)
-                        val recents = presets.filter { it.kcal > 0 } // Very simple fallback to presets for recents
+                        val recents = remember(mealHistory, nowMs) {
+                            rankRecentFoods(mealHistory, nowMs, limit = 8)
+                        }
+                        Text(
+                            "Recents",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextForeground
+                        )
                         if (recents.isNotEmpty()) {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                recents.take(5).forEach { p ->
-                                    Box(
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                recents.forEach { food ->
+                                    Row(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(SecondaryFill)
-                                            .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
                                             .clickable {
-                                                pendingConfirmProduct = p.toProductResult()
+                                                val preset = MealPreset(
+                                                    name = food.name,
+                                                    kcal = food.kcal,
+                                                    protein = food.protein,
+                                                    carbs = food.carbs,
+                                                    fat = food.fat,
+                                                    lastUsedTimestamp = food.lastUsedMs,
+                                                    portionGrams = food.portionGrams,
+                                                    portionLabel = food.portionLabel,
+                                                    displayName = food.displayName,
+                                                )
+                                                pendingConfirmProduct = preset.toProductResult()
                                                 activeBottomSheetMealType = null
                                             }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Text("${p.name} · ${p.kcal.toInt()} kcal", fontSize = 12.sp, color = TextForeground)
+                                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = food.name,
+                                                fontSize = 14.sp,
+                                                color = TextForeground,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            // "3x - yesterday": the two facts that explain
+                                            // the position. Without them an ordering looks
+                                            // arbitrary the first time a staple is not top.
+                                            val why = listOfNotNull(
+                                                recentUsesLabel(food.uses),
+                                                recentAgeLabel(food.daysAgo)
+                                            ).joinToString(" \u00b7 ")
+                                            Text(
+                                                text = why,
+                                                fontSize = 12.sp,
+                                                color = TextMuted,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        Text(
+                                            text = "${food.kcal.toInt()} kcal",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = TealHighlight
+                                        )
+                                    }
                                 }
                             }
+                        } else {
+                            Text(
+                                "Nothing logged yet - your foods will collect here",
+                                fontSize = 12.sp,
+                                color = TextMuted
+                            )
                         }
-                    } else {
-                        Text("No recent foods", fontSize = 12.sp, color = TextMuted)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))

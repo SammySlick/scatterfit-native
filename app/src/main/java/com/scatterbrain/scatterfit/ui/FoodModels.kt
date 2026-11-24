@@ -246,6 +246,17 @@ class FoodTrackerViewModel(
     private val _presets = MutableStateFlow<List<MealPreset>>(emptyList())
     val presets: StateFlow<List<MealPreset>> = _presets.asStateFlow()
 
+    /**
+     * Every meal ever logged, newest first.
+     *
+     * The "Recents" list needs the whole history, not just today's meals, and it needs
+     * to COUNT: how often a food was eaten decides its position, so a deduplicated
+     * preset list cannot answer the question. Exposed separately from [presets] rather
+     * than replacing it - presets are still the right shape for the "Quick add" chips.
+     */
+    private val _mealHistory = MutableStateFlow<List<LoggedMeal>>(emptyList())
+    val mealHistory: StateFlow<List<LoggedMeal>> = _mealHistory.asStateFlow()
+
     private val _recipes = MutableStateFlow<List<Recipe>>(emptyList())
     val recipes: StateFlow<List<Recipe>> = _recipes.asStateFlow()
 
@@ -395,6 +406,7 @@ class FoodTrackerViewModel(
     fun refreshPresets() {
         val allMeals = storage?.getAllMeals() ?: inMemoryStorage.values.flatten()
         _presets.value = deriveMealPresets(allMeals, limit = 8)
+        _mealHistory.value = allMeals.sortedByDescending { it.timestamp }
     }
 
     fun applyPreset(preset: MealPreset) {

@@ -5,9 +5,16 @@ import android.util.Log
 import com.scatterbrain.scatterfit.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
@@ -17,6 +24,50 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+
+/**
+ * A field Open Food Facts is not consistent about.
+ *
+ * OFF's newer search index returns `categories` and `brands` as ARRAYS
+ * (["en:meats", "en:chorizos"]) while its older API returns the same fields as
+ * plain strings ("Meats, Chorizos"). The app declared them as String, so a single
+ * array-shaped hit threw a SerializationException for the WHOLE response - and
+ * parseSaSearchJson caught it, returned null, and the search silently fell through
+ * to the legacy endpoint, whose first page is sorted by popularity rather than
+ * relevance. That is why searching "chorizo" (2026-11-24) produced nothing at all:
+ * the new search had 100 hits and 29 of them usable, and none of them were read.
+ *
+ * This deserialises either shape into one joined string, strips the "en:" language
+ * prefix from category tags, and never throws for a scalar/array mismatch.
+ */
+object FlexibleTextSerializer : KSerializer<String?> {
+    override val descriptor = PrimitiveSerialDescriptor("FlexibleText", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String? {
+        val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeString()
+        return flexibleText(jsonDecoder.decodeJsonElement())
+    }
+
+    override fun serialize(encoder: Encoder, value: String?) {
+        encoder.encodeString(value ?: "")
+    }
+}
+
+/** One joined string from a JSON scalar or array, or null when there is nothing. */
+fun flexibleText(element: JsonElement?): String? {
+    if (element == null) return null
+    if (element is JsonArray) {
+        val parts = element.mapNotNull { item ->
+            (item as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        }
+        return parts
+            .map { it.removePrefix("en:") }
+            .filter { it.isNotBlank() }
+            .joinToString(", ")
+            .takeIf { it.isNotBlank() }
+    }
+    return (element as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+}
 
 @Serializable
 data class OffNutriments(
@@ -512,6 +563,7 @@ data class ProductResult(
     val servingSize: String? = null,
     @SerialName("serving_quantity")
     val servingQuantity: JsonElement? = null,
+    @Serializable(with = FlexibleTextSerializer::class)
     @SerialName("categories")
     val categories: String? = null,
     @kotlinx.serialization.Transient
@@ -619,19 +671,22 @@ private data class SaHit(
     val code: String = "",
     @SerialName("product_name")
     val productName: String? = null,
-    val brands: List<String>? = null,
+    // Array in the new search index, string in the old API. See FlexibleTextSerializer.
+    @Serializable(with = FlexibleTextSerializer::class)
+    val brands: String? = null,
     val quantity: String? = null,
     val nutriments: OffNutriments = OffNutriments(),
     @SerialName("serving_size")
     val servingSize: String? = null,
     @SerialName("serving_quantity")
     val servingQuantity: JsonElement? = null,
+    @Serializable(with = FlexibleTextSerializer::class)
     val categories: String? = null,
 ) {
     fun toProductResult(): ProductResult = ProductResult(
         code = code,
         productName = productName,
-        brands = brands?.filter { it.isNotBlank() }?.joinToString(", ")?.takeIf { it.isNotBlank() },
+        brands = brands,
         quantity = quantity,
         nutriments = nutriments,
         servingSize = servingSize,
@@ -783,7 +838,10 @@ object OpenFoodFactsClient {
         val results = parseSaSearchJson(responseText) ?: emptyList()
         val filtered = results.filter { !it.productName.isNullOrBlank() && it.hasNutritionData }
         val ranked = rankProducts(q, filtered)
-        queryCache[key] = ranked
+        // Only successful pages are cached. Caching an empty list made one transient
+        // failure permanent for the rest of the session: searchPrimary would return
+        // the cached [] forever, so the fallback ran on every keystroke after it.
+        if (ranked.isNotEmpty()) queryCache[key] = ranked
         ranked
     }
 
@@ -800,7 +858,7 @@ object OpenFoodFactsClient {
         val results = parseSearchJson(responseText) ?: emptyList()
         val filtered = results.filter { !it.productName.isNullOrBlank() && it.hasNutritionData }
         val ranked = rankProducts(q, filtered)
-        queryCache[key] = ranked
+        if (ranked.isNotEmpty()) queryCache[key] = ranked
         ranked
     }
 

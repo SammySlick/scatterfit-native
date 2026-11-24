@@ -2,6 +2,7 @@ package com.scatterbrain.scatterfit.data
 
 import com.scatterbrain.scatterfit.ui.toProductResult
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -652,6 +653,59 @@ class OpenFoodFactsTest {
         assertEquals(400.0, product.nutriments.energyKcal_100g!!, 0.001)
         assertEquals(30.0, product.nutriments.proteins_100g!!, 0.001)
         assertEquals("Meals,Meal replacements", product.categories)
+    }
+
+    @Test
+    fun `parseSaSearchJson reads hits whose categories arrive as an array`() {
+        // Recorded verbatim from search.openfoodfacts.org on 2026-11-24 while
+        // investigating "searching chorizo returns nothing". The index returns
+        // `categories` as an ARRAY while the older API returns it as a comma-joined
+        // string. Because SaHit declared it as String, decoding threw for the whole
+        // response, parseSaSearchJson caught it and returned null, and the search fell
+        // through to the legacy endpoint - whose first page is ranked by popularity,
+        // so "chorizo" produced nothing usable. One type mismatch blanked the search.
+        val json = """
+            {
+              "hits": [
+                {
+                  "code": "2157140008002",
+                  "product_name": "Chorizo",
+                  "brands": ["xx:Gusto del sol"],
+                  "categories": ["en:meats-and-their-products", "en:cured-sausages", "en:chorizos"],
+                  "nutriments": { "energy-kcal_100g": 455.0, "proteins_100g": 24.0, "fat_100g": 38.0 }
+                },
+                {
+                  "code": "5057373620309",
+                  "product_name": "Chorizo",
+                  "brands": ["xx:Tesco Finest"],
+                  "categories": ["en:chorizos"],
+                  "nutriments": { "energy-kcal_100g": 357.0 }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val results = OpenFoodFactsClient.parseSaSearchJson(json)
+        assertNotNull(results)
+        assertEquals(2, results!!.size)
+        assertEquals("Chorizo", results.first().productName)
+        // "en:" prefixes stripped, tags joined - these strings get scored and displayed.
+        assertEquals("meats-and-their-products, cured-sausages, chorizos", results.first().categories)
+        assertEquals("Gusto del sol", results.first().brands)
+        // And critically: the hit still carries nutrition, so it survives the
+        // hasNutritionData filter and actually reaches the list.
+        assertTrue(results.first().hasNutritionData)
+        assertEquals(455, results.first().kcalPerServing)
+    }
+
+    @Test
+    fun `flexibleText joins an array, strips the language prefix and tolerates a scalar`() {
+        assertEquals("chorizos, sausages", flexibleText(JsonArray(listOf(JsonPrimitive("en:chorizos"), JsonPrimitive("en:sausages")))))
+        assertEquals("Meals,Meal replacements", flexibleText(JsonPrimitive("Meals,Meal replacements")))
+        assertNull(flexibleText(null))
+        assertNull(flexibleText(JsonArray(emptyList())))
+        // A blank tag must not leave a stray separator behind.
+        assertEquals("chorizos", flexibleText(JsonArray(listOf(JsonPrimitive("en:chorizos"), JsonPrimitive("")))))
     }
 
     @Test
