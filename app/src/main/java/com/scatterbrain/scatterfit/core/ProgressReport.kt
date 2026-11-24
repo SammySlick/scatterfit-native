@@ -87,7 +87,10 @@ fun trendWindow(
         firstDay = first.first.toString(),
         lastValue = last.second,
         lastDay = last.first.toString(),
-        change = last.second - first.second,
+        // One reading is not a change. Returning 0.0 here would read as "steady",
+        // which asserts something we have no evidence for: with a single weigh-in
+        // this page would claim your weight held when it has only ever seen it once.
+        change = if (inWindow.size >= 2) last.second - first.second else null,
         average = inWindow.map { it.second }.average(),
         readings = inWindow.size,
     )
