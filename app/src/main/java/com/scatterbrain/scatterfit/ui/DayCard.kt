@@ -52,6 +52,7 @@ import com.scatterbrain.scatterfit.data.SleepNight
 import com.scatterbrain.scatterfit.data.ZoneBounds
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
+import com.scatterbrain.scatterfit.ui.theme.ChartBlue
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
 import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
@@ -169,6 +170,10 @@ fun DayCard(
     onResetToToday: (() -> Unit)? = null,
     consumedKcal: Double? = null,
     consumedProtein: Double? = null,
+    // Null means "no meal today carries macro data", which is different from 0 g.
+    // The pill shows an em dash for null and "0 g" for a real zero.
+    consumedCarbs: Double? = null,
+    consumedFat: Double? = null,
     deviceSteps: Double? = null,
     estimatedSteps: Int = 0,
     onAdjustStepsClick: (() -> Unit)? = null,
@@ -196,28 +201,27 @@ fun DayCard(
 
     val isCurrentToday = dayKey == remember { todayKey() }
 
-    // Hero calculations: when nothing eaten, shows kcalTarget (not 0); over goal -> "N kcal over T" (number Bold red StateBad)
+    // Hero calculations. Eaten now includes alcohol, so the hero agrees with the
+    // food total rather than quietly excluding a drink.
     val kcalTarget = effectiveSettings.kcalTarget
     val alcoholKcal = daily?.alcoholKcal?.get(dayKey) ?: 0.0
     val foodKcal = consumedKcal
         ?: ((daily?.caloriesEaten?.get(dayKey) ?: 0.0) - alcoholKcal).coerceAtLeast(0.0)
     val totalKcal = foodKcal + alcoholKcal
     val kcalEaten = totalKcal.roundToInt()
-    val isOverGoal = kcalEaten > kcalTarget
-    val overKcal = (kcalEaten - kcalTarget).coerceAtLeast(0)
-    val remainingKcal = (kcalTarget - kcalEaten).coerceAtLeast(0)
+    val isOverGoal = kcalTarget > 0 && kcalEaten > kcalTarget
 
-    val heroNumberText = if (isOverGoal) {
-        String.format(Locale.US, "%,d", overKcal)
-    } else {
-        String.format(Locale.US, "%,d", remainingKcal)
-    }
-    val heroNumberColor = if (isOverGoal) StateBad else TextForeground
-    val heroCaptionText = if (isOverGoal) {
-        "kcal over %,d".format(Locale.US, kcalTarget)
-    } else {
-        "kcal left of %,d".format(Locale.US, kcalTarget)
-    }
+    // HERO, 2026-11-24: "big n/n calories eaten Vs calorie target" (Sam).
+    // Before this the card showed kcal-remaining as the hero AND kcal-eaten in a
+    // Calories row underneath, so 1,934 appeared twice and 2,000 twice on one
+    // screen. The hero owns calories outright now; the row is gone.
+    val heroEatenText = String.format(Locale.US, "%,d", kcalEaten)
+    val heroTargetText = if (kcalTarget > 0) " / " + String.format(Locale.US, "%,d", kcalTarget) else ""
+    val heroCaptionText = calorieHeroCaption(kcalEaten, kcalTarget)
+    // Amber on the caption only, and only when actually over. The big numbers stay
+    // foreground: colouring the eaten figure red for a 20 kcal overshoot would make
+    // the card shout at Sam over a rounding error.
+    val heroCaptionColor = if (isOverGoal) JudgementWarn else TextMuted
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -226,26 +230,40 @@ fun DayCard(
         border = BorderStroke(0.dp, Color.Transparent)
     ) {
         Column {
-            // HERO TOP: Remaining / Over Calories + Ticked counter
+            // HERO TOP: eaten / target, the ticked counter, and Back to today
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    // Left: Big kcal number + caption
-                    Column {
-                        Text(
-                            text = heroNumberText,
-                            fontSize = 56.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = heroNumberColor,
-                            lineHeight = 56.sp
-                        )
+                    // Left: "eaten / target" + caption. Weighted so the tick counter
+                    // on the right cannot be pushed off a narrow screen by a long
+                    // calorie figure - the counter is the thing that would vanish.
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = heroEatenText,
+                                fontSize = 56.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = TextForeground,
+                                lineHeight = 56.sp
+                            )
+                            if (heroTargetText.isNotEmpty()) {
+                                Text(
+                                    text = heroTargetText,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextMuted,
+                                    lineHeight = 28.sp,
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
+                            }
+                        }
                         Text(
                             text = heroCaptionText,
                             fontSize = 12.sp,
-                            color = TextMuted
+                            color = heroCaptionColor
                         )
                     }
 
@@ -274,20 +292,14 @@ fun DayCard(
 
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
-                                text = "${ticks.completedCount}",
-                                fontSize = 17.sp,
+                                text = "${ticks.completedCount} of ${ticks.totalTarget}",
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = StateLocked
-                            )
-                            Text(
-                                text = " / ${ticks.totalTarget}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
                                 color = TextMuted
                             )
                         }
                         Text(
-                            text = "completed",
+                            text = "done",
                             fontSize = 12.sp,
                             color = TextMuted
                         )
@@ -296,35 +308,16 @@ fun DayCard(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // CONTINUOUS METRIC ROWS (Calories, Steps, Protein)
+                // CONTINUOUS METRIC ROWS (Steps) + MACRO PILLS
+                //
+                // The Calories row was removed 2026-11-24: the hero now shows eaten /
+                // target, so the row was printing the same two numbers again. Sam's
+                // complaint was "too many numbers... hard to parse", and the row was
+                // literally the hero in lower case.
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // 1. Calories row
-                    val foodFraction = if (kcalTarget > 0) (foodKcal / kcalTarget).toFloat() else 0f
-                    val alcoholFraction = if (kcalTarget > 0) (alcoholKcal / kcalTarget).toFloat() else 0f
-                    val calColor = getBarColor(computeCaloriesBarColor(totalKcal, kcalTarget,
-                        effectiveSettings.tolerances.kcalGreen))
-                    DayCardBarRow(
-                        icon = { UtensilsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
-                        label = "Calories",
-                        currentText = String.format(Locale.US, "%,d", totalKcal.roundToInt()),
-                        targetText = "of %,d kcal".format(Locale.US, kcalTarget),
-                        progressFraction = foodFraction,
-                        fillColor = calColor,
-                        secondaryFraction = alcoholFraction,
-                        secondaryColor = TextMuted,
-                        showBar = false,
-                        quietNote = kcalRemainingNote(totalKcal, kcalTarget),
-                        breakdownText = if (alcoholKcal > 0.0)
-                            "%s food + %s alcohol".format(
-                                Locale.US,
-                                String.format(Locale.US, "%,d", foodKcal.roundToInt()),
-                                String.format(Locale.US, "%,d", alcoholKcal.roundToInt())
-                            )
-                        else null,
-                        onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
-                    )
-
-                    // 2. Steps row
+                    // 1. Steps row — keeps its bar. A step count is an accumulation
+                    // you finish, so a bar genuinely answers "how far through the day
+                    // am I".
                     val stepRaw = totalSteps
                     val stepTarget = effectiveSettings.stepTarget
                     val stepFraction = if (stepRaw > 0 && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
@@ -353,22 +346,41 @@ fun DayCard(
                         onClick = { onMetricClick(MetricId.STEPS) }
                     )
 
-                    // 3. Protein row
-                    val protRaw = consumedProtein ?: daily?.protein?.get(dayKey)
-                    val protTarget = effectiveSettings.proteinTarget
-                    val protFraction = if (protRaw != null && protTarget > 0) (protRaw.toFloat() / protTarget.toFloat()).coerceIn(0f, 1f) else 0f
-                    val protColor = getBarColor(computeProteinBarColor(protRaw, protTarget))
-                    DayCardBarRow(
-                        icon = { BeefIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
-                        label = "Protein",
-                        currentText = "${protRaw?.roundToInt() ?: 0}g",
-                        targetText = "of %,dg".format(Locale.US, protTarget),
-                        progressFraction = protFraction,
-                        fillColor = protColor,
-                        showBar = false,
-                        quietNote = proteinRemainingNote(protRaw ?: 0.0, protTarget),
-                        onClick = { onMetricClick(MetricId.PROTEIN) }
-                    )
+                    // 2. MACRO PILLS (Protein / Carbs / Fat)
+                    //
+                    // Sam, 2026-11-24: "I like the different coloured pills for the
+                    // Protein, Carbs and Fats in BWS." Pills rather than three more
+                    // rows because a macro is a category, not a sequence — rows made
+                    // the card read as a list of chores. Colour here is a *category*
+                    // cue, never a verdict: nothing turns red for being over a macro,
+                    // same as the Progress report never judges direction.
+                    val protRaw = consumedProtein ?: daily?.protein?.get(dayKey) ?: 0.0
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        MacroPill(
+                            modifier = Modifier.weight(1f),
+                            label = "Protein",
+                            value = macroPillValue(protRaw, effectiveSettings.proteinTarget),
+                            accent = AccentTeal,
+                            onClick = { onMetricClick(MetricId.PROTEIN) }
+                        )
+                        MacroPill(
+                            modifier = Modifier.weight(1f),
+                            label = "Carbs",
+                            value = macroPillValue(consumedCarbs, effectiveSettings.carbTargetG),
+                            accent = ChartBlue,
+                            onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
+                        )
+                        MacroPill(
+                            modifier = Modifier.weight(1f),
+                            label = "Fat",
+                            value = macroPillValue(consumedFat, effectiveSettings.fatTargetG),
+                            accent = JudgementWarn,
+                            onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
+                        )
+                    }
                 }
             }
 
@@ -428,6 +440,13 @@ fun DayCard(
                     modifier = Modifier.weight(1f),
                     icon = { ScaleIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
                     primaryText = weightPrimary,
+                    // Up/down against the last weigh-in. Deliberately muted, not red or
+                    // green: weight rising is correct in a bulk and wrong in a cut, so
+                    // the card reports the direction and lets Sam judge it. Same rule as
+                    // the Progress report - direction is not judgement.
+                    primarySuffix = weightDeltaLabel(
+                        weightDeltaVsPrevious(dayKey, daily?.weight ?: emptyMap())
+                    ),
                     secondaryText = weightSecondary,
                     showDot = hasWeightToday,
                     onClick = onWeighInClick
@@ -488,31 +507,112 @@ fun DayCard(
 }
 
 /**
- * What is left to eat, in plain words. Null when there is no target to speak of,
- * so a row with no goal shows no commentary rather than "0 left".
+ * The line under the calorie hero: eaten, target, and what that leaves.
  *
- * This is the whole replacement for the calorie bar: two numbers and the one
- * number that is actually actionable (what's left). Rounded, so a 3 kcal
- * overshoot does not report "3 kcal over" as if it were a finding.
+ * Sam, 2026-11-24: "Maybe a big 'n/n' calories eaten Vs calorie target?" The hero
+ * now shows eaten / target, so this caption carries the one derived number that is
+ * actually actionable and nothing else. Deliberately three numbers total (eaten,
+ * target, remaining) rather than the six the card used to show, where 1,934 and
+ * 2,000 each appeared twice.
  */
-fun kcalRemainingNote(consumed: Double, target: Int): String? {
-    if (target <= 0) return null
-    val remaining = (target - consumed).roundToInt()
+fun calorieHeroCaption(eaten: Int, target: Int): String {
+    if (target <= 0) return "kcal eaten"
+    val remaining = target - eaten
     return when {
-        remaining > 0 -> "%,d left".format(Locale.US, remaining)
-        remaining == 0 -> "on target"
-        else -> "%,d over".format(Locale.US, -remaining)
+        remaining > 0 -> "kcal eaten · %,d left".format(Locale.US, remaining)
+        remaining == 0 -> "kcal eaten · on target"
+        else -> "kcal eaten · %,d over".format(Locale.US, -remaining)
     }
 }
 
 /**
- * Protein is a floor, not a ceiling: going over it is not a problem worth a word,
- * so this says nothing once you are there. Only the gap is useful.
+ * What a macro pill says. "92 / 160 g" when there is a target, just "92 g" when
+ * there is not, and "—" when nothing has been logged with macro data at all.
+ *
+ * The em dash matters: a card full of meals logged before macro capture existed
+ * would otherwise claim 0 g of carbs, which reads as a fact about Sam's diet
+ * rather than a fact about the data.
  */
-fun proteinRemainingNote(consumed: Double, target: Int): String? {
-    if (target <= 0) return null
-    val remaining = (target - consumed).roundToInt()
-    return if (remaining > 0) "%,d g to go".format(Locale.US, remaining) else null
+fun macroPillValue(consumed: Double?, target: Int): String {
+    val grams = consumed?.roundToInt()
+    return when {
+        grams == null -> if (target > 0) "— / %,d g".format(Locale.US, target) else "—"
+        target > 0 -> "%,d / %,d g".format(Locale.US, grams, target)
+        else -> "%,d g".format(Locale.US, grams)
+    }
+}
+
+/**
+ * Change in weight against the most recent earlier weigh-in.
+ *
+ * "From yday" was the ask, but Sam skips weigh-ins, so taking literally-yesterday
+ * would leave the chevron blank on the days he most wants it. The most recent
+ * earlier reading is used instead — and null when the difference rounds to zero,
+ * so nothing shows a chevron claiming "up 0.0".
+ */
+fun weightDeltaVsPrevious(dayKey: String, weights: Map<String, Double>): Double? {
+    val today = weights[dayKey] ?: return null
+    if (today <= 0.0) return null
+    val previous = weights.entries
+        .filter { it.key < dayKey && it.value > 0.0 }
+        .maxByOrNull { it.key }
+        ?.value ?: return null
+    val delta = today - previous
+    // Rounded to the precision the card displays; anything smaller is not a move.
+    return if (Math.abs(delta) < 0.05) null else delta
+}
+
+/** "▼ 0.4" / "▲ 1.2", or null when there is nothing to report. */
+fun weightDeltaLabel(delta: Double?): String? {
+    if (delta == null) return null
+    val arrow = if (delta > 0) "▲" else "▼"
+    return "%s %.1f".format(Locale.US, arrow, Math.abs(delta))
+}
+
+@Composable
+private fun MacroPill(
+    label: String,
+    value: String,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed) 0.65f else 1f,
+        animationSpec = tween(80),
+        label = "macroPillAlpha"
+    )
+
+    Column(
+        modifier = modifier
+            .graphicsLayer { this.alpha = alpha }
+            .clip(RoundedCornerShape(12.dp))
+            .background(accent.copy(alpha = 0.13f))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = accent
+        )
+        Text(
+            text = value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TextForeground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable
@@ -739,6 +839,10 @@ private fun DayCardContextCard(
     showDot: Boolean,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    // Optional muted suffix after the primary figure, used for the weight up/down
+    // chevron ("\u25bc 0.4"). A plain String, not a composable slot: the chevron is
+    // only ever one styled run, and a slot here bought nothing but inference risk.
+    primarySuffix: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -782,15 +886,27 @@ private fun DayCardContextCard(
             Column {
                 icon()
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = primaryText,
-                    fontSize = if (primaryText.length > 8) 14.sp else 15.sp,
-                    lineHeight = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextForeground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Clip
-                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = primaryText,
+                        fontSize = if (primaryText.length > 8) 14.sp else 15.sp,
+                        lineHeight = 19.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextForeground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip
+                    )
+                    if (primarySuffix != null) {
+                        Text(
+                            text = primarySuffix,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextMuted,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 1.dp)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = secondaryText,

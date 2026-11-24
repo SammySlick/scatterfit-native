@@ -170,6 +170,15 @@ fun MyDayScreen(
     }
     val consumedKcal = remember(dayMeals) { dayMeals.sumOf { it.kcal } }
     val consumedProtein = remember(dayMeals) { dayMeals.sumOf { it.protein ?: 0.0 } }
+    // Null, not zero, when nothing logged today carries a macro. A card full of meals
+    // logged before macro capture existed would otherwise claim 0 g of carbs - a
+    // fact about the data pretending to be a fact about the diet.
+    val consumedCarbs = remember(dayMeals) {
+        if (dayMeals.none { it.carbs != null }) null else dayMeals.sumOf { it.carbs ?: 0.0 }
+    }
+    val consumedFat = remember(dayMeals) {
+        if (dayMeals.none { it.fat != null }) null else dayMeals.sumOf { it.fat ?: 0.0 }
+    }
 
     var estimatedStepsRefreshKey by remember { mutableIntStateOf(0) }
     val dayEstimatedEntries = remember(selectedDay, estimatedStepsRefreshKey) {
@@ -542,6 +551,8 @@ fun MyDayScreen(
             settings = settings,
             consumedKcal = consumedKcal,
             consumedProtein = consumedProtein,
+            consumedCarbs = consumedCarbs,
+            consumedFat = consumedFat,
             deviceSteps = repoDaily?.steps?.get(selectedDay),
             estimatedSteps = dayEstimatedSteps,
             onAdjustStepsClick = { showAdjustStepsSheet = true },

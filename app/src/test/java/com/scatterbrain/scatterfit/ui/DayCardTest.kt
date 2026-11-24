@@ -261,42 +261,83 @@ class DayCardTest {
         assertEquals(MetricBarColor.ORANGE, computeCaloriesBarColor(2750.0, target))
     }
 
-    // --- The bars that came off the Today card (2026-11-24) ------------------
-    // Sam: "the bars are noisy. Works for the step count but I'm not sure about
-    // the calorie count and protein intake." Steps keep their bar; these two
-    // rows now show numbers plus the one actionable figure.
+    // --- Today card redesign, 2026-11-24 -------------------------------------
+    // Sam: "There's now too many numbers... Maybe a big 'n/n' calories eaten Vs
+    // calorie target? I like the different coloured pills for the Protein, Carbs
+    // and Fats in BWS. Weight with a small up or down chevron so show if up or
+    // down from yday?"
+    //
+    // The row-voice notes that this replaces (kcalRemainingNote/proteinRemainingNote)
+    // are gone with their rows: the hero and the pills now carry those numbers, and
+    // keeping two ways of phrasing "how much is left" is how the card got noisy.
 
     @Test
-    fun `calories report what is left, not how full a bar is`() {
-        assertEquals("860 left", kcalRemainingNote(1_240.0, 2_100))
+    fun `hero caption reads eaten, target and what is left`() {
+        assertEquals("kcal eaten \u00b7 860 left", calorieHeroCaption(1_240, 2_100))
+        assertEquals("kcal eaten \u00b7 on target", calorieHeroCaption(2_100, 2_100))
+        assertEquals("kcal eaten \u00b7 40 over", calorieHeroCaption(2_140, 2_100))
     }
 
     @Test
-    fun `a small calorie overshoot reads as over, rounded to whole kcal`() {
-        assertEquals("140 over", kcalRemainingNote(2_240.0, 2_100))
-        // 2100.4 eaten is not "0 left" and not "1 over" - it rounds to on target.
-        assertEquals("on target", kcalRemainingNote(2_100.4, 2_100))
+    fun `hero caption does not invent a remaining figure with no target`() {
+        assertEquals("kcal eaten", calorieHeroCaption(1_240, 0))
     }
 
     @Test
-    fun `no calorie target means no commentary`() {
-        assertNull(kcalRemainingNote(500.0, 0))
-        assertNull(kcalRemainingNote(0.0, 0))
+    fun `hero caption rounds to whole kcal so a rounding error is not a finding`() {
+        // 2,100 eaten exactly is on target; the caption must not say "0 left".
+        assertEquals("kcal eaten \u00b7 on target", calorieHeroCaption(2_100, 2_100))
     }
 
     @Test
-    fun `protein shows the gap to the floor and nothing once reached`() {
-        assertEquals("68 g to go", proteinRemainingNote(92.0, 160))
-        // Over the floor is not a problem, so it gets no note at all. A "35 g over"
-        // pill on protein would be scolding Sam for eating enough.
-        assertNull(proteinRemainingNote(160.0, 160))
-        assertNull(proteinRemainingNote(195.0, 160))
-        assertNull(proteinRemainingNote(92.0, 0))
+    fun `macro pill shows eaten and target when there is a target`() {
+        assertEquals("92 / 160 g", macroPillValue(92.4, 160))
     }
 
     @Test
-    fun `rounding keeps a nearly-met protein target from claiming a gram is left`() {
-        assertNull(proteinRemainingNote(159.6, 160))
-        assertEquals("1 g to go", proteinRemainingNote(159.4, 160))
+    fun `macro pill shows eaten alone when there is no target`() {
+        assertEquals("92 g", macroPillValue(92.0, 0))
     }
+
+    @Test
+    fun `macro pill distinguishes no data from zero grams`() {
+        // No meal logged with carbs is not the same as eating no carbs.
+        assertEquals("\u2014 / 250 g", macroPillValue(null, 250))
+        assertEquals("\u2014", macroPillValue(null, 0))
+        assertEquals("0 / 250 g", macroPillValue(0.0, 250))
+    }
+
+    @Test
+    fun `weight delta uses the most recent earlier weigh-in, not literally yesterday`() {
+        val weights = mapOf(
+            "2026-11-18" to 95.4,
+            "2026-11-20" to 95.1,
+            "2026-11-23" to 95.2
+        )
+        // Sam skips weigh-ins, so 23rd is the comparison for the 24th.
+        assertEquals(0.4, weightDeltaVsPrevious("2026-11-24", weights + ("2026-11-24" to 95.6))!!, 0.001)
+    }
+
+    @Test
+    fun `weight delta ignores later readings and missing data`() {
+        val weights = mapOf("2026-11-23" to 95.0, "2026-11-25" to 99.0)
+        // Only one earlier reading exists, so there is nothing to compare: null.
+        assertNull(weightDeltaVsPrevious("2026-11-23", weights))
+        assertNull(weightDeltaVsPrevious("2026-11-24", mapOf("2026-11-25" to 99.0)))
+    }
+
+    @Test
+    fun `weight delta is null when the weight has not actually moved`() {
+        val weights = mapOf("2026-11-23" to 95.0, "2026-11-24" to 95.0)
+        // 95.0 vs 95.0 must not render as "up 0.0" - that is a chevron claiming a move.
+        assertNull(weightDeltaVsPrevious("2026-11-24", weights))
+    }
+
+    @Test
+    fun `weight delta label carries the arrow and one decimal`() {
+        assertEquals("\u25b2 1.2", weightDeltaLabel(1.24))
+        assertEquals("\u25bc 0.4", weightDeltaLabel(-0.4))
+        assertNull(weightDeltaLabel(null))
+    }
+
 }
