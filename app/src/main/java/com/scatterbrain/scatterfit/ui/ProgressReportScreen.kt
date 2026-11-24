@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,6 +46,10 @@ import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
+import com.scatterbrain.scatterfit.ui.theme.DomainBody
+import com.scatterbrain.scatterfit.ui.theme.DomainMove
+import com.scatterbrain.scatterfit.ui.theme.DomainSleep
+import com.scatterbrain.scatterfit.ui.theme.DomainTrain
 import com.scatterbrain.scatterfit.ui.theme.NeutralAttend
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
@@ -161,7 +166,7 @@ fun ProgressReportScreen(
 
             Spacer(Modifier.height(28.dp))
 
-            SectionHeading("Body")
+            SectionHeading("Body", DomainBody)
 
             StatRow(
                 label = "Body fat",
@@ -182,7 +187,7 @@ fun ProgressReportScreen(
             // Sleep sits above Steps on purpose: it is the thing Sam checks daily and
             // the thing the night's data actually costs him (a bad night is visible in
             // weight and training the next day). Steps are a count-up you glance at.
-            SectionHeading("Sleep")
+            SectionHeading("Sleep", DomainSleep)
 
             StatRow(
                 label = "Nightly average",
@@ -199,7 +204,7 @@ fun ProgressReportScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            SectionHeading("Activity")
+            SectionHeading("Activity", DomainMove)
 
             StatRow(
                 label = "Steps, daily average",
@@ -209,7 +214,7 @@ fun ProgressReportScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            SectionHeading("Training")
+            SectionHeading("Training", DomainTrain)
 
             if (training.isEmpty) {
                 StatRow(
@@ -280,14 +285,29 @@ private fun WindowPicker(windowDays: Int, onChange: (Int) -> Unit) {
  * a large part of why it read as a data board rather than a diary.
  */
 @Composable
-private fun SectionHeading(text: String) {
-    Text(
-        text = text,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = TextMuted,
+private fun SectionHeading(text: String, accent: Color) {
+    // A coloured rule beside the heading, and the heading in its own hue. The
+    // page is otherwise one long column of hairline-separated rows, so without
+    // this the only landmark is a word.
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(bottom = 4.dp),
-    )
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(14.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(accent),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = accent,
+        )
+    }
 }
 
 /**

@@ -88,6 +88,8 @@ import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.BorderInput
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
+import com.scatterbrain.scatterfit.ui.theme.domainSurface
+import com.scatterbrain.scatterfit.ui.theme.mealSlotAccent
 import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.StateBad
@@ -656,6 +658,7 @@ fun FoodHomeScreen(
 
                     MealSectionCard(
                         sectionTitle = sectionKey.uppercase(),
+                        accent = mealSlotAccent(sectionKey),
                         isExpanded = isExpanded,
                         totalKcal = sectionKcal,
                         totalProtein = sectionProtein,
@@ -1020,6 +1023,7 @@ private fun AlcoholMiniRow(
 @Composable
 private fun MealSectionCard(
     sectionTitle: String,
+    accent: Color,
     isExpanded: Boolean,
     totalKcal: Int,
     totalProtein: Int,
@@ -1039,7 +1043,10 @@ private fun MealSectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkCardSurface),
+        // One hue per meal slot: Breakfast, Lunch, Dinner and Snacks are four
+        // stacked lists that were previously identical grey blocks. The hue is
+        // the only thing that has to differ - the layout already matches.
+        colors = CardDefaults.cardColors(containerColor = domainSurface(accent)),
         border = BorderStroke(1.dp, BorderDefault)
     ) {
         Column(
@@ -1065,7 +1072,7 @@ private fun MealSectionCard(
                         text = sectionTitle,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextForeground
+                        color = accent
                     )
 
                     // Section summary chips inline: e.g. "312 kcal" teal chip + P/C/F chips
@@ -1073,14 +1080,14 @@ private fun MealSectionCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(TealHighlight.copy(alpha = 0.15f))
+                                .background(accent.copy(alpha = 0.15f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "$totalKcal kcal",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = TealHighlight
+                                color = accent
                             )
                         }
 

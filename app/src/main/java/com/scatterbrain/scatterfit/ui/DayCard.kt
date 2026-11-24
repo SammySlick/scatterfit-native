@@ -52,8 +52,16 @@ import com.scatterbrain.scatterfit.data.SleepNight
 import com.scatterbrain.scatterfit.data.ZoneBounds
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
-import com.scatterbrain.scatterfit.ui.theme.ChartBlue
 import com.scatterbrain.scatterfit.ui.theme.DarkCardSurface
+import com.scatterbrain.scatterfit.ui.theme.DomainBody
+import com.scatterbrain.scatterfit.ui.theme.DomainDrink
+import com.scatterbrain.scatterfit.ui.theme.DomainFuel
+import com.scatterbrain.scatterfit.ui.theme.DomainMove
+import com.scatterbrain.scatterfit.ui.theme.DomainSleep
+import com.scatterbrain.scatterfit.ui.theme.MacroCarbs
+import com.scatterbrain.scatterfit.ui.theme.MacroFat
+import com.scatterbrain.scatterfit.ui.theme.MacroProtein
+import com.scatterbrain.scatterfit.ui.theme.domainSurface
 import com.scatterbrain.scatterfit.ui.theme.JudgementWarn
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
@@ -252,7 +260,10 @@ fun DayCard(
                             text = "Calories",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = TextMuted,
+                            // The fuel hue: the same colour the meal cards and the
+                            // carbs pill use, so the top of Today and the food log
+                            // read as the same subject.
+                            color = DomainFuel,
                             modifier = Modifier.padding(bottom = 2.dp)
                         )
                         Row(verticalAlignment = Alignment.Bottom) {
@@ -346,21 +357,21 @@ fun DayCard(
                             modifier = Modifier.weight(1f),
                             label = "Protein",
                             value = macroPillValue(protRaw, effectiveSettings.proteinTarget),
-                            accent = AccentTeal,
+                            accent = MacroProtein,
                             onClick = { onMetricClick(MetricId.PROTEIN) }
                         )
                         MacroPill(
                             modifier = Modifier.weight(1f),
                             label = "Carbs",
                             value = macroPillValue(consumedCarbs, effectiveSettings.carbTargetG),
-                            accent = ChartBlue,
+                            accent = MacroCarbs,
                             onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
                         )
                         MacroPill(
                             modifier = Modifier.weight(1f),
                             label = "Fat",
                             value = macroPillValue(consumedFat, effectiveSettings.fatTargetG),
-                            accent = JudgementWarn,
+                            accent = MacroFat,
                             onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
                         )
                     }
@@ -378,12 +389,13 @@ fun DayCard(
                     val stepFraction = if (stepRaw > 0 && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
                     val stepColor = getBarColor(computeStepsBarColor(stepRaw, stepTarget))
                     DayCardBarRow(
-                        icon = { FootstepsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
+                        icon = { FootstepsIcon(modifier = Modifier.size(14.dp), tint = DomainMove) },
                         label = "Steps",
                         currentText = String.format(Locale.US, "%,d", totalSteps.roundToInt()),
                         targetText = "of %,d".format(Locale.US, stepTarget),
                         progressFraction = stepFraction,
                         fillColor = stepColor,
+                        labelColor = DomainMove,
                         breakdownText = if (estimatedSteps > 0) {
                             "${String.format(Locale.US, "%,d", deviceStepsVal.roundToInt())} device + ${String.format(Locale.US, "%,d", estimatedSteps)} estimated"
                         } else null,
@@ -442,10 +454,11 @@ fun DayCard(
 
                 DayCardContextCard(
                     modifier = Modifier.weight(1f),
-                    icon = { MoonIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
+                    icon = { MoonIcon(modifier = Modifier.size(14.dp), tint = DomainSleep) },
                     label = "Sleep",
                     value = sleepPrimary,
                     secondaryText = sleepSecondary,
+                    accent = DomainSleep,
                     onClick = { onMetricClick(MetricId.SLEEP) }
                 )
 
@@ -468,10 +481,11 @@ fun DayCard(
 
                 DayCardContextCard(
                     modifier = Modifier.weight(1f),
-                    icon = { ScaleIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
+                    icon = { ScaleIcon(modifier = Modifier.size(14.dp), tint = DomainBody) },
                     label = "Weight",
                     value = weightPrimary,
                     secondaryText = weightSecondary,
+                    accent = DomainBody,
                     onClick = onWeighInClick
                 )
             }
@@ -492,14 +506,18 @@ fun DayCard(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        WineIcon(modifier = Modifier.size(16.dp), tint = TextMuted)
+                        WineIcon(modifier = Modifier.size(16.dp), tint = DomainDrink)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "DRINKS TODAY",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextMuted,
-                            letterSpacing = 1.5.sp
+                            // Sentence case, and the alcohol section's own hue. It
+                            // was SHOUTING in grey, which is the same treatment as a
+                            // form field label and the reason this block read as a
+                            // warning rather than as part of the day.
+                            text = "Drinks today",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DomainDrink,
+                            letterSpacing = 0.sp
                         )
                     }
 
@@ -647,6 +665,10 @@ private fun DayCardBarRow(
     // Those rows show the two numbers and what's left, and nothing else.
     showBar: Boolean = true,
     quietNote: String? = null,
+    // Optional domain hue for the label. Steps pass DomainMove so the row is
+    // findable at a glance; the fill colour stays threshold-based, because a bar
+    // is a judgement about progress and a hue is not.
+    labelColor: Color = TextForeground,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -679,7 +701,7 @@ private fun DayCardBarRow(
                 Text(
                     text = label,
                     fontSize = 13.sp,
-                    color = TextForeground,
+                    color = labelColor,
                     fontWeight = FontWeight.SemiBold
                 )
                 if (trailingAffordance != null) {
@@ -848,6 +870,7 @@ private fun DayCardContextCard(
     label: String,
     value: String,
     secondaryText: String,
+    accent: Color,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -872,7 +895,10 @@ private fun DayCardContextCard(
                 } else Modifier
             ),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SecondaryFill),
+        // Tinted by domain, not painted a status colour: see Color.kt v4. Two
+        // cards side by side now differ in hue as well as luminance, which is
+        // the difference between "a card" and "that card".
+        colors = CardDefaults.cardColors(containerColor = domainSurface(accent)),
         border = BorderStroke(0.dp, Color.Transparent)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
@@ -886,7 +912,10 @@ private fun DayCardContextCard(
                     text = label,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = TextMuted,
+                    // The domain hue on the label, at full strength: this is the
+                    // name of the card, so it is the one element that should say
+                    // "I am the sleep card" from across the room.
+                    color = accent,
                     maxLines = 1
                 )
             }
