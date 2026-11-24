@@ -210,6 +210,27 @@ fun FoodHomeScreen(
     var showBarcodeScanner by remember { mutableStateOf(false) }
     var barcodeNotFound by viewModel::barcodeNotFound
     var pendingConfirmProduct by viewModel::pendingConfirmProduct
+
+    // Which meal section the confirm card belongs to. Sam, 2026-11-24: "you
+    // select the food item from the search list, then it 'disappears', when in
+    // reality it's jumped to the top of the page." It had, literally - the
+    // confirm card was rendered above the FOOD LOG header, so tapping "+" on
+    // Snacks put the card off-screen above the section he was looking at.
+    // It now renders inside its own section, so the item lands where he tapped.
+    var pendingConfirmMealType by remember { mutableStateOf<String?>(null) }
+
+    // A single funnel for every path that opens the confirm card (barcode,
+    // preset, OFF product, recents, generic, and editing an existing row). Six
+    // call sites setting two pieces of state separately is how one of them ends
+    // up disagreeing with the others.
+    fun showConfirm(product: ProductResult, mealType: String) {
+        // confirmSectionFor guarantees a section key that actually exists, so the
+        // card can never be set to a slot with no section to render it in.
+        val key = confirmSectionFor(mealType, viewModel.mealTypeInput)
+        pendingConfirmMealType = key
+        pendingConfirmProduct = product
+        expandedSections = expandedSections + key
+    }
     var offResults by remember { mutableStateOf<List<ProductResult>>(emptyList()) }
     var offUnavailable by remember { mutableStateOf(false) }
     var isSearchingOff by remember { mutableStateOf(false) }
@@ -260,7 +281,7 @@ fun FoodHomeScreen(
                 scope.launch {
                     val product = OpenFoodFactsClient.lookupBarcode(barcode)
                     if (product != null) {
-                        pendingConfirmProduct = product
+                        showConfirm(product, viewModel.mealTypeInput)
                         barcodeNotFound = false
                     } else {
                         barcodeNotFound = true
@@ -617,37 +638,50 @@ fun FoodHomeScreen(
                     )
                 }
 
-                // In-place Confirm Sheet for Scanned or Selected OFF Product
-                if (pendingConfirmProduct != null) {
-                    ConfirmProductCard(
-                        product = pendingConfirmProduct!!,
-                        defaultMealType = viewModel.mealTypeInput,
-                        dayKey = activeDay,
-                        existingMealId = editingMealId,
-                        onConfirm = { mealToLog ->
-                            if (editingMealId != null) {
-                                viewModel.updateMeal(editingMealId!!, mealToLog)
+                // The confirm card, composed once and then rendered WHERE IT
+                // BELONGS - inside the meal section it is destined for, rather
+                // than above the FOOD LOG header. See pendingConfirmMealType.
+                val confirmCard: @Composable (Modifier) -> Unit = { cardModifier ->
+                    pendingConfirmProduct?.let { product ->
+                        ConfirmProductCard(
+                            product = product,
+                            defaultMealType = pendingConfirmMealType ?: viewModel.mealTypeInput,
+                            dayKey = activeDay,
+                            existingMealId = editingMealId,
+                            onConfirm = { mealToLog ->
+                                if (editingMealId != null) {
+                                    viewModel.updateMeal(editingMealId!!, mealToLog)
+                                    editingMealId = null
+                                } else {
+                                    viewModel.logCustomMeal(mealToLog)
+                                }
+                                expandedSections = expandedSections + mealToLog.mealType.lowercase()
+                                pendingConfirmProduct = null
+                                pendingConfirmMealType = null
+                                searchQuery = ""
+                            },
+                            onCancel = {
                                 editingMealId = null
-                            } else {
-                                viewModel.logCustomMeal(mealToLog)
-                            }
-                            expandedSections = expandedSections + mealToLog.mealType.lowercase()
-                            pendingConfirmProduct = null
-                            searchQuery = ""
-                        },
-                        onCancel = {
-                            editingMealId = null
-                            pendingConfirmProduct = null
-                        }
-                    )
+                                pendingConfirmProduct = null
+                                pendingConfirmMealType = null
+                            },
+                            modifier = cardModifier
+                        )
+                    }
                 }
 
-                // Live search results (local favourites/presets/recipes + Open Food Facts products) moved to bottom sheet
-
                 // Meal Sections: BREAKFAST / LUNCH / DINNER / SNACKS
-                val sections = listOf("breakfast", "lunch", "dinner", "snacks")
+                //
+                // Guard for a product set WITHOUT going through showConfirm (which
+                // always supplies a section). Unreachable today, deliberately kept:
+                // a card rendered in the wrong place is recoverable, a card rendered
+                // nowhere loses the food the user just picked, and that is the exact
+                // complaint being fixed here.
+                if (pendingConfirmProduct != null && pendingConfirmMealType == null) {
+                    confirmCard(Modifier.fillMaxWidth())
+                }
 
-                sections.forEach { sectionKey ->
+                MEAL_SECTIONS.forEach { sectionKey ->
                     val isExpanded = expandedSections.contains(sectionKey)
                     val sectionMeals = displayMeals.filter { it.mealType.equals(sectionKey, ignoreCase = true) }
 
@@ -655,6 +689,17 @@ fun FoodHomeScreen(
                     val sectionProtein = sectionMeals.sumOf { it.protein ?: 0.0 }.roundToInt()
                     val sectionCarbs = sectionMeals.sumOf { it.carbs ?: 0.0 }.roundToInt()
                     val sectionFat = sectionMeals.sumOf { it.fat ?: 0.0 }.roundToInt()
+
+                    // Declared as an explicitly typed val rather than a conditional
+                    // inline lambda: expected-type inference for a composable lambda
+                    // inside an if-expression is exactly the kind of thing that
+                    // fails the build for a reason unrelated to the change.
+                    val confirmSlotForThisSection: (@Composable () -> Unit)? =
+                        if (pendingConfirmMealType == sectionKey) {
+                            { confirmCard(Modifier.fillMaxWidth()) }
+                        } else {
+                            null
+                        }
 
                     MealSectionCard(
                         sectionTitle = sectionKey.uppercase(),
@@ -692,17 +737,21 @@ fun FoodHomeScreen(
                                 fat_100g = mealToEdit.fat?.let { it * ratio }
                             )
 
-                            pendingConfirmProduct = ProductResult(
+                            showConfirm(
+                                ProductResult(
                                 code = mealToEdit.id,
                                 productName = mealToEdit.name,
                                 nutriments = derivedNutriments,
                                 servingQuantity = kotlinx.serialization.json.JsonPrimitive(portion)
+                                ),
+                                mealToEdit.mealType
                             )
                         },
                         onDeleteMeal = { mealToDelete ->
                             viewModel.deleteMeal(mealToDelete.id)
                             pendingDeletedMeal = mealToDelete
-                        }
+                        },
+                        pendingConfirm = confirmSlotForThisSection
                     )
                 }
 
@@ -784,7 +833,8 @@ fun FoodHomeScreen(
                             searchQuery = ""
                         },
                         onSelectPreset = { preset ->
-                            pendingConfirmProduct = preset.toProductResult()
+                            val targetMeal = activeBottomSheetMealType ?: viewModel.mealTypeInput
+                            showConfirm(preset.toProductResult(), targetMeal)
                             activeBottomSheetMealType = null
                             searchQuery = ""
                         },
@@ -803,7 +853,8 @@ fun FoodHomeScreen(
                             searchQuery = ""
                         },
                         onSelectOffProduct = { product ->
-                            pendingConfirmProduct = product
+                            val targetMeal = activeBottomSheetMealType ?: viewModel.mealTypeInput
+                            showConfirm(product, targetMeal)
                             activeBottomSheetMealType = null
                         },
                         modifier = Modifier
@@ -835,7 +886,9 @@ fun FoodHomeScreen(
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(10.dp))
                                             .clickable {
-                                                pendingConfirmProduct = MealPreset(
+                                                val targetMeal = activeBottomSheetMealType ?: viewModel.mealTypeInput
+                                                showConfirm(
+                                                MealPreset(
                                                     name = food.name,
                                                     kcal = food.kcal,
                                                     protein = food.protein,
@@ -845,7 +898,9 @@ fun FoodHomeScreen(
                                                     portionGrams = food.portionGrams,
                                                     portionLabel = food.portionLabel,
                                                     displayName = food.displayName
-                                                ).toProductResult()
+                                                ).toProductResult(),
+                                                targetMeal
+                                                )
                                                 activeBottomSheetMealType = null
                                             }
                                             .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -907,7 +962,8 @@ fun FoodHomeScreen(
                                     .background(SecondaryFill)
                                     .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
                                     .clickable {
-                                        pendingConfirmProduct = g
+                                        val targetMeal = activeBottomSheetMealType ?: viewModel.mealTypeInput
+                                        showConfirm(g, targetMeal)
                                         activeBottomSheetMealType = null
                                     }
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -1034,6 +1090,10 @@ private fun MealSectionCard(
     onAddClick: () -> Unit,
     onEditMeal: (LoggedMeal) -> Unit,
     onDeleteMeal: (LoggedMeal) -> Unit,
+    // Rendered at the top of the expanded body. This is where the confirm card
+    // goes when the item is being added to THIS section, so it lands under the
+    // section header the user just tapped instead of jumping to the page top.
+    pendingConfirm: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val localMeals = meals.filter { it.isLocal }
@@ -1130,6 +1190,11 @@ private fun MealSectionCard(
 
             // Expanded Meal Items inside
             if (isExpanded) {
+                // Before the empty-state branch: the card must appear even when
+                // the section has nothing in it yet, which is the common case for
+                // adding a first item to Snacks.
+                pendingConfirm?.invoke()
+
                 if (localMeals.isEmpty() && otherAppMeals.isEmpty()) {
                     Text(
                         text = "No $sectionTitle logged yet",
