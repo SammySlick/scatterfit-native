@@ -260,4 +260,43 @@ class DayCardTest {
         // Stays ORANGE between 100% and 110% (e.g. 2750)
         assertEquals(MetricBarColor.ORANGE, computeCaloriesBarColor(2750.0, target))
     }
+
+    // --- The bars that came off the Today card (2026-11-24) ------------------
+    // Sam: "the bars are noisy. Works for the step count but I'm not sure about
+    // the calorie count and protein intake." Steps keep their bar; these two
+    // rows now show numbers plus the one actionable figure.
+
+    @Test
+    fun `calories report what is left, not how full a bar is`() {
+        assertEquals("860 left", kcalRemainingNote(1_240.0, 2_100))
+    }
+
+    @Test
+    fun `a small calorie overshoot reads as over, rounded to whole kcal`() {
+        assertEquals("140 over", kcalRemainingNote(2_240.0, 2_100))
+        // 2100.4 eaten is not "0 left" and not "1 over" - it rounds to on target.
+        assertEquals("on target", kcalRemainingNote(2_100.4, 2_100))
+    }
+
+    @Test
+    fun `no calorie target means no commentary`() {
+        assertNull(kcalRemainingNote(500.0, 0))
+        assertNull(kcalRemainingNote(0.0, 0))
+    }
+
+    @Test
+    fun `protein shows the gap to the floor and nothing once reached`() {
+        assertEquals("68 g to go", proteinRemainingNote(92.0, 160))
+        // Over the floor is not a problem, so it gets no note at all. A "35 g over"
+        // pill on protein would be scolding Sam for eating enough.
+        assertNull(proteinRemainingNote(160.0, 160))
+        assertNull(proteinRemainingNote(195.0, 160))
+        assertNull(proteinRemainingNote(92.0, 0))
+    }
+
+    @Test
+    fun `rounding keeps a nearly-met protein target from claiming a gram is left`() {
+        assertNull(proteinRemainingNote(159.6, 160))
+        assertEquals("1 g to go", proteinRemainingNote(159.4, 160))
+    }
 }

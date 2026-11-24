@@ -312,6 +312,8 @@ fun DayCard(
                         fillColor = calColor,
                         secondaryFraction = alcoholFraction,
                         secondaryColor = TextMuted,
+                        showBar = false,
+                        quietNote = kcalRemainingNote(totalKcal, kcalTarget),
                         breakdownText = if (alcoholKcal > 0.0)
                             "%s food + %s alcohol".format(
                                 Locale.US,
@@ -363,6 +365,8 @@ fun DayCard(
                         targetText = "of %,dg".format(Locale.US, protTarget),
                         progressFraction = protFraction,
                         fillColor = protColor,
+                        showBar = false,
+                        quietNote = proteinRemainingNote(protRaw ?: 0.0, protTarget),
                         onClick = { onMetricClick(MetricId.PROTEIN) }
                     )
                 }
@@ -483,6 +487,34 @@ fun DayCard(
     }
 }
 
+/**
+ * What is left to eat, in plain words. Null when there is no target to speak of,
+ * so a row with no goal shows no commentary rather than "0 left".
+ *
+ * This is the whole replacement for the calorie bar: two numbers and the one
+ * number that is actually actionable (what's left). Rounded, so a 3 kcal
+ * overshoot does not report "3 kcal over" as if it were a finding.
+ */
+fun kcalRemainingNote(consumed: Double, target: Int): String? {
+    if (target <= 0) return null
+    val remaining = (target - consumed).roundToInt()
+    return when {
+        remaining > 0 -> "%,d left".format(Locale.US, remaining)
+        remaining == 0 -> "on target"
+        else -> "%,d over".format(Locale.US, -remaining)
+    }
+}
+
+/**
+ * Protein is a floor, not a ceiling: going over it is not a problem worth a word,
+ * so this says nothing once you are there. Only the gap is useful.
+ */
+fun proteinRemainingNote(consumed: Double, target: Int): String? {
+    if (target <= 0) return null
+    val remaining = (target - consumed).roundToInt()
+    return if (remaining > 0) "%,d g to go".format(Locale.US, remaining) else null
+}
+
 @Composable
 private fun DayCardBarRow(
     icon: @Composable () -> Unit,
@@ -497,6 +529,13 @@ private fun DayCardBarRow(
     modifier: Modifier = Modifier,
     breakdownText: String? = null,
     trailingAffordance: (@Composable () -> Unit)? = null,
+    // Steps keep their bar: a step count is an accumulation you finish, so a bar
+    // genuinely answers "how far through the day am I". Calories and protein do not
+    // — a half-full calorie bar at 6pm reads as a verdict on a target you may not
+    // even be chasing, and two of them side by side turn Today into a scoreboard.
+    // Those rows show the two numbers and what's left, and nothing else.
+    showBar: Boolean = true,
+    quietNote: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -555,34 +594,37 @@ private fun DayCardBarRow(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        if (showBar) {
+            Spacer(modifier = Modifier.height(8.dp))
 
-        // 6dp Progress Bar with Track token
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(CircleShape)
-                .background(Track)
-        ) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                val rawPrimary = progressFraction.coerceAtLeast(0f)
-                val rawSecondary = secondaryFraction.coerceAtLeast(0f)
-                val total = rawPrimary + rawSecondary
-                val scale = if (total > 1f) 1f / total else 1f
-                val primary = if (rawPrimary > 0f) maxOf(rawPrimary * scale, 0.02f) else 0f
-                val secondary = if (rawSecondary > 0f) maxOf(rawSecondary * scale, 0.02f) else 0f
-                val rest = (1f - primary - secondary).coerceAtLeast(0f)
-                if (primary > 0f) Box(Modifier.fillMaxHeight().weight(primary).background(fillColor))
-                if (secondary > 0f) Box(Modifier.fillMaxHeight().weight(secondary).background(secondaryColor))
-                if (rest > 0f) Box(Modifier.fillMaxHeight().weight(rest))
+            // 6dp Progress Bar with Track token
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(CircleShape)
+                    .background(Track)
+            ) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    val rawPrimary = progressFraction.coerceAtLeast(0f)
+                    val rawSecondary = secondaryFraction.coerceAtLeast(0f)
+                    val total = rawPrimary + rawSecondary
+                    val scale = if (total > 1f) 1f / total else 1f
+                    val primary = if (rawPrimary > 0f) maxOf(rawPrimary * scale, 0.02f) else 0f
+                    val secondary = if (rawSecondary > 0f) maxOf(rawSecondary * scale, 0.02f) else 0f
+                    val rest = (1f - primary - secondary).coerceAtLeast(0f)
+                    if (primary > 0f) Box(Modifier.fillMaxHeight().weight(primary).background(fillColor))
+                    if (secondary > 0f) Box(Modifier.fillMaxHeight().weight(secondary).background(secondaryColor))
+                    if (rest > 0f) Box(Modifier.fillMaxHeight().weight(rest))
+                }
             }
         }
 
-        if (breakdownText != null) {
-            Spacer(modifier = Modifier.height(4.dp))
+        val note = listOfNotNull(quietNote, breakdownText).joinToString("  ·  ").ifEmpty { null }
+        if (note != null) {
+            Spacer(modifier = Modifier.height(if (showBar) 4.dp else 3.dp))
             Text(
-                text = breakdownText,
+                text = note,
                 fontSize = 12.sp,
                 color = TextMuted,
                 fontWeight = FontWeight.Normal

@@ -179,19 +179,32 @@ fun ProgressReportScreen(
 
             Spacer(Modifier.height(24.dp))
 
+            // Sleep sits above Steps on purpose: it is the thing Sam checks daily and
+            // the thing the night's data actually costs him (a bad night is visible in
+            // weight and training the next day). Steps are a count-up you glance at.
+            SectionHeading("Sleep")
+
+            StatRow(
+                label = "Nightly average",
+                value = sleepWindow.average?.let { formatSleep(it) } ?: "—",
+                sub = trendSentence("Sleep", sleepWindow, " min", decimals = 0, steadyBand = 15.0)
+                    ?: coverage(sleep, today, windowDays),
+            )
+
+            StatRow(
+                label = "Nights recorded",
+                value = "${sleepWindow.readings} of $windowDays",
+                sub = if (sleepWindow.readings < windowDays / 2) "Sparse. The band needs to be worn overnight." else null,
+            )
+
+            Spacer(Modifier.height(24.dp))
+
             SectionHeading("Activity")
 
             StatRow(
                 label = "Steps, daily average",
                 value = stepWindow.average?.let { formatCount(it.toInt()) } ?: "—",
                 sub = if (stepWindow.readings > 0) "across ${stepWindow.readings} days with data" else coverage(steps, today, windowDays),
-            )
-
-            StatRow(
-                label = "Sleep, nightly average",
-                value = sleepWindow.average?.let { formatSleep(it) } ?: "—",
-                sub = trendSentence("Sleep", sleepWindow, " min", decimals = 0, steadyBand = 15.0)
-                    ?: coverage(sleep, today, windowDays),
             )
 
             Spacer(Modifier.height(24.dp))
