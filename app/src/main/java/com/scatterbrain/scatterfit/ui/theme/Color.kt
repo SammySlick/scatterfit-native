@@ -30,14 +30,12 @@ val AppBackground = Color(0xFF16191E)
 val AppCardSurface = Color(0xFF20242B)
 val SecondaryFill = Color(0xFF272C34)
 val MutedFill = Color(0xFF272C34)
-val AccentFill = Color(0xFF272C34)
 
 // Muted lifted from #8E9BAE: most of this app's copy is 11-12sp, and 6.4:1 at
 // 11sp still squints. This is ~7.4:1 on the card colour.
 val TextForeground = Color(0xFFF4F6F9)
 val TextMuted = Color(0xFFA3AEBC)
 val TextFaint = Color(0xFFA9B3C0)
-val TextFaintDark = Color(0xFF8B95A3)
 
 // Hairlines, not outlines. A card should be found by its contrast with the
 // page, not by a drawn rectangle around it.
@@ -45,24 +43,15 @@ val BorderDefault = Color.White.copy(alpha = 0.07f)
 val BorderInput = Color.White.copy(alpha = 0.13f)
 val Track = Color(0xFF333A44)
 val AccentTeal   = Color(0xFF15B6A4)
-val RingFocus = AccentTeal.copy(alpha = 0.60f)
 
 // Brand & Chart Colours
 val BrandPrimaryLime = AccentTeal    // Retired: aliased to AccentTeal
 val OnPrimaryText = Color(0xFF0A0A0A)
 val ChartBlue = Color(0xFF43B4D4)
-val ChartAmber = Color(0xFFF0BB3B)
-val ChartRed = Color(0xFFF14D4C)
 
 // Legacy / Compatibility Aliases
 val DarkCardSurface = AppCardSurface
-val AppRowSurface = MutedFill
 val TealHighlight = AccentTeal
-val DarkBackground = AppBackground
-val DarkBorderOutline = BorderDefault
-val StatusOnTarget = JudgementGood
-val StatusNearTarget = JudgementWarn
-val StatusOffTarget = JudgementBad
 
 // Colour System v2 tokens
 val StateBad     = Color(0xFFF05B54)
@@ -70,7 +59,6 @@ val StateSlip    = Color(0xFFF29D1E)
 val StateRhythm  = Color(0xFFF0BB3B)
 val StateLocked  = Color(0xFF44B65E)
 val StatePeak    = Color(0xFF3FA9F5)
-val ZoneAccent   = Color(0xFFF17084)
 
 // --- v3: the colour that is allowed to mean nothing -------------------------
 // Everyday state. Not on track, not off track: just today's reading. Use this
@@ -78,5 +66,3 @@ val ZoneAccent   = Color(0xFFF17084)
 val NeutralAttend = Color(0xFFB9C3D0)
 
 // Softer surfaces for the "diary" feel: a section that is a quiet block of the
-// page rather than a raised panel. One step below AppCardSurface.
-val SurfaceSubtle = Color(0xFF1B1F25)
