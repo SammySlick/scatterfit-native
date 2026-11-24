@@ -142,9 +142,8 @@ fun FoodHomeScreen(
 
     val storedMeals by viewModel.mealsForDay.collectAsState()
     val mealHistory by viewModel.mealHistory.collectAsState()
-    // A single timestamp per composition. Recomputed from System.currentTimeMillis()
-    // inside the item loop it would drift mid-scroll and shuffle the list under the
-    // finger; sampled once, the ages are consistent until the screen is reopened.
+    // Sampled once per composition: recomputed inside the item loop it would drift
+    // mid-scroll and shuffle the order under the finger.
     val nowMs = remember { System.currentTimeMillis() }
     val presets by viewModel.presets.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
@@ -813,7 +812,7 @@ fun FoodHomeScreen(
                     // logged. See rankRecentFoods: this used to be the first five saved
                     // presets, which is why only a couple of them were ever actually
                     // recent. Rows rather than chips, because a row has space to say
-                    // why it is there ("3x - yesterday") and chips do not.
+                    // why it is there ("3x - yesterday") and a chip does not.
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -824,12 +823,7 @@ fun FoodHomeScreen(
                         val recents = remember(mealHistory, nowMs) {
                             rankRecentFoods(mealHistory, nowMs, limit = 8)
                         }
-                        Text(
-                            "Recents",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextForeground
-                        )
+                        Text("Recents", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextForeground)
                         if (recents.isNotEmpty()) {
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 recents.forEach { food ->
@@ -838,7 +832,7 @@ fun FoodHomeScreen(
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(10.dp))
                                             .clickable {
-                                                val preset = MealPreset(
+                                                pendingConfirmProduct = MealPreset(
                                                     name = food.name,
                                                     kcal = food.kcal,
                                                     protein = food.protein,
@@ -847,9 +841,8 @@ fun FoodHomeScreen(
                                                     lastUsedTimestamp = food.lastUsedMs,
                                                     portionGrams = food.portionGrams,
                                                     portionLabel = food.portionLabel,
-                                                    displayName = food.displayName,
-                                                )
-                                                pendingConfirmProduct = preset.toProductResult()
+                                                    displayName = food.displayName
+                                                ).toProductResult()
                                                 activeBottomSheetMealType = null
                                             }
                                             .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -864,15 +857,14 @@ fun FoodHomeScreen(
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                            // "3x - yesterday": the two facts that explain
-                                            // the position. Without them an ordering looks
+                                            // "3x . yesterday": the two facts that explain
+                                            // the position. Without them the order looks
                                             // arbitrary the first time a staple is not top.
-                                            val why = listOfNotNull(
-                                                recentUsesLabel(food.uses),
-                                                recentAgeLabel(food.daysAgo)
-                                            ).joinToString(" \u00b7 ")
                                             Text(
-                                                text = why,
+                                                text = listOfNotNull(
+                                                    recentUsesLabel(food.uses),
+                                                    recentAgeLabel(food.daysAgo)
+                                                ).joinToString(" \u00b7 "),
                                                 fontSize = 12.sp,
                                                 color = TextMuted,
                                                 maxLines = 1
@@ -894,7 +886,6 @@ fun FoodHomeScreen(
                                 color = TextMuted
                             )
                         }
-                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Generic Foods", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextForeground)
