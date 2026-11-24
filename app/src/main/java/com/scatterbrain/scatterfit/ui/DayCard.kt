@@ -237,10 +237,24 @@ fun DayCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    // Left: "eaten / target" + caption. Weighted so the tick counter
-                    // on the right cannot be pushed off a narrow screen by a long
-                    // calorie figure - the counter is the thing that would vanish.
+                    // Left: eyebrow + "eaten / target" + caption. Weighted so the
+                    // tick counter on the right cannot be pushed off a narrow screen
+                    // by a long calorie figure - the counter is the thing that would
+                    // vanish.
                     Column(modifier = Modifier.weight(1f)) {
+                        // Sam, 2026-11-24: "Can we have a 'Calories' eyebrow above
+                        // the hero number too? Feels like a floating number
+                        // otherwise." He is right - 66 / 2,000 is a big pair of
+                        // numbers with nothing saying what they count. Sentence case
+                        // and 12sp, per the v3 direction: an eyebrow is a label, not a
+                        // section shout.
+                        Text(
+                            text = "Calories",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TextMuted,
+                            modifier = Modifier.padding(bottom = 2.dp)
+                        )
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
                                 text = heroEatenText,
@@ -315,38 +329,7 @@ fun DayCard(
                 // complaint was "too many numbers... hard to parse", and the row was
                 // literally the hero in lower case.
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // 1. Steps row — keeps its bar. A step count is an accumulation
-                    // you finish, so a bar genuinely answers "how far through the day
-                    // am I".
-                    val stepRaw = totalSteps
-                    val stepTarget = effectiveSettings.stepTarget
-                    val stepFraction = if (stepRaw > 0 && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
-                    val stepColor = getBarColor(computeStepsBarColor(stepRaw, stepTarget))
-                    DayCardBarRow(
-                        icon = { FootstepsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
-                        label = "Steps",
-                        currentText = String.format(Locale.US, "%,d", totalSteps.roundToInt()),
-                        targetText = "of %,d".format(Locale.US, stepTarget),
-                        progressFraction = stepFraction,
-                        fillColor = stepColor,
-                        breakdownText = if (estimatedSteps > 0) {
-                            "${String.format(Locale.US, "%,d", deviceStepsVal.roundToInt())} device + ${String.format(Locale.US, "%,d", estimatedSteps)} estimated"
-                        } else null,
-                        trailingAffordance = if (onAdjustStepsClick != null) {
-                            {
-                                Text(
-                                    text = "Adjust steps",
-                                    color = AccentTeal,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.clickable { onAdjustStepsClick() }
-                                )
-                            }
-                        } else null,
-                        onClick = { onMetricClick(MetricId.STEPS) }
-                    )
-
-                    // 2. MACRO PILLS (Protein / Carbs / Fat)
+                    // MACRO PILLS (Protein / Carbs / Fat)
                     //
                     // Sam, 2026-11-24: "I like the different coloured pills for the
                     // Protein, Carbs and Fats in BWS." Pills rather than three more
@@ -381,6 +364,42 @@ fun DayCard(
                             onClick = { onMetricClick(MetricId.CALORIES_EATEN) }
                         )
                     }
+
+                    // Steps LAST, below the macro pills.
+                    //
+                    // Sam, 2026-11-24: "move the steps and it's bar below the p/c/f."
+                    // Order is now hero -> macros -> steps: the pills are what he acts
+                    // on while eating, steps are what happens to him in the background.
+                    // Steps row — keeps its bar. A step count is an accumulation
+                    // you finish, so a bar genuinely answers "how far through the day
+                    // am I".
+                    val stepRaw = totalSteps
+                    val stepTarget = effectiveSettings.stepTarget
+                    val stepFraction = if (stepRaw > 0 && stepTarget > 0) (stepRaw.toFloat() / stepTarget.toFloat()).coerceIn(0f, 1f) else 0f
+                    val stepColor = getBarColor(computeStepsBarColor(stepRaw, stepTarget))
+                    DayCardBarRow(
+                        icon = { FootstepsIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
+                        label = "Steps",
+                        currentText = String.format(Locale.US, "%,d", totalSteps.roundToInt()),
+                        targetText = "of %,d".format(Locale.US, stepTarget),
+                        progressFraction = stepFraction,
+                        fillColor = stepColor,
+                        breakdownText = if (estimatedSteps > 0) {
+                            "${String.format(Locale.US, "%,d", deviceStepsVal.roundToInt())} device + ${String.format(Locale.US, "%,d", estimatedSteps)} estimated"
+                        } else null,
+                        trailingAffordance = if (onAdjustStepsClick != null) {
+                            {
+                                Text(
+                                    text = "Adjust steps",
+                                    color = AccentTeal,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable { onAdjustStepsClick() }
+                                )
+                            }
+                        } else null,
+                        onClick = { onMetricClick(MetricId.STEPS) }
+                    )
                 }
             }
 
@@ -411,14 +430,22 @@ fun DayCard(
                 } else {
                     "—"
                 }
-                val sleepSecondary = if (hasSleepData) "last night" else "syncs overnight"
+                // Secondary used to read "last night", which told Sam nothing he did
+                // not already know from the word "Sleep" above it. Deep sleep is a
+                // real stage value already in the record and never shown anywhere;
+                // "1h 4m deep" is a fact worth glancing at. Falls back to the old line
+                // when the watch did not share stages (deepMin == 0).
+                val sleepSecondary = when {
+                    !hasSleepData -> "syncs overnight"
+                    else -> sleepDeepLabel(sleepNight.deepMin) ?: "last night"
+                }
 
                 DayCardContextCard(
                     modifier = Modifier.weight(1f),
                     icon = { MoonIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
-                    primaryText = sleepPrimary,
+                    label = "Sleep",
+                    value = sleepPrimary,
                     secondaryText = sleepSecondary,
-                    showDot = hasSleepData,
                     onClick = { onMetricClick(MetricId.SLEEP) }
                 )
 
@@ -427,7 +454,10 @@ fun DayCard(
                 val todayBf = daily?.bodyFat?.get(dayKey)
                 val hasWeightToday = todayWeight != null && todayWeight > 0.0
 
-                val weightPrimary = if (hasWeightToday) "%.1f kg".format(Locale.US, todayWeight) else "No weigh-in yet"
+                // "No weigh-in yet" as the *value* needed 14sp to fit and still read
+                // as a sentence where a figure belongs. The value slot now always
+                // holds a figure-shaped thing; the explanation moved below it.
+                val weightPrimary = if (hasWeightToday) "%.1f kg".format(Locale.US, todayWeight) else "—"
                 val weightSecondary = if (hasWeightToday && todayBf != null && todayBf > 0.0) {
                     "%.1f%% body fat".format(Locale.US, todayBf)
                 } else if (hasWeightToday) {
@@ -439,16 +469,9 @@ fun DayCard(
                 DayCardContextCard(
                     modifier = Modifier.weight(1f),
                     icon = { ScaleIcon(modifier = Modifier.size(14.dp), tint = TextMuted) },
-                    primaryText = weightPrimary,
-                    // Up/down against the last weigh-in. Deliberately muted, not red or
-                    // green: weight rising is correct in a bulk and wrong in a cut, so
-                    // the card reports the direction and lets Sam judge it. Same rule as
-                    // the Progress report - direction is not judgement.
-                    primarySuffix = weightDeltaLabel(
-                        weightDeltaVsPrevious(dayKey, daily?.weight ?: emptyMap())
-                    ),
+                    label = "Weight",
+                    value = weightPrimary,
                     secondaryText = weightSecondary,
-                    showDot = hasWeightToday,
                     onClick = onWeighInClick
                 )
             }
@@ -519,10 +542,24 @@ fun calorieHeroCaption(eaten: Int, target: Int): String {
     if (target <= 0) return "kcal eaten"
     val remaining = target - eaten
     return when {
-        remaining > 0 -> "kcal eaten · %,d left".format(Locale.US, remaining)
-        remaining == 0 -> "kcal eaten · on target"
-        else -> "kcal eaten · %,d over".format(Locale.US, -remaining)
+        remaining > 0 -> "%,d left".format(Locale.US, remaining)
+        remaining == 0 -> "on target"
+        else -> "%,d over".format(Locale.US, -remaining)
     }
+}
+
+/**
+ * "1h 04m deep", or null when the watch did not share sleep stages.
+ *
+ * A sleep tile that says "last night" is telling Sam something he already knows from
+ * the word "Sleep" directly above it. Deep sleep is in the record and never shown
+ * anywhere, so it earns the line. Null rather than "0m deep" when the source has no
+ * stage data - zero minutes of deep sleep is a claim about his sleep, not the data.
+ */
+fun sleepDeepLabel(deepMin: Double): String? {
+    if (deepMin <= 0.0) return null
+    val total = deepMin.roundToInt()
+    return "%dh %02dm deep".format(Locale.US, total / 60, total % 60)
 }
 
 /**
@@ -542,32 +579,6 @@ fun macroPillValue(consumed: Double?, target: Int): String {
     }
 }
 
-/**
- * Change in weight against the most recent earlier weigh-in.
- *
- * "From yday" was the ask, but Sam skips weigh-ins, so taking literally-yesterday
- * would leave the chevron blank on the days he most wants it. The most recent
- * earlier reading is used instead — and null when the difference rounds to zero,
- * so nothing shows a chevron claiming "up 0.0".
- */
-fun weightDeltaVsPrevious(dayKey: String, weights: Map<String, Double>): Double? {
-    val today = weights[dayKey] ?: return null
-    if (today <= 0.0) return null
-    val previous = weights.entries
-        .filter { it.key < dayKey && it.value > 0.0 }
-        .maxByOrNull { it.key }
-        ?.value ?: return null
-    val delta = today - previous
-    // Rounded to the precision the card displays; anything smaller is not a move.
-    return if (Math.abs(delta) < 0.05) null else delta
-}
-
-/** "▼ 0.4" / "▲ 1.2", or null when there is nothing to report. */
-fun weightDeltaLabel(delta: Double?): String? {
-    if (delta == null) return null
-    val arrow = if (delta > 0) "▲" else "▼"
-    return "%s %.1f".format(Locale.US, arrow, Math.abs(delta))
-}
 
 @Composable
 private fun MacroPill(
@@ -834,15 +845,11 @@ private fun DayCardTrainingRow(
 @Composable
 private fun DayCardContextCard(
     icon: @Composable () -> Unit,
-    primaryText: String,
+    label: String,
+    value: String,
     secondaryText: String,
-    showDot: Boolean,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    // Optional muted suffix after the primary figure, used for the weight up/down
-    // chevron ("\u25bc 0.4"). A plain String, not a composable slot: the chevron is
-    // only ever one styled run, and a slot here bought nothing but inference risk.
-    primarySuffix: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -868,55 +875,44 @@ private fun DayCardContextCard(
         colors = CardDefaults.cardColors(containerColor = SecondaryFill),
         border = BorderStroke(0.dp, Color.Transparent)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            if (showDot) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(AccentTeal)
-                        .align(Alignment.TopEnd)
-                )
-            }
-
-            Column {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            // Icon + label on one line. They were stacked (icon above the number, no
+            // label at all), which is why these two cards read as mystery tiles: a
+            // moon and a pair of scales, then a number, then a fragment of context.
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 icon()
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = primaryText,
-                        fontSize = if (primaryText.length > 8) 14.sp else 15.sp,
-                        lineHeight = 19.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextForeground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip
-                    )
-                    if (primarySuffix != null) {
-                        Text(
-                            text = primarySuffix,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextMuted,
-                            maxLines = 1,
-                            modifier = Modifier.padding(start = 4.dp, bottom = 1.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = secondaryText,
+                    text = label,
                     fontSize = 12.sp,
-                    lineHeight = 13.sp,
+                    fontWeight = FontWeight.Medium,
                     color = TextMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1
                 )
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            // 20sp, up from 15sp. On the hero card the divider between "a number you
+            // glance at" and "a number you read" was size, and these were on the
+            // wrong side of it. No length-based size hack any more - the strings are
+            // built here, so a long one is a bug to fix, not a font size to shrink.
+            Text(
+                text = value,
+                fontSize = 20.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextForeground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = secondaryText,
+                fontSize = 12.sp,
+                lineHeight = 15.sp,
+                color = TextMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

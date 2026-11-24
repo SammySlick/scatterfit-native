@@ -267,15 +267,19 @@ class DayCardTest {
     // and Fats in BWS. Weight with a small up or down chevron so show if up or
     // down from yday?"
     //
+    // The chevron itself was removed the same evening: "No up or down chevrons." The
+    // delta helpers went with it rather than sitting unused - a function nobody calls
+    // is how DashboardScreen survived a redesign.
+    //
     // The row-voice notes that this replaces (kcalRemainingNote/proteinRemainingNote)
     // are gone with their rows: the hero and the pills now carry those numbers, and
     // keeping two ways of phrasing "how much is left" is how the card got noisy.
 
     @Test
     fun `hero caption reads eaten, target and what is left`() {
-        assertEquals("kcal eaten \u00b7 860 left", calorieHeroCaption(1_240, 2_100))
-        assertEquals("kcal eaten \u00b7 on target", calorieHeroCaption(2_100, 2_100))
-        assertEquals("kcal eaten \u00b7 40 over", calorieHeroCaption(2_140, 2_100))
+        assertEquals("860 left", calorieHeroCaption(1_240, 2_100))
+        assertEquals("on target", calorieHeroCaption(2_100, 2_100))
+        assertEquals("40 over", calorieHeroCaption(2_140, 2_100))
     }
 
     @Test
@@ -286,7 +290,7 @@ class DayCardTest {
     @Test
     fun `hero caption rounds to whole kcal so a rounding error is not a finding`() {
         // 2,100 eaten exactly is on target; the caption must not say "0 left".
-        assertEquals("kcal eaten \u00b7 on target", calorieHeroCaption(2_100, 2_100))
+        assertEquals("on target", calorieHeroCaption(2_100, 2_100))
     }
 
     @Test
@@ -308,36 +312,17 @@ class DayCardTest {
     }
 
     @Test
-    fun `weight delta uses the most recent earlier weigh-in, not literally yesterday`() {
-        val weights = mapOf(
-            "2026-11-18" to 95.4,
-            "2026-11-20" to 95.1,
-            "2026-11-23" to 95.2
-        )
-        // Sam skips weigh-ins, so 23rd is the comparison for the 24th.
-        assertEquals(0.4, weightDeltaVsPrevious("2026-11-24", weights + ("2026-11-24" to 95.6))!!, 0.001)
+    fun `sleep context line reads deep sleep and pads the minutes`() {
+        // 1h 4m, not "1h 4m deep" with a stray space, and not "64m".
+        assertEquals("1h 04m deep", sleepDeepLabel(64.0))
+        assertEquals("0h 07m deep", sleepDeepLabel(7.2))
     }
 
     @Test
-    fun `weight delta ignores later readings and missing data`() {
-        val weights = mapOf("2026-11-23" to 95.0, "2026-11-25" to 99.0)
-        // Only one earlier reading exists, so there is nothing to compare: null.
-        assertNull(weightDeltaVsPrevious("2026-11-23", weights))
-        assertNull(weightDeltaVsPrevious("2026-11-24", mapOf("2026-11-25" to 99.0)))
-    }
-
-    @Test
-    fun `weight delta is null when the weight has not actually moved`() {
-        val weights = mapOf("2026-11-23" to 95.0, "2026-11-24" to 95.0)
-        // 95.0 vs 95.0 must not render as "up 0.0" - that is a chevron claiming a move.
-        assertNull(weightDeltaVsPrevious("2026-11-24", weights))
-    }
-
-    @Test
-    fun `weight delta label carries the arrow and one decimal`() {
-        assertEquals("\u25b2 1.2", weightDeltaLabel(1.24))
-        assertEquals("\u25bc 0.4", weightDeltaLabel(-0.4))
-        assertNull(weightDeltaLabel(null))
+    fun `sleep context line is silent rather than claiming zero deep sleep`() {
+        // No stage data from the source is not the same as no deep sleep.
+        assertNull(sleepDeepLabel(0.0))
+        assertNull(sleepDeepLabel(-1.0))
     }
 
 }
