@@ -265,7 +265,7 @@ fun DayCard(
                             ) {
                                 Text(
                                     text = "Back to today",
-                                    fontSize = 10.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = TextForeground
                                 )
@@ -288,7 +288,7 @@ fun DayCard(
                         }
                         Text(
                             text = "completed",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = TextMuted
                         )
                     }
@@ -342,7 +342,7 @@ fun DayCard(
                                 Text(
                                     text = "Adjust steps",
                                     color = AccentTeal,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.clickable { onAdjustStepsClick() }
                                 )
@@ -450,7 +450,7 @@ fun DayCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "DRINKS TODAY",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextMuted,
                             letterSpacing = 1.5.sp
@@ -548,7 +548,7 @@ private fun DayCardBarRow(
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = targetText,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     lineHeight = 14.sp,
                     color = TextMuted
                 )
@@ -583,7 +583,7 @@ private fun DayCardBarRow(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = breakdownText,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = TextMuted,
                 fontWeight = FontWeight.Normal
             )
@@ -673,7 +673,7 @@ private fun DayCardTrainingRow(
                 )
                 Text(
                     text = if (isTrainingDay) "Tap to log your session" else "No session planned",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     lineHeight = 14.sp,
                     color = TextMuted
                 )
@@ -752,7 +752,7 @@ private fun DayCardContextCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = secondaryText,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     lineHeight = 13.sp,
                     color = TextMuted,
                     maxLines = 1,
@@ -789,7 +789,7 @@ private fun DrinksStatChip(
             )
             Text(
                 text = label.uppercase(),
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextMuted,
                 letterSpacing = 1.sp

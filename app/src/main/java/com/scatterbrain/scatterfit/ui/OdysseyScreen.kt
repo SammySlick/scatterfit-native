@@ -85,7 +85,8 @@ data class SpokeItem(
 fun OdysseyScreen(
     modifier: Modifier = Modifier,
     momentumSource: MomentumSource? = null,
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onOpenProgressReport: () -> Unit = {}
 ) {
     val source: MomentumSource = remember(momentumSource) {
         momentumSource ?: TodayFacadeMomentumSource()
@@ -157,6 +158,20 @@ fun OdysseyScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Progress report entry. Deliberately a row rather than a card: it is a
+        // doorway to another page, not a panel of information, and the app
+        // already has 117 Cards competing for attention.
+        Text(
+            text = "Progress report  ›",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AccentTeal,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenProgressReport() }
+                .padding(vertical = 12.dp)
+        )
+
         // Top Header — Matrix
         Row(
             modifier = Modifier
@@ -197,7 +212,7 @@ fun OdysseyScreen(
                 Column {
                     Text(
                         text = "MOMENTUM",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextMuted,
                         letterSpacing = 1.sp
@@ -250,7 +265,7 @@ fun OdysseyScreen(
                 ) {
                     Text(
                         text = "CONTRIBUTIONS",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextMuted,
                         letterSpacing = 1.sp
@@ -272,7 +287,7 @@ fun OdysseyScreen(
                                 Text(
                                     text = label,
                                     color = textColor,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                 )
                             }
@@ -295,7 +310,7 @@ fun OdysseyScreen(
         // Metric Rows Header
         Text(
             text = "METRICS",
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = TextMuted,
             letterSpacing = 1.sp,
@@ -390,7 +405,7 @@ fun MatrixSpiderGraph(
             val textColor = if (hasData) TextForeground else TextMuted
             val measured = textMeasurer.measure(
                 text = spoke.name,
-                style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = textColor)
+                style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textColor)
             )
             drawText(
                 textLayoutResult = measured,
@@ -472,7 +487,7 @@ fun MetricScoreRow(
                         if (item.todayPoints != null) {
                             Text(
                                 text = "+${item.todayPoints.roundToInt()} pts",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = TextMuted,
                                 fontWeight = FontWeight.Medium
                             )
@@ -494,7 +509,7 @@ fun MetricScoreRow(
                     }
                     Text(
                         text = "mean of ${item.participatingDays} ${if (item.participatingDays == 1) "day" else "days"}",
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         color = TextMuted,
                         fontWeight = FontWeight.Normal
                     )

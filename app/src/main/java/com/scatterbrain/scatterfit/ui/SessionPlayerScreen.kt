@@ -762,7 +762,7 @@ private fun SelectAllOnFocusField(
                 Text(
                     placeholder,
                     color = TextFaint,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -839,7 +839,7 @@ private fun PlayerExerciseCard(
                     ) {
                         Text(
                             text = "⏱ $restText",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (restTimer.isRunning) TealHighlight else TextMuted
                         )
@@ -854,18 +854,18 @@ private fun PlayerExerciseCard(
                     .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("SET", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(32.dp), textAlign = TextAlign.Center)
-                Text("PREV", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Text("KG", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.9f), textAlign = TextAlign.Center)
+                Text("SET", fontSize = 12.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(32.dp), textAlign = TextAlign.Center)
+                Text("PREV", fontSize = 12.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text("KG", fontSize = 12.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.9f), textAlign = TextAlign.Center)
                 Text(
                     if (exerciseState.isTimed) "TIME" else "REPS",
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = TextMuted,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1.1f),
                     textAlign = TextAlign.Center
                 )
-                Text("DIFF", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(48.dp), textAlign = TextAlign.Center)
+                Text("DIFF", fontSize = 12.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(48.dp), textAlign = TextAlign.Center)
                 Text("✓", fontSize = 12.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
             }
 
@@ -913,7 +913,7 @@ private fun PlayerExerciseCard(
                     // PREV column
                     Text(
                         text = prevSummary,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = TextFaint,
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center,
@@ -974,7 +974,7 @@ private fun PlayerExerciseCard(
                                     cursorBrush = SolidColor(TealHighlight),
                                     decorationBox = { inner ->
                                         if (timeText.isEmpty() && !set.isHolding) {
-                                            Text("00:30", color = TextFaint, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                                            Text("00:30", color = TextFaint, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                                         }
                                         inner()
                                     },
@@ -989,7 +989,7 @@ private fun PlayerExerciseCard(
                                         .clickable { set.isHolding = !set.isHolding }
                                         .padding(horizontal = 4.dp, vertical = 2.dp)
                                 ) {
-                                    Text(if (set.isHolding) "Stop" else "Hold", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (set.isHolding) Color.White else TealHighlight)
+                                    Text(if (set.isHolding) "Stop" else "Hold", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (set.isHolding) Color.White else TealHighlight)
                                 }
                             }
                         } else {
@@ -1033,7 +1033,7 @@ private fun PlayerExerciseCard(
                             .padding(vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = diffLabel, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = diffColor, textAlign = TextAlign.Center)
+                        Text(text = diffLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = diffColor, textAlign = TextAlign.Center)
                     }
 
                     // Done ✓ checkbox

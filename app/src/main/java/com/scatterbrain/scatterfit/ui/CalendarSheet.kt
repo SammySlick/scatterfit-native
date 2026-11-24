@@ -132,7 +132,7 @@ fun CalendarSheet(
                     ) {
                         Text(
                             text = header,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TextMuted,
                             textAlign = TextAlign.Center
@@ -226,7 +226,7 @@ fun CalendarSheet(
                             ) {
                                 Text(
                                     text = date.dayOfMonth.toString(),
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     color = TextMuted.copy(alpha = 0.2f),
                                     textAlign = TextAlign.Center
                                 )

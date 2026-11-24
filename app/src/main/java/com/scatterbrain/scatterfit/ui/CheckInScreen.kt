@@ -223,7 +223,7 @@ fun CheckInScreen(
                 )
                 Text(
                     text = "$filledCount of $rowCount filled",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = TextMuted
                 )
             }
@@ -270,7 +270,7 @@ fun CheckInScreen(
                     ) {
                         Text(
                             text = letter,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = if (isToday) AccentTeal else TextMuted,
                             textAlign = TextAlign.Center
                         )
@@ -283,7 +283,7 @@ fun CheckInScreen(
         // (CHANGE 4) HINT LINE
         Text(
             text = "Tap a row to enter values",
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             color = TextMuted,
             modifier = Modifier.padding(bottom = 4.dp)
         )
@@ -292,7 +292,7 @@ fun CheckInScreen(
         sectionsToRender.forEach { (section, rows) ->
             Text(
                 text = section.name.uppercase(),
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextMuted,
                 letterSpacing = 0.8.sp,
@@ -371,7 +371,7 @@ fun CheckInScreen(
                                             if (row.scale == CheckInScale.SCALE_1_5) {
                                                 Text(
                                                     text = cellText,
-                                                    fontSize = 11.sp,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.Medium,
                                                     color = TextForeground,
                                                     textAlign = TextAlign.Center
@@ -379,7 +379,7 @@ fun CheckInScreen(
                                             } else if (row.scale == CheckInScale.YES_NO) {
                                                 Text(
                                                     text = cellText,
-                                                    fontSize = 10.sp,
+                                                    fontSize = 12.sp,
                                                     color = TextMuted,
                                                     textAlign = TextAlign.Center
                                                 )

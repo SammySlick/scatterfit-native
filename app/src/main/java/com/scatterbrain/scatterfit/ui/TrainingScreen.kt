@@ -661,13 +661,13 @@ private fun WeeklyPlannerSection(
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(
                                         text = weekdayAbbrev,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (isCurrentToday) TealHighlight else TextMuted
                                     )
                                     Text(
                                         text = dayNumber,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isCurrentToday) TealHighlight else TextForeground
                                     )
@@ -726,7 +726,7 @@ private fun WeeklyPlannerSection(
                                                 .clickable { onStartWorkout(routine, null, dayKey) }
                                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) {
-                                            Text("Start", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            Text("Start", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                         }
 
                                         if (!isLogged) {
@@ -740,11 +740,11 @@ private fun WeeklyPlannerSection(
                                                     }
                                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                                             ) {
-                                                Text("Log it", color = TealHighlight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                Text("Log it", color = TealHighlight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                         TextButton(onClick = { onRemovePlan(dayKey) }) {
-                                            Text("Remove", color = TextMuted, fontSize = 11.sp)
+                                            Text("Remove", color = TextMuted, fontSize = 12.sp)
                                         }
                                     }
                                 }
@@ -798,7 +798,7 @@ private fun WeeklyPlannerSection(
                                                     .clickable { onStartWorkout(null, sessionName, dayKey) }
                                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                                             ) {
-                                                Text("Start", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                Text("Start", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                             }
 
                                             if (!isLogged) {
@@ -812,11 +812,11 @@ private fun WeeklyPlannerSection(
                                                         }
                                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                                 ) {
-                                                    Text("Log it", color = TealHighlight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    Text("Log it", color = TealHighlight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                                 }
                                             }
                                             TextButton(onClick = { onRemovePlan(dayKey) }) {
-                                                Text("Remove", color = TextMuted, fontSize = 11.sp)
+                                                Text("Remove", color = TextMuted, fontSize = 12.sp)
                                             }
                                         }
                                     }
@@ -895,7 +895,7 @@ private fun WeeklyPlannerSection(
                                                 Text(
                                                     text = "${r.exercises.size} ex",
                                                     color = TextMuted,
-                                                    fontSize = 10.sp,
+                                                    fontSize = 12.sp,
                                                     maxLines = 1
                                                 )
                                             }
@@ -1002,7 +1002,7 @@ private fun WeeklyPlannerSection(
             ) {
                 Text(
                     text = "RECENT LOGS",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextMuted,
                     letterSpacing = 1.sp
@@ -1043,7 +1043,7 @@ private fun WeeklyPlannerSection(
                                 )
                                 Text(
                                     text = logDateFormatted,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     color = TextMuted
                                 )
                             }
@@ -1198,7 +1198,7 @@ fun RoutineOverviewScreen(
                             if (subtitleParts.isNotEmpty()) {
                                 Text(
                                     text = subtitleParts.joinToString(" · "),
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     color = TextMuted
                                 )
                             }
@@ -1362,7 +1362,7 @@ private fun DetectedSessionsCard(
         ) {
             Text(
                 text = "DETECTED SESSIONS",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextMuted,
                 letterSpacing = 1.sp
@@ -1537,12 +1537,12 @@ private fun ResumeSessionCard(
             ) {
                 Text(
                     text = "SESSION IN PROGRESS",
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = TealHighlight
                 )
                 TextButton(onClick = onDiscard) {
-                    Text("Discard", color = TextMuted, fontSize = 11.sp)
+                    Text("Discard", color = TextMuted, fontSize = 12.sp)
                 }
             }
 

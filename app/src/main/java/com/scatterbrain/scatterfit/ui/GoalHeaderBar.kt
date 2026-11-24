@@ -40,7 +40,7 @@ fun GoalHeaderBar(
         // LEFT slot: elapsed progress
         Text(
             text = elapsedText,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = TextMuted,
             letterSpacing = 0.5.sp
@@ -59,7 +59,7 @@ fun GoalHeaderBar(
         val projectionColor = if (isOnTrack) JudgementGood else JudgementWarn
         Text(
             text = projectionText,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = projectionColor,
             letterSpacing = 0.5.sp

@@ -3,27 +3,47 @@ package com.scatterbrain.scatterfit.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Judgement Palette (colour = judgement)
+//
+// ACCESSIBILITY NOTE (2026-11-24): JudgementWarn was referenced 27 times but
+// JudgementGood 16 — amber had become the app's default tint, so every screen
+// opened in a state of mild caution. Amber is for genuine warnings. For "this
+// is a number, it is fine" use TextMuted or NeutralAttend below.
 val JudgementGood = Color(0xFF4FD57F)        // good (on track)
 val JudgementWarn = Color(0xFFF0BB3B)        // warn (watch)
 val JudgementBad = Color(0xFFF14D4C)         // bad (off track)
 val JudgementDestructive = Color(0xFFE64343) // destructive
 val AccentHot = Color(0xFFF86111)            // hot / activity
 
-// Neutrals (matching Lovable approved export: #0A0D0F / #13181C / #1C2227)
-val AppBackground = Color(0xFF0A0D0F)
-val AppCardSurface = Color(0xFF13181C)
-val SecondaryFill = Color(0xFF1C2227)
-val MutedFill = Color(0xFF1C2227)
-val AccentFill = Color(0xFF1C2227)
+// Neutrals v3 — "lighter dark" (2026-11-24, Sam: "less terminal screen, more
+// fitness app"). The v1 ramp started at #0A0D0F, which is 3% luminance: on an
+// OLED phone that reads as a black hole with text on it, and every card had to
+// be outlined to be visible at all. The floor is lifted and the steps between
+// surfaces are wider, so a card is legible by being LIGHTER than the page
+// instead of by its border. Borders then drop to a hairline.
+//
+//   #16191E  page        (was #0A0D0F)
+//   #20242B  card        (was #13181C)
+//   #272C34  fill        (was #1C2227)
+//
+// Kept in the same names so every screen inherits this without being touched.
+val AppBackground = Color(0xFF16191E)
+val AppCardSurface = Color(0xFF20242B)
+val SecondaryFill = Color(0xFF272C34)
+val MutedFill = Color(0xFF272C34)
+val AccentFill = Color(0xFF272C34)
 
-val TextForeground = Color(0xFFF1F5F9)
-val TextMuted = Color(0xFF8E9BAE)
-val TextFaint = Color(0xFF979FAB)
-val TextFaintDark = Color(0xFF79818D)
+// Muted lifted from #8E9BAE: most of this app's copy is 11-12sp, and 6.4:1 at
+// 11sp still squints. This is ~7.4:1 on the card colour.
+val TextForeground = Color(0xFFF4F6F9)
+val TextMuted = Color(0xFFA3AEBC)
+val TextFaint = Color(0xFFA9B3C0)
+val TextFaintDark = Color(0xFF8B95A3)
 
-val BorderDefault = Color.White.copy(alpha = 0.10f)
-val BorderInput = Color.White.copy(alpha = 0.14f)
-val Track = Color(0xFF263037)
+// Hairlines, not outlines. A card should be found by its contrast with the
+// page, not by a drawn rectangle around it.
+val BorderDefault = Color.White.copy(alpha = 0.07f)
+val BorderInput = Color.White.copy(alpha = 0.13f)
+val Track = Color(0xFF333A44)
 val AccentTeal   = Color(0xFF15B6A4)
 val RingFocus = AccentTeal.copy(alpha = 0.60f)
 
@@ -51,3 +71,12 @@ val StateRhythm  = Color(0xFFF0BB3B)
 val StateLocked  = Color(0xFF44B65E)
 val StatePeak    = Color(0xFF3FA9F5)
 val ZoneAccent   = Color(0xFFF17084)
+
+// --- v3: the colour that is allowed to mean nothing -------------------------
+// Everyday state. Not on track, not off track: just today's reading. Use this
+// wherever a row used to reach for JudgementWarn simply to have a colour.
+val NeutralAttend = Color(0xFFB9C3D0)
+
+// Softer surfaces for the "diary" feel: a section that is a quiet block of the
+// page rather than a raised panel. One step below AppCardSurface.
+val SurfaceSubtle = Color(0xFF1B1F25)

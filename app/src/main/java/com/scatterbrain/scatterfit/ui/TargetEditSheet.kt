@@ -246,7 +246,7 @@ private fun CaloriesEditContent(
 
             Text(
                 text = "Target: ${currentSettings.kcalTarget} kcal · Remaining $remainingKcal kcal: $derivedCarbs g carbs · $derivedFat g fat",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = TextMuted
             )
         }
@@ -386,7 +386,7 @@ private fun StepsEditContent(
             colors = fieldColors(),
             modifier = Modifier.fillMaxWidth()
         )
-        Text("Daily target (default: 10,000 steps)", fontSize = 11.sp, color = TextMuted)
+        Text("Daily target (default: 10,000 steps)", fontSize = 12.sp, color = TextMuted)
     }
 
     SheetActions(
@@ -427,7 +427,7 @@ private fun SleepEditContent(
             colors = fieldColors(),
             modifier = Modifier.fillMaxWidth()
         )
-        Text("Nightly target (default: 8.0 hours)", fontSize = 11.sp, color = TextMuted)
+        Text("Nightly target (default: 8.0 hours)", fontSize = 12.sp, color = TextMuted)
     }
 
     SheetActions(
@@ -463,7 +463,7 @@ private fun AlcoholEditContent(
             colors = fieldColors(),
             modifier = Modifier.fillMaxWidth()
         )
-        Text("Weekly moderation cap (default: 14 units)", fontSize = 11.sp, color = TextMuted)
+        Text("Weekly moderation cap (default: 14 units)", fontSize = 12.sp, color = TextMuted)
     }
 
     SheetActions(
@@ -537,7 +537,7 @@ private fun ExerciseEditContent(
 
             Text(
                 text = "Zone 2: ${breakdown.z2}m (60%) · Zone 3: ${breakdown.z3}m (25%) · Zone 4: ${breakdown.z4}m (10%) · Zone 5: ${breakdown.z5}m (5%)",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = TextMuted
             )
         }

@@ -227,7 +227,7 @@ fun FoodLoggerScreen(
                                     ) {
                                         Text(
                                             text = "$displayName · $kcalStr",
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = TextForeground,
                                             maxLines = 1,
@@ -276,10 +276,10 @@ fun FoodLoggerScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
-                                            Text("★", color = TealHighlight, fontSize = 11.sp)
+                                            Text("★", color = TealHighlight, fontSize = 12.sp)
                                             Text(
                                                 text = "${fav.name} · ${fav.kcalPerServing} kcal",
-                                                fontSize = 11.sp,
+                                                fontSize = 12.sp,
                                                 fontWeight = FontWeight.Medium,
                                                 color = TextForeground,
                                                 maxLines = 1,
@@ -375,7 +375,7 @@ fun FoodLoggerScreen(
                                                     Text(
                                                         text = "×${recipe.portionsInPool} left",
                                                         color = TealHighlight,
-                                                        fontSize = 11.sp,
+                                                        fontSize = 12.sp,
                                                         fontWeight = FontWeight.Bold
                                                     )
                                                 }
@@ -389,7 +389,7 @@ fun FoodLoggerScreen(
                                                     Text(
                                                         text = "Pool empty",
                                                         color = TextMuted,
-                                                        fontSize = 11.sp
+                                                        fontSize = 12.sp
                                                     )
                                                 }
                                             }
@@ -406,14 +406,14 @@ fun FoodLoggerScreen(
 
                                         Text(
                                             text = macroDetails,
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
                                             color = TextMuted
                                         )
 
                                         if (!recipe.note.isNullOrBlank()) {
                                             Text(
                                                 text = recipe.note,
-                                                fontSize = 11.sp,
+                                                fontSize = 12.sp,
                                                 color = TextMuted.copy(alpha = 0.8f)
                                             )
                                         }
@@ -502,7 +502,7 @@ fun FoodLoggerScreen(
                                     ) {
                                         Text(
                                             text = type.replaceFirstChar { it.uppercase() },
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             color = if (isSelected) Color.Black else TextForeground
                                         )
@@ -557,7 +557,7 @@ fun FoodLoggerScreen(
                                     onValueChange = { input ->
                                         viewModel.proteinInput = input.filter { it.isDigit() || it == '.' }
                                     },
-                                    label = { Text("Protein (g)", color = TextMuted, fontSize = 11.sp) },
+                                    label = { Text("Protein (g)", color = TextMuted, fontSize = 12.sp) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier.weight(1f),
@@ -575,7 +575,7 @@ fun FoodLoggerScreen(
                                     onValueChange = { input ->
                                         viewModel.carbsInput = input.filter { it.isDigit() || it == '.' }
                                     },
-                                    label = { Text("Carbs (g)", color = TextMuted, fontSize = 11.sp) },
+                                    label = { Text("Carbs (g)", color = TextMuted, fontSize = 12.sp) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier.weight(1f),
@@ -593,7 +593,7 @@ fun FoodLoggerScreen(
                                     onValueChange = { input ->
                                         viewModel.fatInput = input.filter { it.isDigit() || it == '.' }
                                     },
-                                    label = { Text("Fat (g)", color = TextMuted, fontSize = 11.sp) },
+                                    label = { Text("Fat (g)", color = TextMuted, fontSize = 12.sp) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier.weight(1f),
@@ -774,7 +774,7 @@ fun FoodLoggerScreen(
                                                 }
                                                 Text(
                                                     text = timeStr,
-                                                    fontSize = 11.sp,
+                                                    fontSize = 12.sp,
                                                     color = TextMuted
                                                 )
                                             }
@@ -791,7 +791,7 @@ fun FoodLoggerScreen(
                                                 if (macroSummary.isNotEmpty()) {
                                                     Text(
                                                         text = macroSummary,
-                                                        fontSize = 11.sp,
+                                                        fontSize = 12.sp,
                                                         color = TextMuted
                                                     )
                                                 }
@@ -918,7 +918,7 @@ fun RecipeEditorCard(
                 OutlinedTextField(
                     value = carbs,
                     onValueChange = { carbs = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Carbs (g)", color = TextMuted, fontSize = 11.sp) },
+                    label = { Text("Carbs (g)", color = TextMuted, fontSize = 12.sp) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
@@ -933,7 +933,7 @@ fun RecipeEditorCard(
                 OutlinedTextField(
                     value = fat,
                     onValueChange = { fat = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Fat (g)", color = TextMuted, fontSize = 11.sp) },
+                    label = { Text("Fat (g)", color = TextMuted, fontSize = 12.sp) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
@@ -948,7 +948,7 @@ fun RecipeEditorCard(
                 OutlinedTextField(
                     value = grams,
                     onValueChange = { grams = it.filter { ch -> ch.isDigit() } },
-                    label = { Text("Grams", color = TextMuted, fontSize = 11.sp) },
+                    label = { Text("Grams", color = TextMuted, fontSize = 12.sp) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
@@ -989,7 +989,7 @@ fun RecipeEditorCard(
             ) {
                 Column {
                     Text("Cooked a batch?", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextForeground)
-                    Text("Pool portions available", fontSize = 11.sp, color = TextMuted)
+                    Text("Pool portions available", fontSize = 12.sp, color = TextMuted)
                 }
 
                 Row(

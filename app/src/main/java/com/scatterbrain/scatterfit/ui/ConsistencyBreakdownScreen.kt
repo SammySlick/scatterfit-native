@@ -446,7 +446,7 @@ private fun ConsistencyRow(
                 ) {
                     Text(
                         text = summary.todayLine,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
                         color = TextMuted,
                         textAlign = TextAlign.End,

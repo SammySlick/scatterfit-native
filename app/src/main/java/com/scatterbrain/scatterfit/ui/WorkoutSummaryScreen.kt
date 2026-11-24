@@ -314,7 +314,7 @@ fun WorkoutSummaryScreen(
                             fontWeight = FontWeight.Bold,
                             color = TextForeground
                         )
-                        Text("duration", fontSize = 11.sp, color = TextMuted)
+                        Text("duration", fontSize = 12.sp, color = TextMuted)
                     }
 
                     // Sets
@@ -325,7 +325,7 @@ fun WorkoutSummaryScreen(
                             fontWeight = FontWeight.Bold,
                             color = TextForeground
                         )
-                        Text(if (totalDoneSets == 1) "set" else "sets", fontSize = 11.sp, color = TextMuted)
+                        Text(if (totalDoneSets == 1) "set" else "sets", fontSize = 12.sp, color = TextMuted)
                     }
 
                     // Exercises
@@ -336,7 +336,7 @@ fun WorkoutSummaryScreen(
                             fontWeight = FontWeight.Bold,
                             color = TextForeground
                         )
-                        Text(if (record.exercises.size == 1) "exercise" else "exercises", fontSize = 11.sp, color = TextMuted)
+                        Text(if (record.exercises.size == 1) "exercise" else "exercises", fontSize = 12.sp, color = TextMuted)
                     }
 
                     // Avg Difficulty (if any set had difficulty)
@@ -354,7 +354,7 @@ fun WorkoutSummaryScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = diffColor
                             )
-                            Text("difficulty", fontSize = 11.sp, color = TextMuted)
+                            Text("difficulty", fontSize = 12.sp, color = TextMuted)
                         }
                     }
                 }
@@ -367,7 +367,7 @@ fun WorkoutSummaryScreen(
             ) {
                 Text(
                     text = "PERSONAL BESTS",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextMuted,
                     letterSpacing = 1.sp
@@ -405,7 +405,7 @@ fun WorkoutSummaryScreen(
                                     )
                                     Text(
                                         text = pbDetailLine(pb),
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         color = TextMuted
                                     )
                                 }
@@ -422,7 +422,7 @@ fun WorkoutSummaryScreen(
                                 ) {
                                     Text(
                                         text = "NEW PB",
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TealHighlight,
                                         maxLines = 1,

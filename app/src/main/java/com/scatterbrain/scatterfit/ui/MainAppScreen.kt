@@ -92,6 +92,7 @@ fun MainAppScreen(
     var bannerClock by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var resumeRequest by remember { mutableIntStateOf(0) }
     var isPlayerOpen by remember { mutableStateOf(false) }
+    var progressReportOpen by remember { mutableStateOf(false) }
 
     // Coming back to the app is the moment the draft can have changed underneath us.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -114,6 +115,15 @@ fun MainAppScreen(
             bannerClock = System.currentTimeMillis()
             activeDraft = draftStorage.load()
         }
+    }
+
+    // The progress report is a full page over the tabs, like the session player:
+    // it is its own Scaffold, so it cannot be nested inside the tab content
+    // without being clipped by it.
+    if (progressReportOpen) {
+        BackHandler { progressReportOpen = false }
+        ProgressReportScreen(onBack = { progressReportOpen = false })
+        return
     }
 
     BackHandler(enabled = selectedTab != AppTab.MY_DAY) {
@@ -174,7 +184,8 @@ fun MainAppScreen(
                 )
                 AppTab.ODYSSEY -> OdysseyScreen(
                     momentumSource = momentumSource,
-                    onSettingsClick = onSettingsClick
+                    onSettingsClick = onSettingsClick,
+                    onOpenProgressReport = { progressReportOpen = true }
                 )
                 AppTab.FOOD -> {
                     FoodHomeScreen(
@@ -241,7 +252,7 @@ fun ActiveWorkoutBanner(
             Text(
                 text = draftProgressLabel(draft, nowMillis),
                 color = TextMuted,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 maxLines = 1
             )
         }
@@ -370,7 +381,7 @@ fun BottomNavItem(
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             color = color
         )

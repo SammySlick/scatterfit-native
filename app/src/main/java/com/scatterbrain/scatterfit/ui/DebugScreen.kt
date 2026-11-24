@@ -169,20 +169,20 @@ private fun BackgroundSyncCard(refreshKey: Int) {
         }
         Text(
             text = "last worker run: $lastRun",
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             color = if (diag.neverRan) JudgementBad else TextMuted,
             modifier = Modifier.padding(top = 2.dp)
         )
         Text(
             text = "battery restricted: ${if (restricted) "yes — the OS may defer or skip the job" else "no"} · standby bucket: $bucket",
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             color = if (restricted) JudgementWarn else TextMuted,
             modifier = Modifier.padding(top = 2.dp)
         )
         if (launchedAt > 0L) {
             Text(
                 text = "manual sync enqueued ${formatAge(nowMs - launchedAt)} — pull Refresh",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = TealHighlight,
                 modifier = Modifier.padding(top = 2.dp)
             )
@@ -226,7 +226,7 @@ private fun StepsBySourceCard(refreshKey: Int) {
             Text(
                 text = if (records == 0) "no step records cached at all"
                 else "$records step records cached, none dated today",
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = JudgementWarn,
                 modifier = Modifier.padding(top = 2.dp)
             )
@@ -234,14 +234,14 @@ private fun StepsBySourceCard(refreshKey: Int) {
             for (r in rows) {
                 Text(
                     text = "${r.name}: ${r.steps} steps${if (r.won) "  ← used" else ""}",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = if (r.won) TealHighlight else TextMuted,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
             Text(
                 text = "The app shows the highest source's count, never the sum.",
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 color = TextMuted,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -615,12 +615,12 @@ fun DebugScreen(
                                 ) {
                                     Text(
                                         text = num.lastRecordLabel,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         color = TextMuted
                                     )
                                     Text(
                                         text = num.lastRecordDetail,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         color = TextMuted,
                                         textAlign = TextAlign.End
                                     )
@@ -656,7 +656,7 @@ fun DebugScreen(
                             if (info.method == RecordMethod.RESTING_HEART_RATE && info.recordCount == 0) {
                                 Text(
                                     text = "Samsung Health doesn't share resting HR with Health Connect — no source writes it",
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     color = TextMuted
                                 )
                             }

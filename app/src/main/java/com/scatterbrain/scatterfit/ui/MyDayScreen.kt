@@ -675,7 +675,7 @@ private fun DayAnchorBar(selectedDate: LocalDate, today: LocalDate) {
             ) {
                 Text(
                     text = pillText,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TextMuted
                 )
@@ -737,7 +737,7 @@ fun WeighInDialog(
                         Text(
                             text = weightError!!,
                             color = Color(0xFFE57373),
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
                     }
@@ -764,7 +764,7 @@ fun WeighInDialog(
                         Text(
                             text = bodyFatError!!,
                             color = Color(0xFFE57373),
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
                     }
@@ -939,7 +939,7 @@ private fun QuickActionButton(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = label,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextMuted,
                 textAlign = TextAlign.Center,
@@ -990,7 +990,7 @@ fun AdjustStepsSheet(
 
             // Date picker field
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("DATE", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 1.sp)
+                Text("DATE", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 1.sp)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1024,7 +1024,7 @@ fun AdjustStepsSheet(
 
             // Steps number field
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("ESTIMATED STEPS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 1.sp)
+                Text("ESTIMATED STEPS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 1.sp)
                 OutlinedTextField(
                     value = stepsInput,
                     onValueChange = {
@@ -1049,14 +1049,14 @@ fun AdjustStepsSheet(
                     Text(
                         text = stepsError!!,
                         color = StateBad,
-                        fontSize = 11.sp
+                        fontSize = 12.sp
                     )
                 }
             }
 
             // Optional note field
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("NOTE (OPTIONAL)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 1.sp)
+                Text("NOTE (OPTIONAL)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 1.sp)
                 OutlinedTextField(
                     value = noteInput,
                     onValueChange = { noteInput = it },
@@ -1097,7 +1097,7 @@ fun AdjustStepsSheet(
             // Existing entries for this day
             if (existingEntries.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("EXISTING ESTIMATES FOR THIS DAY", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 1.sp)
+                    Text("EXISTING ESTIMATES FOR THIS DAY", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 1.sp)
                     existingEntries.forEach { entry ->
                         Row(
                             modifier = Modifier
@@ -1119,7 +1119,7 @@ fun AdjustStepsSheet(
                                     Text(
                                         text = entry.note,
                                         color = TextMuted,
-                                        fontSize = 11.sp
+                                        fontSize = 12.sp
                                     )
                                 }
                             }

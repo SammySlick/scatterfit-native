@@ -408,7 +408,7 @@ fun FoodHomeScreen(
                             ) {
                                 Text(
                                     text = "CONSUMED",
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (macroMode == MacroCardMode.CONSUMED) FontWeight.Bold else FontWeight.Medium,
                                     color = if (macroMode == MacroCardMode.CONSUMED) Color.Black else TextMuted
                                 )
@@ -425,7 +425,7 @@ fun FoodHomeScreen(
                             ) {
                                 Text(
                                     text = "REMAINING",
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (macroMode == MacroCardMode.REMAINING) FontWeight.Bold else FontWeight.Medium,
                                     color = if (macroMode == MacroCardMode.REMAINING) Color.Black else TextMuted
                                 )
@@ -831,7 +831,7 @@ fun FoodHomeScreen(
                                             }
                                             .padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
-                                    Text("${p.name} · ${p.kcal.toInt()} kcal", fontSize = 11.sp, color = TextForeground)
+                                    Text("${p.name} · ${p.kcal.toInt()} kcal", fontSize = 12.sp, color = TextForeground)
                                 }
                             }
                         }
@@ -861,7 +861,7 @@ fun FoodHomeScreen(
                                     }
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
-                                Text("${g.productName} · ${g.kcalPerServing} kcal", fontSize = 11.sp, color = TextForeground)
+                                Text("${g.productName} · ${g.kcalPerServing} kcal", fontSize = 12.sp, color = TextForeground)
                             }
                         }
                     }
@@ -1030,20 +1030,20 @@ private fun MealSectionCard(
                         ) {
                             Text(
                                 text = "$totalKcal kcal",
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TealHighlight
                             )
                         }
 
                         if (totalProtein > 0) {
-                            Text("P: ${totalProtein}g", fontSize = 10.sp, color = TextMuted)
+                            Text("P: ${totalProtein}g", fontSize = 12.sp, color = TextMuted)
                         }
                         if (totalCarbs > 0) {
-                            Text("C: ${totalCarbs}g", fontSize = 10.sp, color = TextMuted)
+                            Text("C: ${totalCarbs}g", fontSize = 12.sp, color = TextMuted)
                         }
                         if (totalFat > 0) {
-                            Text("F: ${totalFat}g", fontSize = 10.sp, color = TextMuted)
+                            Text("F: ${totalFat}g", fontSize = 12.sp, color = TextMuted)
                         }
                     }
                 }
@@ -1078,7 +1078,7 @@ private fun MealSectionCard(
                 if (localMeals.isEmpty() && otherAppMeals.isEmpty()) {
                     Text(
                         text = "No $sectionTitle logged yet",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = TextMuted,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
@@ -1105,12 +1105,12 @@ private fun MealSectionCard(
                             ) {
                                 Text(
                                     text = "${otherAppMeals.size} ${if (otherAppMeals.size == 1) "item" else "items"} from other apps (included in totals)",
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     color = TextMuted
                                 )
                                 Text(
                                     text = if (isOtherAppsExpanded) "▴" else "▾",
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     color = TextMuted
                                 )
                             }
@@ -1262,7 +1262,7 @@ private fun MealItemContent(
                 if (tag != null) {
                     Text(
                         text = tag,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         color = TextMuted,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
@@ -1273,7 +1273,7 @@ private fun MealItemContent(
             }
             Text(
                 text = timeStr,
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 color = TextMuted
             )
         }
@@ -1288,7 +1288,7 @@ private fun MealItemContent(
             meal.protein?.let {
                 Text(
                     text = "${it.toInt()}g P",
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = TealHighlight
                 )
             }
@@ -1495,7 +1495,7 @@ fun ConfirmProductCard(
                                 }
                             } ?: "${formatAmount(servingQuantity)} $defaultUnit"
                         }
-                        Text(text = "Serving: $servingInfo", fontSize = 11.sp, color = TealHighlight)
+                        Text(text = "Serving: $servingInfo", fontSize = 12.sp, color = TealHighlight)
                     }
 
                     Column(horizontalAlignment = Alignment.End) {
@@ -1522,9 +1522,9 @@ fun ConfirmProductCard(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
-                    Text("C: ${scaled.carbs.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
-                    Text("F: ${scaled.fat.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
-                    Text("P: ${scaled.protein.roundToInt()}g", fontSize = 11.sp, color = TextForeground)
+                    Text("C: ${scaled.carbs.roundToInt()}g", fontSize = 12.sp, color = TextForeground)
+                    Text("F: ${scaled.fat.roundToInt()}g", fontSize = 12.sp, color = TextForeground)
+                    Text("P: ${scaled.protein.roundToInt()}g", fontSize = 12.sp, color = TextForeground)
                 }
 
                 // PORTION UI: 1. Quick Presets Row
@@ -1557,7 +1557,7 @@ fun ConfirmProductCard(
                             ) {
                                 Text(
                                     text = preset.label,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (isPresetActive) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isPresetActive) Color.Black else TextForeground
                                 )
@@ -1643,7 +1643,7 @@ fun ConfirmProductCard(
                             ) {
                                 Text(
                                     text = u,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) Color.Black else TextForeground
                                 )
@@ -1676,7 +1676,7 @@ fun ConfirmProductCard(
                     ) {
                         Text(
                             text = type.replaceFirstChar { it.uppercase() },
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = if (isSelected) Color.Black else TextForeground
                         )
@@ -1823,11 +1823,11 @@ private fun LiveFoodSearchResults(
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("MATCHING FOODS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TealHighlight)
+            Text("MATCHING FOODS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TealHighlight)
 
             // Local curated items
             if (matchedFavourites.isNotEmpty() || matchedPresets.isNotEmpty() || matchedRecipes.isNotEmpty()) {
-                Text("LOCAL FOODS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                Text("LOCAL FOODS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -1841,7 +1841,7 @@ private fun LiveFoodSearchResults(
                                 .clickable { onSelectFavourite(fav) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Text("★ ${fav.name} · ${fav.kcalPerServing} kcal", fontSize = 11.sp, color = TextForeground)
+                            Text("★ ${fav.name} · ${fav.kcalPerServing} kcal", fontSize = 12.sp, color = TextForeground)
                         }
                     }
 
@@ -1854,7 +1854,7 @@ private fun LiveFoodSearchResults(
                                 .clickable { onSelectPreset(p) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Text("${p.name} · ${p.kcal.toInt()} kcal", fontSize = 11.sp, color = TextForeground)
+                            Text("${p.name} · ${p.kcal.toInt()} kcal", fontSize = 12.sp, color = TextForeground)
                         }
                     }
 
@@ -1867,14 +1867,14 @@ private fun LiveFoodSearchResults(
                                 .clickable { onSelectRecipe(r) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Text("${r.name} · ${r.perPortionKcal} kcal", fontSize = 11.sp, color = TealHighlight)
+                            Text("${r.name} · ${r.perPortionKcal} kcal", fontSize = 12.sp, color = TealHighlight)
                         }
                     }
                 }
             }
 
             if (genericSearchResults.isNotEmpty()) {
-                Text("GENERIC FOODS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                Text("GENERIC FOODS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     genericSearchResults.forEach { product: ProductResult ->
                         Card(
@@ -1906,7 +1906,7 @@ private fun LiveFoodSearchResults(
                                         product.servingSize ?: product.servingQuantityGrams?.let { "${it.toInt()}g" }
                                     ).joinToString(" · ")
                                     if (subtitle.isNotBlank()) {
-                                        Text(text = subtitle, fontSize = 11.sp, color = TextMuted, maxLines = 1)
+                                        Text(text = subtitle, fontSize = 12.sp, color = TextMuted, maxLines = 1)
                                     }
                                 }
 
@@ -1919,7 +1919,7 @@ private fun LiveFoodSearchResults(
                                     )
                                     Text(
                                         text = "${String.format(Locale.US, "%.1f", product.proteinPerServing)}g P",
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         color = TextMuted
                                     )
                                 }
@@ -1937,7 +1937,7 @@ private fun LiveFoodSearchResults(
             // Chain menus first: they answer "I'm in a Costa" better than anything
             // Open Food Facts can, and they're already on the device.
             if (menuMatches.isNotEmpty()) {
-                Text("RESTAURANT MENUS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                Text("RESTAURANT MENUS", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     menuMatches.forEach { item ->
                         Card(
@@ -1966,7 +1966,7 @@ private fun LiveFoodSearchResults(
                                     )
                                     Text(
                                         text = "${item.brand} · ${item.serving}",
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         color = TextMuted,
                                         maxLines = 1
                                     )
@@ -1980,7 +1980,7 @@ private fun LiveFoodSearchResults(
                                     )
                                     Text(
                                         text = item.protein?.let { String.format(Locale.US, "%.0f", it) + "g P" } ?: "tap to log",
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         color = TextMuted
                                     )
                                 }
@@ -2000,7 +2000,7 @@ private fun LiveFoodSearchResults(
                     { it.categories }
                 ).ifEmpty { offResults.take(8) }
                 val headerText = if (isWidened) "OPEN FOOD FACTS — WIDER MATCHES" else "OPEN FOOD FACTS"
-                Text(headerText, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextMuted)
+                Text(headerText, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMuted)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     displayOffResults.forEach { product ->
                         Card(
@@ -2032,7 +2032,7 @@ private fun LiveFoodSearchResults(
                                         product.servingSize ?: product.servingQuantityGrams?.let { "${it.toInt()}g" }
                                     ).joinToString(" · ")
                                     if (subtitle.isNotBlank()) {
-                                        Text(text = subtitle, fontSize = 11.sp, color = TextMuted, maxLines = 1)
+                                        Text(text = subtitle, fontSize = 12.sp, color = TextMuted, maxLines = 1)
                                     }
                                 }
 
@@ -2045,7 +2045,7 @@ private fun LiveFoodSearchResults(
                                     )
                                     Text(
                                         text = "${String.format(Locale.US, "%.1f", product.proteinPerServing)}g P",
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         color = TextMuted
                                     )
                                 }

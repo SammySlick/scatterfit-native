@@ -227,7 +227,7 @@ fun MetricPageScreen(
                                 Text(
                                     text = pillText,
                                     color = pillColor,
-                                    fontSize = 10.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -259,7 +259,7 @@ fun MetricPageScreen(
                             )
                             Text(
                                 text = heroUnit,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = TextMuted,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
@@ -279,7 +279,7 @@ fun MetricPageScreen(
                             Text(
                                 text = pillText,
                                 color = pillColor,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -311,7 +311,7 @@ fun MetricPageScreen(
                             }
                         },
                         style = TextStyle(
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontFeatureSettings = "tnum"
                         ),
                         maxLines = 1,
@@ -449,12 +449,12 @@ fun MetricPageScreen(
                             color = TextMuted,
                             letterSpacing = 1.sp,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.sp
+                            fontSize = 12.sp
                         )
                         val logged = DayRows.loggedCount(rows)
                         Text(
                             text = if (logged == 0) "no readings" else "$logged of ${rows.size} logged",
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             color = TextMuted
                         )
                     }
@@ -493,7 +493,7 @@ fun MetricPageScreen(
                                 if (hasValue && row.average != null) {
                                     Text(
                                         text = "avg " + formatValue(row.average),
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         color = TextMuted
                                     )
                                 }
@@ -629,7 +629,7 @@ private fun MetricChartCard(
                 ) {
                     Text(
                         text = formatDayKeyTitle(pt.dayKey, today),
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = TextMuted
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -809,7 +809,7 @@ private fun LegendDot(color: Color, label: String) {
         Canvas(modifier = Modifier.size(6.dp)) {
             drawCircle(color = color, radius = size.minDimension / 2f)
         }
-        Text(text = label, fontSize = 10.sp, color = TextMuted)
+        Text(text = label, fontSize = 12.sp, color = TextMuted)
     }
 }
 

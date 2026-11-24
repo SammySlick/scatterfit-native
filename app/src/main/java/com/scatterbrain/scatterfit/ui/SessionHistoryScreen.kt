@@ -84,7 +84,7 @@ fun SessionHistoryList(
     ) {
         Text(
             text = weekLine,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             color = TextMuted,
         )
 
@@ -101,7 +101,7 @@ fun SessionHistoryList(
         groups.forEach { group ->
             Text(
                 text = group.label,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextMuted,
                 letterSpacing = 1.sp,
@@ -151,13 +151,13 @@ private fun SessionHistoryCard(
         ) {
             Text(
                 text = historyDateLabel(record.dayKey),
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = TextMuted,
             )
             if (hasPb) {
                 Text(
                     text = "NEW PB",
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = JudgementGood,
                     modifier = Modifier

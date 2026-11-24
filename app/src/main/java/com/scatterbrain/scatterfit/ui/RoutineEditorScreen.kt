@@ -520,7 +520,7 @@ private fun HevyExerciseCard(
                 ) {
                     Text(
                         text = "⏱ $restLabel",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (exercise.restSeconds > 0) TealHighlight else TextMuted,
                         maxLines = 1,
@@ -540,7 +540,7 @@ private fun HevyExerciseCard(
                 ) {
                     Text(
                         text = if (hasNote) "Note" else "+ Note",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (hasNote) TealHighlight else TextMuted,
                         maxLines = 1,
@@ -561,7 +561,7 @@ private fun HevyExerciseCard(
                 ) {
                     Text(
                         text = tempoChipLabel,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (hasTempo) TealHighlight else TextMuted,
                         maxLines = 1,
@@ -583,7 +583,7 @@ private fun HevyExerciseCard(
                 ) {
                     Text(
                         text = if (isTimed) "Time: ON" else "Time",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (isTimed) TealHighlight else TextMuted,
                         maxLines = 1,
@@ -634,7 +634,7 @@ private fun HevyExerciseCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Tempo:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextMuted)
+                    Text("Tempo:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextMuted)
 
                     listOf(
                         Triple("E", tempoE) { v: String -> tempoE = v },
@@ -643,7 +643,7 @@ private fun HevyExerciseCard(
                         Triple("P", tempoP2) { v: String -> tempoP2 = v }
                     ).forEach { (lbl, currVal, updateVal) ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(lbl, fontSize = 9.sp, color = TextMuted, fontWeight = FontWeight.Bold)
+                            Text(lbl, fontSize = 12.sp, color = TextMuted, fontWeight = FontWeight.Bold)
                             Box(
                                 modifier = Modifier
                                     .size(width = 34.dp, height = 30.dp)
@@ -694,7 +694,7 @@ private fun HevyExerciseCard(
             if (displayLines.isNotEmpty() && !isEditingNote) {
                 Text(
                     text = displayLines.joinToString(" · "),
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = TextMuted,
                     modifier = Modifier.clickable {
                         noteInput = exercise.note ?: ""
@@ -710,11 +710,11 @@ private fun HevyExerciseCard(
                     .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("SET", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
-                Text("KG", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text("SET", fontSize = 12.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
+                Text("KG", fontSize = 12.sp, color = TextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Text(
                     if (exercise.isTimed) "TIME" else "REPS",
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = TextMuted,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1.5f),
@@ -883,7 +883,7 @@ fun RepSetRow(
                         Text(
                             text = "No Weight",
                             color = TextFaint,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Normal,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -935,7 +935,7 @@ fun RepSetRow(
                         Text(
                             text = "8-12",
                             color = TextFaint,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Normal,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -1040,7 +1040,7 @@ fun TimeSetRow(
                         Text(
                             text = "No Weight",
                             color = TextFaint,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Normal,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -1103,7 +1103,7 @@ fun TimeSetRow(
                             Text(
                                 text = placeholder,
                                 color = TextFaint,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Normal,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth()
@@ -1130,7 +1130,7 @@ fun TimeSetRow(
                 ) {
                     Text(
                         text = timeUnitPickerLabel(setUnit),
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = TealHighlight,
                         maxLines = 1,
@@ -1194,14 +1194,14 @@ fun RoutineSummaryCard(
                             ) {
                                 Text(
                                     text = muscle.uppercase(),
-                                    fontSize = 10.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TextMuted,
                                     letterSpacing = 1.sp
                                 )
                                 Text(
                                     text = "$count ${if (count == 1) "set" else "sets"}",
-                                    fontSize = 10.sp,
+                                    fontSize = 12.sp,
                                     color = TextMuted
                                 )
                             }
@@ -1332,7 +1332,7 @@ internal fun ExercisePickerSheet(
                         item {
                             Text(
                                 text = muscle.uppercase(),
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextMuted,
                                 letterSpacing = 1.2.sp,

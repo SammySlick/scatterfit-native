@@ -374,7 +374,7 @@ fun GoalSetScreen(
                                         )
                                         Text(
                                             text = desc.second,
-                                            fontSize = 11.sp,
+                                            fontSize = 12.sp,
                                             color = TextMuted
                                         )
                                     }

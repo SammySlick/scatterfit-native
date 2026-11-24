@@ -330,7 +330,7 @@ private fun WeekStripContent(
 
                 Text(
                     text = if (isSyncing) "$dateRangeText · Syncing…" else dateRangeText,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = TextMuted,
                     fontWeight = FontWeight.Normal,
                     lineHeight = 11.sp,
@@ -361,7 +361,7 @@ private fun WeekStripContent(
                             )
                             Text(
                                 text = "${streakInfo.count}",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = JudgementWarn
                             )
@@ -381,7 +381,7 @@ private fun WeekStripContent(
                         ) {
                             Text(
                                 text = "${streakInfo.count}",
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = AccentTeal
                             )
@@ -423,7 +423,7 @@ private fun WeekStripContent(
                     ) {
                         Text(
                             text = initial,
-                            fontSize = 9.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TextMuted,
                             textAlign = TextAlign.Center
@@ -544,7 +544,7 @@ private fun MonthGridContent(
             if (streakInfo.count > 0) {
                 Text(
                     text = "🔥 ${streakInfo.count}",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (streakInfo.isAtRisk) JudgementWarn else AccentTeal
                 )
@@ -566,7 +566,7 @@ private fun MonthGridContent(
                 ) {
                     Text(
                         text = header,
-                        fontSize = 9.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextMuted,
                         textAlign = TextAlign.Center
@@ -625,7 +625,7 @@ private fun MonthGridContent(
                             Text(
                                 text = date.dayOfMonth.toString(),
                                 style = TextStyle(
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     color = TextMuted.copy(alpha = 0.25f),
                                     textAlign = TextAlign.Center,
                                     platformStyle = PlatformTextStyle(includeFontPadding = false)

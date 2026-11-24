@@ -452,7 +452,7 @@ fun DrinkDayPickerStrip(
                 ) {
                     Text(
                         text = dayName,
-                        fontSize = 9.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = textColor
                     )
@@ -574,7 +574,7 @@ fun DrinkLibraryItemRow(
                     Text(
                         text = drink.brand.uppercase(),
                         color = TextMuted,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -593,7 +593,7 @@ fun DrinkLibraryItemRow(
                     text = drink.serving.ifBlank { "${drink.volumeMl}ml" },
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -608,25 +608,25 @@ fun DrinkLibraryItemRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${drink.abv}% · ",
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         color = TextMuted
                     )
                     Text(
                         text = String.format(Locale.US, "%.1fu", drink.units),
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         color = if (isFutureDay) TextMuted else TextForeground,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = " · ${drink.kcals}kcal",
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         color = TextMuted
                     )
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = String.format(Locale.US, "£%.2f", drink.cost),
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = TextMuted
                 )
             }
@@ -644,7 +644,7 @@ fun DrinkLibraryItemRow(
                     Text(
                         text = "Upcoming",
                         color = TextMuted,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -759,7 +759,7 @@ fun DrinkDayIndicatorPill(
                 Text(
                     text = stateText,
                     color = pillColor,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     lineHeight = 12.sp
@@ -768,7 +768,7 @@ fun DrinkDayIndicatorPill(
                     Text(
                         text = verdictText,
                         color = pillColor,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         lineHeight = 12.sp
@@ -819,7 +819,7 @@ fun DailyTotalsCard(
                     Text(
                         text = "Reset",
                         color = TextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
@@ -875,7 +875,7 @@ fun MetricSummaryItem(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = TextMuted,
-            fontSize = 10.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(modifier = Modifier.height(4.dp))
@@ -921,13 +921,13 @@ fun LoggedDrinksSection(
                     style = MaterialTheme.typography.labelSmall,
                     color = TextMuted,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp
+                    fontSize = 12.sp
                 )
                 Text(
                     text = "Tap row to edit time",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted,
-                    fontSize = 10.sp
+                    fontSize = 12.sp
                 )
             }
 
@@ -966,7 +966,7 @@ fun LoggedDrinksSection(
                                 Text(
                                     text = timeStr,
                                     color = AccentTeal,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -984,7 +984,7 @@ fun LoggedDrinksSection(
                                 Text(
                                     text = String.format(Locale.US, "• %.1fu · %d kcal · £%.2f", logged.drink.units, logged.drink.kcals, logged.drink.cost),
                                     color = TextMuted,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -1109,7 +1109,7 @@ fun LoggedDrinkTimePickerDialog(
                 Text(
                     text = "Can only edit today and yesterday",
                     color = TextMuted,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     textAlign = TextAlign.Center
                 )
             }
