@@ -903,14 +903,26 @@ fun FoodHomeScreen(
                                                 )
                                                 activeBottomSheetMealType = null
                                             }
-                                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                                            .padding(horizontal = 10.dp, vertical = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
+                                            // lineHeight is set explicitly on both lines.
+                                            //
+                                            // It used to be inherited, and Material3's
+                                            // LocalTextStyle is bodyLarge: a 24sp line box for
+                                            // 16sp text. A 14sp name inside a 24sp box carries
+                                            // ~5dp of slack above and below the glyphs it draws,
+                                            // so each row reserved ~10dp of nothing before any
+                                            // padding at all. Measured against Sam's BWS
+                                            // screenshot (374.jpg) the rows came out ~77dp
+                                            // against BWS's ~64dp: 21% taller while looking
+                                            // smaller. Bigger type, tighter rows.
                                             Text(
                                                 text = food.name,
-                                                fontSize = 14.sp,
+                                                fontSize = 16.sp,
+                                                lineHeight = 20.sp,
                                                 color = TextForeground,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -923,14 +935,15 @@ fun FoodHomeScreen(
                                                     recentUsesLabel(food.uses),
                                                     recentAgeLabel(food.daysAgo)
                                                 ).joinToString(" \u00b7 "),
-                                                fontSize = 12.sp,
+                                                fontSize = 13.sp,
+                                                lineHeight = 16.sp,
                                                 color = TextMuted,
                                                 maxLines = 1
                                             )
                                         }
                                         Text(
                                             text = "${food.kcal.toInt()} kcal",
-                                            fontSize = 13.sp,
+                                            fontSize = 15.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = TealHighlight
                                         )

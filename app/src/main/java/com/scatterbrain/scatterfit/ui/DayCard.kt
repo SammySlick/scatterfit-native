@@ -75,53 +75,11 @@ import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.roundToInt
 
-data class DayCardTicks(
-    val completedCount: Int,
-    val totalTarget: Int, // 5 on training days, 4 on rest days
-) {
-    val counterText: String = "$completedCount / $totalTarget"
-}
-
-fun computeDayCardTicks(
-    daily: AssembledDaily?,
-    settings: ScoringSettings = SettingsStorage().loadSettings(),
-    todayKey: String,
-    isTrainingDay: Boolean,
-    consumedKcal: Double? = null,
-    consumedProtein: Double? = null,
-    totalSteps: Double? = null,
-): DayCardTicks {
-    val totalM = if (isTrainingDay) 5 else 4
-    if (daily == null && consumedKcal == null && consumedProtein == null && totalSteps == null) {
-        return DayCardTicks(completedCount = 0, totalTarget = totalM)
-    }
-
-    val calVal = (daily?.caloriesEaten?.get(todayKey) ?: 0.0)
-    // Ticked if calories in band (or logged within goal)
-    val calCompleted = calVal > 0.0 && calVal <= (settings.kcalTarget + settings.tolerances.kcalGreen)
-
-    val stepVal = totalSteps ?: daily?.steps?.get(todayKey) ?: 0.0
-    val stepCompleted = stepVal >= settings.stepTarget
-
-    val protVal = consumedProtein ?: daily?.protein?.get(todayKey) ?: 0.0
-    val protCompleted = protVal >= settings.proteinTarget
-
-    val weightVal = daily?.weight?.get(todayKey)
-    val weightCompleted = weightVal != null && weightVal > 0.0
-
-    val trainMins = daily?.trainingMinutes?.get(todayKey) ?: 0.0
-    // Training days only! Rest days never auto-tick training.
-    val trainCompleted = isTrainingDay && trainMins > 0.0
-
-    val baseCount = listOf(calCompleted, stepCompleted, protCompleted, weightCompleted).count { it }
-    val totalCount = baseCount + if (trainCompleted) 1 else 0
-    val completedCount = totalCount.coerceIn(0, totalM)
-
-    return DayCardTicks(
-        completedCount = completedCount,
-        totalTarget = totalM
-    )
-}
+// The My Day checklist counter (DayCardTicks / computeDayCardTicks, "2 of 4 done")
+// was removed here on Sam's instruction, 2026-11-25: "let's remove the checklist for
+// now. I'm not using it and it's just taking up space." The maths went with the
+// pixels rather than sitting unused - a function nobody calls is how DashboardScreen
+// survived a redesign. It is recoverable from git at commit 067f5c5 if it returns.
 
 enum class MetricBarColor {
     TEAL,
@@ -195,41 +153,39 @@ fun DayCard(
     val deviceStepsVal = deviceSteps ?: daily?.steps?.get(dayKey) ?: 0.0
     val totalSteps = deviceStepsVal + estimatedSteps.toDouble()
 
-    val ticks = remember(daily, effectiveSettings, dayKey, isTrainingDay, consumedKcal, consumedProtein, totalSteps) {
-        computeDayCardTicks(
-            daily = daily,
-            settings = effectiveSettings,
-            todayKey = dayKey,
-            isTrainingDay = isTrainingDay,
-            consumedKcal = consumedKcal,
-            consumedProtein = consumedProtein,
-            totalSteps = totalSteps
-        )
-    }
-
     val isCurrentToday = dayKey == remember { todayKey() }
 
     // Hero calculations. Eaten now includes alcohol, so the hero agrees with the
     // food total rather than quietly excluding a drink.
     val kcalTarget = effectiveSettings.kcalTarget
+    val kcalGreen = effectiveSettings.tolerances.kcalGreen
     val alcoholKcal = daily?.alcoholKcal?.get(dayKey) ?: 0.0
     val foodKcal = consumedKcal
         ?: ((daily?.caloriesEaten?.get(dayKey) ?: 0.0) - alcoholKcal).coerceAtLeast(0.0)
     val totalKcal = foodKcal + alcoholKcal
     val kcalEaten = totalKcal.roundToInt()
-    val isOverGoal = kcalTarget > 0 && kcalEaten > kcalTarget
+    // Over the band's CEILING, not over the point target. Sam, 2026-11-25: "Band. For
+    // sure. Better to have a range as a target than a fixed number or you can end up
+    // obsessing over it." The app already judged with a band (kcalTarget +- kcalGreen);
+    // it was only the DISPLAY that used a point, which is why 2,098 against 2,000 read
+    // "98 over" in amber while squareBand() called the same day green.
+    val isOverBand = kcalTarget > 0 && kcalEaten > kcalTarget + kcalGreen
 
     // HERO, 2026-11-24: "big n/n calories eaten Vs calorie target" (Sam).
     // Before this the card showed kcal-remaining as the hero AND kcal-eaten in a
     // Calories row underneath, so 1,934 appeared twice and 2,000 twice on one
     // screen. The hero owns calories outright now; the row is gone.
+    //
+    // The band sits on its own line rather than after a slash ("2,098 / 1,850-2,150")
+    // because that string at 52sp + 20sp is wider than a phone. A line break cannot
+    // overflow; a bet on font metrics I cannot measure here can.
     val heroEatenText = String.format(Locale.US, "%,d", kcalEaten)
-    val heroTargetText = if (kcalTarget > 0) " / " + String.format(Locale.US, "%,d", kcalTarget) else ""
-    val heroCaptionText = calorieHeroCaption(kcalEaten, kcalTarget)
-    // Amber on the caption only, and only when actually over. The big numbers stay
+    val heroBandText = calorieBandLabel(kcalTarget, kcalGreen)
+    val heroCaptionText = calorieHeroCaption(kcalEaten, kcalTarget, kcalGreen)
+    // Amber on the caption only, and only outside the band. The big numbers stay
     // foreground: colouring the eaten figure red for a 20 kcal overshoot would make
     // the card shout at Sam over a rounding error.
-    val heroCaptionColor = if (isOverGoal) JudgementWarn else TextMuted
+    val heroCaptionColor = if (isOverBand) JudgementWarn else TextMuted
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -266,24 +222,21 @@ fun DayCard(
                             color = DomainFuel,
                             modifier = Modifier.padding(bottom = 2.dp)
                         )
-                        Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = heroEatenText,
+                            fontSize = 52.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextForeground,
+                            lineHeight = 52.sp
+                        )
+                        if (heroBandText != null) {
                             Text(
-                                text = heroEatenText,
-                                fontSize = 56.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = TextForeground,
-                                lineHeight = 56.sp
+                                text = heroBandText,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextMuted,
+                                lineHeight = 22.sp
                             )
-                            if (heroTargetText.isNotEmpty()) {
-                                Text(
-                                    text = heroTargetText,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextMuted,
-                                    lineHeight = 28.sp,
-                                    modifier = Modifier.padding(bottom = 6.dp)
-                                )
-                            }
                         }
                         Text(
                             text = heroCaptionText,
@@ -292,42 +245,29 @@ fun DayCard(
                         )
                     }
 
-                    // Right: Ticked fraction + Back to today if past/future
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        if (!isCurrentToday && onResetToToday != null) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(SecondaryFill)
-                                    .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
-                                    .clickable(onClick = onResetToToday)
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "Back to today",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextForeground
-                                )
-                            }
-                        }
-
-                        Row(verticalAlignment = Alignment.Bottom) {
+                    // Right: Back to today if this is not today.
+                    //
+                    // The checklist counter ("2 of 4 / done") was removed from here on
+                    // Sam's instruction, 2026-11-25: "let's remove the checklist for
+                    // now. I'm not using it and it's just taking up space." The counter
+                    // was the only visible remnant of the checklist: it scored the day
+                    // and made him work out the items.
+                    if (!isCurrentToday && onResetToToday != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(SecondaryFill)
+                                .border(BorderStroke(1.dp, BorderDefault), RoundedCornerShape(12.dp))
+                                .clickable(onClick = onResetToToday)
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
                             Text(
-                                text = "${ticks.completedCount} of ${ticks.totalTarget}",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextMuted
+                                text = "Back to today",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextForeground
                             )
                         }
-                        Text(
-                            text = "done",
-                            fontSize = 12.sp,
-                            color = TextMuted
-                        )
                     }
                 }
 
@@ -548,21 +488,45 @@ fun DayCard(
 }
 
 /**
- * The line under the calorie hero: eaten, target, and what that leaves.
+ * The calorie target as the range the app already judges against: target +- green.
  *
- * Sam, 2026-11-24: "Maybe a big 'n/n' calories eaten Vs calorie target?" The hero
- * now shows eaten / target, so this caption carries the one derived number that is
- * actually actionable and nothing else. Deliberately three numbers total (eaten,
- * target, remaining) rather than the six the card used to show, where 1,934 and
- * 2,000 each appeared twice.
+ * Sam, 2026-11-25: "Band. For sure. Better to have a range as a target than a fixed
+ * number or you can end up obsessing over it." The band is not a new policy - it is
+ * the one squareBand() has used since 2026-10-14 (|v - kcalTarget| <= kcalGreen is
+ * green). The card was the only place still pretending the target was a point.
+ *
+ * Null when there is no target. A zero tolerance collapses to a single value rather
+ * than printing "2,000-2,000", which would look like a bug rather than a setting.
  */
-fun calorieHeroCaption(eaten: Int, target: Int): String {
+fun calorieBandLabel(target: Int, green: Int): String? {
+    if (target <= 0) return null
+    val g = green.coerceAtLeast(0)
+    if (g == 0) return "%,d kcal".format(Locale.US, target)
+    val lower = (target - g).coerceAtLeast(0)
+    return "%,d\u2013%,d kcal".format(Locale.US, lower, target + g)
+}
+
+/**
+ * The line under the calorie band: where today sits relative to it.
+ *
+ * Three states, and "in range" is deliberately the ordinary one. 2,098 against a
+ * 2,000 target with a 150 band is inside it - the old caption called that same day
+ * "98 over" while squareBand() called it green, so the card was judging him more
+ * harshly than its own maths. The display now agrees with the judgement.
+ *
+ * "nothing logged yet" rather than a figure, because "1,850 below range" at 8am reads
+ * as a failure when it is simply the start of a day.
+ */
+fun calorieHeroCaption(eaten: Int, target: Int, green: Int = 150): String {
     if (target <= 0) return "kcal eaten"
-    val remaining = target - eaten
+    if (eaten <= 0) return "nothing logged yet"
+    val g = green.coerceAtLeast(0)
+    val lower = (target - g).coerceAtLeast(0)
+    val upper = target + g
     return when {
-        remaining > 0 -> "%,d left".format(Locale.US, remaining)
-        remaining == 0 -> "on target"
-        else -> "%,d over".format(Locale.US, -remaining)
+        eaten > upper -> "%,d over range".format(Locale.US, eaten - upper)
+        eaten < lower -> "%,d below range".format(Locale.US, lower - eaten)
+        else -> "in range"
     }
 }
 

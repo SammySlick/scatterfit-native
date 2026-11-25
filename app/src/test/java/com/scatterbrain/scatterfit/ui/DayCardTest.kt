@@ -24,121 +24,6 @@ class DayCardTest {
     private val defaultBounds = ZoneBounds(130, 145, 160, 175)
 
     @Test
-    fun `tick count maths - training day has M equal 5 and counts all passing including weigh-in`() {
-        val daily = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0), // within goal tolerance -> ticked
-            steps = mapOf(today to 10500.0),        // >= 10k -> ticked
-            protein = mapOf(today to 160.0),        // >= 160g -> ticked
-            weight = mapOf(today to 82.4),          // weigh-in -> ticked
-            sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")), // sleep is context, never ticks
-            trainingMinutes = mapOf(today to 30.0), // training day with logged work -> ticked
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
-
-        val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = true)
-        assertEquals(5, ticks.totalTarget)
-        assertEquals(5, ticks.completedCount)
-        assertEquals("5 / 5", ticks.counterText)
-
-        // Without weigh-in -> 4 / 5
-        val dailyNoWeight = daily.copy(weight = emptyMap())
-        val ticksNoWeight = computeDayCardTicks(dailyNoWeight, defaultSettings, today, isTrainingDay = true)
-        assertEquals(5, ticksNoWeight.totalTarget)
-        assertEquals(4, ticksNoWeight.completedCount)
-        assertEquals("4 / 5", ticksNoWeight.counterText)
-    }
-
-    @Test
-    fun `tick count maths - rest day has M equal 4 and never auto-ticks training`() {
-        val daily = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0), // ticked
-            steps = mapOf(today to 10500.0),        // ticked
-            protein = mapOf(today to 160.0),        // ticked
-            weight = mapOf(today to 82.4),          // ticked (base item)
-            sleep = mapOf(today to SleepNight(today, 480.0, 60.0, 90.0, 270.0, 60.0, "${today}T07:00:00Z")),
-            trainingMinutes = mapOf(today to 0.0),  // rest day
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
-
-        val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = false)
-        assertEquals(4, ticks.totalTarget)
-        assertEquals(4, ticks.completedCount)
-        assertEquals("4 / 4", ticks.counterText)
-
-        // Without weigh-in -> 3 / 4
-        val dailyNoWeight = daily.copy(weight = emptyMap())
-        val ticksNoWeight = computeDayCardTicks(dailyNoWeight, defaultSettings, today, isTrainingDay = false)
-        assertEquals(4, ticksNoWeight.totalTarget)
-        assertEquals(3, ticksNoWeight.completedCount)
-        assertEquals("3 / 4", ticksNoWeight.counterText)
-    }
-
-    @Test
-    fun `tick count maths - rest day with training minutes still has M equal 4 and does not award training tick`() {
-        val daily = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0),
-            steps = mapOf(today to 10500.0),
-            protein = mapOf(today to 160.0),
-            weight = mapOf(today to 82.4),
-            trainingMinutes = mapOf(today to 45.0),
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
-
-        val ticks = computeDayCardTicks(daily, defaultSettings, today, isTrainingDay = false)
-        assertEquals(4, ticks.totalTarget)
-        assertEquals(4, ticks.completedCount)
-        assertEquals("4 / 4", ticks.counterText)
-    }
-
-    @Test
-    fun `tick count maths - weigh-in is counted as a base item and completedCount never exceeds totalTarget`() {
-        // Training day: all 4 base items passing + training -> 5 / 5 (never exceeds 5)
-        val dailyTraining = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0),
-            steps = mapOf(today to 10500.0),
-            protein = mapOf(today to 160.0),
-            trainingMinutes = mapOf(today to 30.0),
-            weight = mapOf(today to 82.4),
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
-        val ticksTraining = computeDayCardTicks(dailyTraining, defaultSettings, today, isTrainingDay = true)
-        assertEquals(5, ticksTraining.totalTarget)
-        assertEquals(5, ticksTraining.completedCount)
-        assertEquals("5 / 5", ticksTraining.counterText)
-
-        // Rest day: all 4 base items passing -> 4 / 4 (never exceeds 4)
-        val dailyRest = AssembledDaily(
-            caloriesEaten = mapOf(today to 2000.0),
-            steps = mapOf(today to 10500.0),
-            protein = mapOf(today to 160.0),
-            weight = mapOf(today to 82.4),
-            zoneBounds = defaultBounds,
-            zone = defaultZone
-        )
-        val ticksRest = computeDayCardTicks(dailyRest, defaultSettings, today, isTrainingDay = false)
-        assertEquals(4, ticksRest.totalTarget)
-        assertEquals(4, ticksRest.completedCount)
-        assertEquals("4 / 4", ticksRest.counterText)
-    }
-
-    @Test
-    fun `tick count maths - null daily reports 0 and counter is never negative`() {
-        val ticksTraining = computeDayCardTicks(null, defaultSettings, today, isTrainingDay = true)
-        assertEquals(5, ticksTraining.totalTarget)
-        assertEquals(0, ticksTraining.completedCount)
-        assertEquals("0 / 5", ticksTraining.counterText)
-
-        val ticksRest = computeDayCardTicks(null, defaultSettings, today, isTrainingDay = false)
-        assertEquals(4, ticksRest.totalTarget)
-        assertEquals(0, ticksRest.completedCount)
-        assertEquals("0 / 4", ticksRest.counterText)
-    }
-
-    @Test
     fun `bar colour logic - calories shows teal in progress, green in band, orange over goal, red over 10 percent`() {
         // Target 2500, greenTolerance 150
         // In progress (< target - 150) -> TEAL
@@ -275,22 +160,60 @@ class DayCardTest {
     // are gone with their rows: the hero and the pills now carry those numbers, and
     // keeping two ways of phrasing "how much is left" is how the card got noisy.
 
+    // --- Target shown as the band it already was, 2026-11-25 ---------------
+    // Sam: "Band. For sure. Better to have a range as a target than a fixed number
+    // or you can end up obsessing over it."
+    //
+    // These replace the three "N left / on target / N over" caption tests that stood
+    // here. That wording was the bug: it judged against a point while squareBand()
+    // judged the same day against target +- kcalGreen.
+
     @Test
-    fun `hero caption reads eaten, target and what is left`() {
-        assertEquals("860 left", calorieHeroCaption(1_240, 2_100))
-        assertEquals("on target", calorieHeroCaption(2_100, 2_100))
-        assertEquals("40 over", calorieHeroCaption(2_140, 2_100))
+    fun `band label prints the tolerance range the app judges against`() {
+        assertEquals("1,850\u20132,150 kcal", calorieBandLabel(2_000, 150))
     }
 
     @Test
-    fun `hero caption does not invent a remaining figure with no target`() {
-        assertEquals("kcal eaten", calorieHeroCaption(1_240, 0))
+    fun `band label has no range without a target`() {
+        assertNull(calorieBandLabel(0, 150))
     }
 
     @Test
-    fun `hero caption rounds to whole kcal so a rounding error is not a finding`() {
-        // 2,100 eaten exactly is on target; the caption must not say "0 left".
-        assertEquals("on target", calorieHeroCaption(2_100, 2_100))
+    fun `band label collapses a zero tolerance to one value rather than 2000-2000`() {
+        assertEquals("2,000 kcal", calorieBandLabel(2_000, 0))
+    }
+
+    @Test
+    fun `band label never prints a negative floor`() {
+        // A 100 kcal target with a 150 band would otherwise read "-50-250 kcal".
+        assertEquals("0\u2013250 kcal", calorieBandLabel(100, 150))
+    }
+
+    @Test
+    fun `caption calls a day inside the band in range, not over`() {
+        // The case that started this: 2,098 against 2,000 is 98 out, which is inside a
+        // 150 band, and the old caption called it "98 over" while the square went green.
+        assertEquals("in range", calorieHeroCaption(2_098, 2_000, 150))
+        assertEquals("in range", calorieHeroCaption(2_000, 2_000, 150))
+        assertEquals("in range", calorieHeroCaption(1_850, 2_000, 150))
+        assertEquals("in range", calorieHeroCaption(2_150, 2_000, 150))
+    }
+
+    @Test
+    fun `caption measures how far outside the band, not how far from the target`() {
+        // 2,300 is 300 over the target but only 150 over the band's ceiling.
+        assertEquals("150 over range", calorieHeroCaption(2_300, 2_000, 150))
+        assertEquals("200 below range", calorieHeroCaption(1_650, 2_000, 150))
+    }
+
+    @Test
+    fun `caption does not call an empty day a failure`() {
+        assertEquals("nothing logged yet", calorieHeroCaption(0, 2_000, 150))
+    }
+
+    @Test
+    fun `caption does not invent a band with no target`() {
+        assertEquals("kcal eaten", calorieHeroCaption(1_240, 0, 150))
     }
 
     @Test
