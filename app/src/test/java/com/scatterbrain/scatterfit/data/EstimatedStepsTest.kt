@@ -1,7 +1,8 @@
 package com.scatterbrain.scatterfit.data
 
 import com.scatterbrain.scatterfit.core.ScoringSettings
-import com.scatterbrain.scatterfit.ui.computeDayCardTicks
+import com.scatterbrain.scatterfit.ui.MetricBarColor
+import com.scatterbrain.scatterfit.ui.computeStepsBarColor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -58,35 +59,20 @@ class EstimatedStepsTest {
     }
 
     @Test
-    fun `tick triggers on combined total`() {
-        val dayKey = "2026-10-21"
+    fun `combined total is what clears the step target`() {
         val settings = ScoringSettings(stepTarget = 10000)
         val deviceSteps = 8000.0
         val estimate = 3000
 
-        val zone = java.time.ZoneId.of("UTC")
-        val bounds = ZoneBounds(130, 145, 160, 175)
+        // Device steps alone (8,000 < 10,000) do not clear the target.
+        assertEquals(MetricBarColor.TEAL, computeStepsBarColor(deviceSteps, settings.stepTarget))
 
-        // Device steps alone (8,000 < 10,000) does not meet target
-        val ticksBefore = computeDayCardTicks(
-            daily = AssembledDaily(steps = mapOf(dayKey to deviceSteps), zoneBounds = bounds, zone = zone),
-            settings = settings,
-            todayKey = dayKey,
-            isTrainingDay = false,
-            totalSteps = deviceSteps
-        )
-
-        // Combined total (11,000 >= 10,000) triggers the step tick
+        // Combined total (11,000 >= 10,000) does. This used to be observed through
+        // computeDayCardTicks, which the My Day checklist counter took with it on
+        // 2026-11-25; the bar colour is the same judgement the card still makes, so
+        // the coverage survives the removal instead of going with it.
         val combinedSteps = deviceSteps + estimate
-        val ticksAfter = computeDayCardTicks(
-            daily = AssembledDaily(steps = mapOf(dayKey to deviceSteps), zoneBounds = bounds, zone = zone),
-            settings = settings,
-            todayKey = dayKey,
-            isTrainingDay = false,
-            totalSteps = combinedSteps
-        )
-
-        assertEquals(ticksBefore.completedCount + 1, ticksAfter.completedCount)
+        assertEquals(MetricBarColor.GREEN, computeStepsBarColor(combinedSteps, settings.stepTarget))
     }
 
     @Test
