@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,9 +54,11 @@ import com.scatterbrain.scatterfit.core.GoalId
 import com.scatterbrain.scatterfit.core.MetricId
 import com.scatterbrain.scatterfit.core.SquareBand
 import com.scatterbrain.scatterfit.core.dayBefore
+import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
 import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
+import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.ScatterFitTheme
 import com.scatterbrain.scatterfit.ui.theme.StateBad
 import com.scatterbrain.scatterfit.ui.theme.StateLocked
@@ -67,15 +71,30 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/**
+ * Per-metric consistency for one day: every weighted metric as a week of squares,
+ * grouped into NEED WORK / GOING STEADY / GOOD WORK.
+ *
+ * Two shapes out of one screen, deliberately:
+ * - [onBackClick] non-null  -> pushed page, with back chevron and its own BackHandler.
+ * - [onBackClick] null      -> the Metrics tab. No chevron, no BackHandler (the host
+ *                              already returns to My Day), a Progress report doorway
+ *                              and a settings gear instead.
+ *
+ * One screen rather than a wrapper on purpose: the codebase already grew two
+ * parallel metric-detail systems, and a third would repeat that mistake.
+ */
 @Composable
 fun ConsistencyBreakdownScreen(
     momentumSource: MomentumSource,
     dayKey: String,
-    onBackClick: () -> Unit,
+    onBackClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     onMetricClick: (MetricId) -> Unit = {},
     initialScrollPosition: Int = 0,
     onScrollPositionChanged: (Int) -> Unit = {},
+    onOpenProgressReport: (() -> Unit)? = null,
+    onSettingsClick: (() -> Unit)? = null,
 ) {
     val scrollState = rememberScrollState()
     LaunchedEffect(Unit) {
@@ -90,12 +109,18 @@ fun ConsistencyBreakdownScreen(
             .collect { onScrollPositionChanged(it) }
     }
 
-    val handleBack = {
-        onScrollPositionChanged(0)
-        onBackClick()
+    val handleBack: (() -> Unit)? = onBackClick?.let { pop ->
+        {
+            onScrollPositionChanged(0)
+            pop()
+        }
     }
 
-    BackHandler(onBack = handleBack)
+    // Only a pushed page owns hardware back. As a tab, the host's BackHandler
+    // already returns to My Day, and two of them would fight over one press.
+    if (handleBack != null) {
+        BackHandler(onBack = handleBack)
+    }
 
     // Current momentum score & band
     val momentumScoreRaw = momentumSource.momentumForDay(dayKey)
@@ -134,45 +159,91 @@ fun ConsistencyBreakdownScreen(
             .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. TOP BAR: reuse the metric-page chrome pattern exactly
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            IconButton(
-                onClick = handleBack,
-                modifier = Modifier.size(36.dp)
+        val today = remember { com.scatterbrain.scatterfit.core.todayKey() }
+        val dayLabel = remember(dayKey, today) {
+            if (dayKey == today) {
+                "Today"
+            } else {
+                runCatching {
+                    val date = LocalDate.parse(dayKey)
+                    date.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US))
+                }.getOrDefault(dayKey)
+            }
+        }
+
+        if (handleBack != null) {
+            // 1a. PUSHED PAGE: reuse the metric-page chrome pattern exactly
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                ChevronLeftIcon(
-                    modifier = Modifier.size(16.dp),
-                    tint = TextForeground
+                IconButton(
+                    onClick = { handleBack() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    ChevronLeftIcon(
+                        modifier = Modifier.size(16.dp),
+                        tint = TextForeground
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = "Momentum — Breakdown",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextForeground
+                    )
+                    Text(
+                        text = dayLabel,
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
+                }
+            }
+        } else {
+            // 1b. TAB: the Progress report was only ever reachable from the Matrix
+            // page, so its doorway moves here rather than dying with that page.
+            if (onOpenProgressReport != null) {
+                Text(
+                    text = "Progress report  ›",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AccentTeal,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenProgressReport() }
+                        .padding(vertical = 12.dp)
                 )
             }
 
-            Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Momentum — Breakdown",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "Metrix",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
                     color = TextForeground
                 )
-                val today = remember { com.scatterbrain.scatterfit.core.todayKey() }
-                val dayLabel = remember(dayKey, today) {
-                    if (dayKey == today) {
-                        "Today"
-                    } else {
-                        runCatching {
-                            val date = LocalDate.parse(dayKey)
-                            date.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.US))
-                        }.getOrDefault(dayKey)
+                if (onSettingsClick != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(SecondaryFill)
+                            .clickable { onSettingsClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        SettingsIcon(
+                            modifier = Modifier.size(18.dp),
+                            tint = TextMuted
+                        )
                     }
                 }
-                Text(
-                    text = dayLabel,
-                    fontSize = 12.sp,
-                    color = TextMuted
-                )
             }
         }
 

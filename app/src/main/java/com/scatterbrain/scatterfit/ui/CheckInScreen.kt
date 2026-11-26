@@ -21,6 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -56,6 +58,7 @@ import com.scatterbrain.scatterfit.data.DailyRepository
 import com.scatterbrain.scatterfit.data.WeeklyCheckInStorage
 import com.scatterbrain.scatterfit.ui.theme.AccentTeal
 import com.scatterbrain.scatterfit.ui.theme.AppBackground
+import com.scatterbrain.scatterfit.ui.theme.AppCardSurface
 import com.scatterbrain.scatterfit.ui.theme.BorderDefault
 import com.scatterbrain.scatterfit.ui.theme.SecondaryFill
 import com.scatterbrain.scatterfit.ui.theme.TextForeground
@@ -78,7 +81,8 @@ private sealed class CheckInDisplayRow {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CheckInScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    momentumSource: MomentumSource? = null,
 ) {
     val scrollState = rememberScrollState()
     val context = LocalContext.current
@@ -87,11 +91,28 @@ fun CheckInScreen(
     var weekAnchor by remember { mutableStateOf(todayKey()) }
     var editingRow by remember { mutableStateOf<CheckInRow?>(null) }
 
+    val momentum: MomentumSource = remember(momentumSource) {
+        momentumSource ?: TodayFacadeMomentumSource()
+    }
+    var momentumWindowDays by remember { mutableIntStateOf(7) }
+
     val today = remember { todayKey() }
     val days = remember(weekAnchor) { weekKeysFor(weekAnchor) }
     val weekStart = days.first()
     val currentWeekStart = remember(today) { weekKeysFor(today).first() }
     val isCurrentWeek = weekStart == currentWeekStart
+
+    // The spider's windows end on the WEEK you are reviewing, not on today, so
+    // paging back a week shows that week's shape. Clamped to today because a
+    // window ending on this Sunday would spend its length averaging days that
+    // haven't happened yet, and missing days drag every spoke down.
+    val momentumAnchor = remember(days, today) {
+        val weekEnd = days.last()
+        if (weekEnd > today) today else weekEnd
+    }
+    val spokes = remember(momentum, momentumWindowDays, momentumAnchor) {
+        buildSpokeItems(momentum, momentumWindowDays, momentumAnchor)
+    }
 
     val daily by DailyRepository.daily.collectAsState()
     val checkInRecord = remember(weekStart, saveTick) { storage.load(weekStart) }
@@ -278,6 +299,49 @@ fun CheckInScreen(
                 }
             }
             Spacer(modifier = Modifier.width(56.dp))
+        }
+
+        // (2b) MOMENTUM SHAPE
+        // Lifted from the Matrix page, which Sam retired on 2026-11-25; the
+        // Momentum Rework Spec v1 had always put this graph in the check-in.
+        // It sits above the rows because the shape is the context for the week
+        // you are about to fill in, not a reward at the bottom of a long form.
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = AppCardSurface),
+            border = BorderStroke(1.dp, BorderDefault)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "MOMENTUM",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextMuted,
+                        letterSpacing = 1.sp
+                    )
+                    MomentumWindowSelector(
+                        selectedDays = momentumWindowDays,
+                        onSelect = { momentumWindowDays = it }
+                    )
+                }
+                MomentumSpiderGraph(
+                    spokes = spokes,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                )
+            }
         }
 
         // (CHANGE 4) HINT LINE

@@ -117,20 +117,6 @@ fun LightningIcon(
 }
 
 @Composable
-fun CompassIcon(
-    modifier: Modifier = Modifier,
-    tint: Color = Color.Gray,
-    strokeWidthDp: Dp = 1.5.dp
-) {
-    Icon(
-        painter = painterResource(id = R.drawable.ic_compass),
-        contentDescription = "Compass",
-        tint = tint,
-        modifier = modifier
-    )
-}
-
-@Composable
 fun AskChatIcon(
     modifier: Modifier = Modifier,
     tint: Color = Color.Gray,
@@ -470,8 +456,21 @@ fun ScatterFitIconsPreview() {
             PulseIcon()
             HeartPulseIcon()
             LightningIcon()
-            CompassIcon()
+            ChartBarIcon()
             AskChatIcon()
         }
     }
+}
+
+@Composable
+fun ChartBarIcon(
+    modifier: Modifier = Modifier,
+    tint: Color = TextForeground
+) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_chart_bar),
+        contentDescription = "Metrix",
+        tint = tint,
+        modifier = modifier
+    )
 }

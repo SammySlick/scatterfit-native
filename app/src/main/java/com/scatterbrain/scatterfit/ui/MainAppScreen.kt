@@ -50,7 +50,10 @@ import kotlinx.coroutines.delay
 
 enum class AppTab {
     MY_DAY,
-    ODYSSEY,
+    /** Was ODYSSEY, the Matrix page. Renamed with the page: the tab shows the
+     *  per-metric consistency squares now, and a tab called ODYSSEY pointing at
+     *  metrics would be a fossil. */
+    METRICS,
     FOOD,
     TRAINING,
     CHECKIN
@@ -83,6 +86,10 @@ fun MainAppScreen(
     }
 
     var selectedTab by remember { mutableStateOf(AppTab.MY_DAY) }
+
+    // The Metrics tab is always today: the squares are a calendar week ending
+    // today. Remembered rather than recomputed per frame, matching MetricScreen.
+    val metricsDay = remember { com.scatterbrain.scatterfit.core.todayKey() }
 
     // The in-progress workout, read here so its banner can follow him across every tab.
     // TrainingScreen owns the session itself; this is only the on-disk copy, used to show
@@ -182,10 +189,12 @@ fun MainAppScreen(
                     onOpenTraining = { selectedTab = AppTab.TRAINING },
                     foodViewModel = foodViewModel
                 )
-                AppTab.ODYSSEY -> OdysseyScreen(
+                AppTab.METRICS -> ConsistencyBreakdownScreen(
                     momentumSource = momentumSource,
+                    dayKey = metricsDay,
+                    // Null onBackClick = tab mode: no back chevron, no inner BackHandler.
+                    onOpenProgressReport = { progressReportOpen = true },
                     onSettingsClick = onSettingsClick,
-                    onOpenProgressReport = { progressReportOpen = true }
                 )
                 AppTab.FOOD -> {
                     FoodHomeScreen(
@@ -204,7 +213,7 @@ fun MainAppScreen(
                         onPlayerOpenChanged = { isPlayerOpen = it }
                     )
                 }
-                AppTab.CHECKIN -> CheckInScreen()
+                AppTab.CHECKIN -> CheckInScreen(momentumSource = momentumSource)
             }
             }
         }
@@ -306,14 +315,13 @@ fun BottomNavBar(
             )
 
             BottomNavItem(
-                label = "Matrix",
-                isSelected = selectedTab == AppTab.ODYSSEY,
-                onClick = { onTabSelected(AppTab.ODYSSEY) },
+                label = "Metrix",
+                isSelected = selectedTab == AppTab.METRICS,
+                onClick = { onTabSelected(AppTab.METRICS) },
                 icon = { tint ->
-                    CompassIcon(
+                    ChartBarIcon(
                         modifier = Modifier.size(24.dp),
-                        tint = tint,
-                        strokeWidthDp = 1.8.dp
+                        tint = tint
                     )
                 }
             )
