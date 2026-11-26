@@ -100,6 +100,10 @@ fun MainAppScreen(
     var resumeRequest by remember { mutableIntStateOf(0) }
     var isPlayerOpen by remember { mutableStateOf(false) }
     var progressReportOpen by remember { mutableStateOf(false) }
+    // Consistency breakdown is no longer the Metrix tab: the tab is the chart
+    // list, and the squares keep a doorway from its footer rather than being
+    // deleted a day after they were built.
+    var consistencyOpen by remember { mutableStateOf(false) }
 
     // Coming back to the app is the moment the draft can have changed underneath us.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -130,6 +134,19 @@ fun MainAppScreen(
     if (progressReportOpen) {
         BackHandler { progressReportOpen = false }
         ProgressReportScreen(onBack = { progressReportOpen = false })
+        return
+    }
+
+    if (consistencyOpen) {
+        BackHandler { consistencyOpen = false }
+        ConsistencyBreakdownScreen(
+            momentumSource = momentumSource,
+            dayKey = metricsDay,
+            onOpenProgressReport = { progressReportOpen = true },
+            onSettingsClick = onSettingsClick,
+            onBackClick = { consistencyOpen = false },
+            modifier = modifier.fillMaxSize(),
+        )
         return
     }
 
@@ -189,12 +206,9 @@ fun MainAppScreen(
                     onOpenTraining = { selectedTab = AppTab.TRAINING },
                     foodViewModel = foodViewModel
                 )
-                AppTab.METRICS -> ConsistencyBreakdownScreen(
-                    momentumSource = momentumSource,
-                    dayKey = metricsDay,
-                    // Null onBackClick = tab mode: no back chevron, no inner BackHandler.
+                AppTab.METRICS -> MetrixScreen(
                     onOpenProgressReport = { progressReportOpen = true },
-                    onSettingsClick = onSettingsClick,
+                    onOpenConsistency = { consistencyOpen = true },
                 )
                 AppTab.FOOD -> {
                     FoodHomeScreen(

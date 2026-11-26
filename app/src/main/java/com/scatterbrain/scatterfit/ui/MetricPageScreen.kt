@@ -38,6 +38,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -45,13 +50,13 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.scatterbrain.scatterfit.core.DayRows
 import com.scatterbrain.scatterfit.core.MovingAverage
 import com.scatterbrain.scatterfit.core.lastNDayKeys
@@ -522,7 +527,7 @@ fun MetricPageScreen(
  * - Line: 2dp BrandPrimaryLime; sparse null points rendered as gaps
  */
 /** Second series resolved to the same day keys, with its own formatter. */
-private data class SecondaryPoints(
+internal data class SecondaryPoints(
     val label: String,
     val unit: String,
     val points: List<MetricPoint>,
@@ -555,10 +560,15 @@ private fun DrawScope.drawConnectedSeries(
     strokeWidth: Float,
     dashBridges: Boolean = true,
     bridgeColor: Color = color,
+    /** Plot bounds — the Y-axis gutter means the series no longer spans the
+     *  full canvas width. */
+    left: Float = 0f,
+    right: Float = size.width,
 ) {
     if (n == 0) return
-    val slotWidth = if (n > 1) size.width / (n - 1) else size.width
-    fun xOf(i: Int): Float = if (n > 1) i * slotWidth else size.width / 2f
+    val plotW = (right - left).coerceAtLeast(1f)
+    val slotWidth = if (n > 1) plotW / (n - 1) else plotW
+    fun xOf(i: Int): Float = if (n > 1) left + i * slotWidth else left + plotW / 2f
 
     val real = (0 until n).filter { valueAt(it) != null }
     if (real.isEmpty()) return
@@ -584,7 +594,7 @@ private fun DrawScope.drawConnectedSeries(
 }
 
 @Composable
-private fun MetricChartCard(
+internal fun MetricChartCard(
     points: List<MetricPoint>,
     chartType: MetricChartType,
     formatValue: (Double?) -> String,
@@ -592,13 +602,34 @@ private fun MetricChartCard(
     secondary: SecondaryPoints? = null,
     average: List<Double?> = emptyList(),
     primaryLabel: String? = null,
-    modifier: Modifier = Modifier
+    /** Dashed reference line at the metric's target, and a "target" label on it. */
+    targetValue: Double? = null,
+    chartHeight: Dp = 140.dp,
+    /** Short X label for a day key. Passed in so a 7-day chart can use weekdays. */
+    xLabel: (String) -> String = ::shortAxisDay,
+    modifier: Modifier = Modifier,
+    /** When set, the whole card opens the metric's full page. */
+    onClick: (() -> Unit)? = null,
+    /** Line/bar colour. The Metrix list passes the metric's domain hue; the
+     *  full page keeps the teal so one metric does not change colour when you
+     *  open it. */
+    seriesColor: Color = AccentTeal,
+    /** Title block above the chart — used by the Metrix list for name + value. */
+    header: (@Composable () -> Unit)? = null,
 ) {
     var selectedIndex by remember(points) { mutableIntStateOf(-1) }
 
     val nonNullValues = points.mapNotNull { it.value }
-    val (minVal, maxVal) = scaleOf(nonNullValues, chartType == MetricChartType.LINE)
-    val range = (maxVal - minVal).coerceAtLeast(1.0)
+    val (dataMin, dataMax) = scaleOf(nonNullValues, chartType == MetricChartType.LINE)
+    // The axis must also fit the target line. A target above every reading is
+    // the normal case while you are working toward it, and clamped to the data
+    // it would silently drop out of the plot.
+    val axisMin = targetValue?.let { minOf(dataMin, it) } ?: dataMin
+    val axisMax = targetValue?.let { maxOf(dataMax, it) } ?: dataMax
+    val ticks = remember(axisMin, axisMax) { niceAxisTicks(axisMin, axisMax) }
+    val plotMin = ticks.firstOrNull() ?: axisMin
+    val plotMax = ticks.lastOrNull() ?: axisMax
+    val range = (plotMax - plotMin).coerceAtLeast(0.1)
 
     // Secondary gets its own scale — kg and % share no unit.
     val secValues = secondary?.points?.mapNotNull { it.value } ?: emptyList()
@@ -608,8 +639,18 @@ private fun MetricChartCard(
     val hasAverage = average.size == points.size && average.any { it != null }
     val latestAverage = average.lastOrNull { it != null }
 
+    val measurer = rememberTextMeasurer()
+    // 10sp floor: the legibility pass cut sub-12sp UI text, and an axis label
+    // you have to lean in for is not a label.
+    val axisStyle = remember { TextStyle(fontSize = 10.sp, color = TextMuted) }
+
+    val yGutter = 34.dp
+    val xBand = 16.dp
+
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = AppCardSurface),
         border = BorderStroke(1.dp, BorderDefault)
@@ -618,6 +659,8 @@ private fun MetricChartCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            header?.invoke()
+
             // Tooltip header on tap — both measures for the same day.
             if (selectedIndex in points.indices) {
                 val pt = points[selectedIndex]
@@ -637,7 +680,7 @@ private fun MetricChartCard(
                             text = formatValue(pt.value),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = AccentTeal
+                            color = seriesColor
                         )
                         if (secondary != null && secPt != null) {
                             Text(
@@ -656,14 +699,19 @@ private fun MetricChartCard(
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
+                    .height(chartHeight)
                     .pointerInput(points) {
                         detectTapGestures { offset ->
                             val n = points.size
                             if (n > 0) {
-                                val colWidth = size.width / n
-                                val index = (offset.x / colWidth).toInt().coerceIn(0, n - 1)
-                                selectedIndex = index
+                                val gutter = yGutter.toPx()
+                                val plotW = (size.width - gutter - 6.dp.toPx()).coerceAtLeast(1f)
+                                val rel = ((offset.x - gutter) / plotW).coerceIn(0f, 1f)
+                                selectedIndex = when {
+                                    n == 1 -> 0
+                                    chartType == MetricChartType.BAR -> (rel * n).toInt().coerceIn(0, n - 1)
+                                    else -> (rel * (n - 1)).roundToInt().coerceIn(0, n - 1)
+                                }
                             }
                         }
                     }
@@ -671,50 +719,106 @@ private fun MetricChartCard(
                 val w = size.width
                 val h = size.height
                 val n = points.size
-                val inset = 8.dp.toPx()
 
-                // Reference lines: max and min (MutedFill 1dp)
+                val plotLeft = yGutter.toPx()
+                val plotRight = w - 6.dp.toPx()
+                val plotW = (plotRight - plotLeft).coerceAtLeast(1f)
+                val plotTop = 8.dp.toPx()
+                val plotBottom = h - xBand.toPx()
+                val plotH = (plotBottom - plotTop).coerceAtLeast(1f)
+
+                fun yOf(v: Double): Float =
+                    plotBottom - (((v - plotMin) / range).toFloat().coerceIn(0f, 1f) * plotH)
+
+                fun xOfLine(i: Int): Float =
+                    if (n > 1) plotLeft + i * (plotW / (n - 1)) else plotLeft + plotW / 2f
+
+                fun xOfBar(i: Int): Float = plotLeft + (i + 0.5f) * (plotW / n)
+
+                // Y gridlines and their numbers. Ticks are snapped to round
+                // steps, so these read as a scale rather than as noise.
+                ticks.forEach { t ->
+                    val y = yOf(t)
+                    if (y in plotTop..plotBottom) {
+                        drawLine(
+                            color = MutedFill,
+                            start = Offset(plotLeft, y),
+                            end = Offset(plotRight, y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+                    }
+                    val layout = measurer.measure(AnnotatedString(shortAxisNumber(t)), axisStyle)
+                    drawText(
+                        textLayoutResult = layout,
+                        topLeft = Offset(
+                            x = (plotLeft - 6.dp.toPx() - layout.size.width).coerceAtLeast(0f),
+                            y = y - layout.size.height / 2f
+                        )
+                    )
+                }
+
+                // Baseline: the one line that is always the floor of the plot.
                 drawLine(
                     color = MutedFill,
-                    start = Offset(0f, 0f),
-                    end = Offset(w, 0f),
-                    strokeWidth = 1.dp.toPx()
-                )
-                drawLine(
-                    color = MutedFill,
-                    start = Offset(0f, h),
-                    end = Offset(w, h),
+                    start = Offset(plotLeft, plotBottom),
+                    end = Offset(plotRight, plotBottom),
                     strokeWidth = 1.dp.toPx()
                 )
 
                 if (n == 0) return@Canvas
 
-                // One mapping per chart type, so the average line lands on the
-                // same scale as the thing it averages.
-                val yOf: (Double) -> Float =
-                    if (chartType == MetricChartType.BAR) {
-                        { v -> h - ((v - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 8.dp.toPx()) }
-                    } else {
-                        { v -> h - inset - ((v - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 2 * inset) }
+                // Where the finger landed. Drawn under the series so it reads as
+                // a guide, not as data.
+                if (selectedIndex in 0 until n) {
+                    val sx = if (chartType == MetricChartType.BAR) xOfBar(selectedIndex) else xOfLine(selectedIndex)
+                    drawLine(
+                        color = TextMuted,
+                        start = Offset(sx, plotTop),
+                        end = Offset(sx, plotBottom),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+
+                // Target line: dashed and labelled on the line itself, so it
+                // needs no legend entry to be understood.
+                targetValue?.let { t ->
+                    if (t in plotMin..plotMax) {
+                        val ty = yOf(t)
+                        drawLine(
+                            color = TextMuted,
+                            start = Offset(plotLeft, ty),
+                            end = Offset(plotRight, ty),
+                            strokeWidth = 1.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(
+                                floatArrayOf(4.dp.toPx(), 4.dp.toPx()), 0f
+                            )
+                        )
+                        val layout = measurer.measure(AnnotatedString("target"), axisStyle)
+                        drawText(
+                            textLayoutResult = layout,
+                            topLeft = Offset(
+                                x = plotRight - layout.size.width,
+                                y = (ty - layout.size.height - 1.dp.toPx()).coerceAtLeast(0f)
+                            )
+                        )
                     }
+                }
 
                 if (chartType == MetricChartType.BAR) {
-                    val slotWidth = w / n
+                    val slotWidth = plotW / n
                     val barWidth = (slotWidth * 0.70f).coerceIn(4f, 24f)
 
                     points.forEachIndexed { i, pt ->
                         val v = pt.value ?: return@forEachIndexed // never plot a missing day as 0
-                        val barHeight = ((v - minVal) / range).toFloat().coerceIn(0f, 1f) * (h - 8.dp.toPx())
-                        val x = i * slotWidth + (slotWidth - barWidth) / 2f
-                        val y = h - barHeight
+                        val top = yOf(v)
+                        val barHeight = (plotBottom - top).coerceAtLeast(2.dp.toPx())
+                        val x = plotLeft + i * slotWidth + (slotWidth - barWidth) / 2f
                         val isSelected = i == selectedIndex
 
-                        val barColor = if (isSelected) AccentTeal else AccentTeal.copy(alpha = 0.60f)
-
                         drawRoundRect(
-                            color = barColor,
-                            topLeft = Offset(x, y),
-                            size = Size(barWidth, barHeight.coerceAtLeast(2.dp.toPx())),
+                            color = if (isSelected) seriesColor else seriesColor.copy(alpha = 0.60f),
+                            topLeft = Offset(x, plotBottom - barHeight),
+                            size = Size(barWidth, barHeight),
                             cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
                         )
                     }
@@ -724,9 +828,13 @@ private fun MetricChartCard(
                         drawConnectedSeries(
                             n = n,
                             valueAt = { i -> sec.points.getOrNull(i)?.value },
-                            yOf = { v -> h - inset - (((v - secMin) / secRange).toFloat().coerceIn(0f, 1f) * (h - 2 * inset)) },
+                            yOf = { v ->
+                                plotBottom - (((v - secMin) / secRange).toFloat().coerceIn(0f, 1f) * plotH)
+                            },
                             color = sec.color,
                             strokeWidth = 2.dp.toPx(),
+                            left = plotLeft,
+                            right = plotRight,
                         )
                     }
 
@@ -735,8 +843,10 @@ private fun MetricChartCard(
                         n = n,
                         valueAt = { i -> points.getOrNull(i)?.value },
                         yOf = yOf,
-                        color = AccentTeal,
+                        color = seriesColor,
                         strokeWidth = 2.dp.toPx(),
+                        left = plotLeft,
+                        right = plotRight,
                     )
                 }
 
@@ -750,36 +860,50 @@ private fun MetricChartCard(
                         color = AverageLine,
                         strokeWidth = 1.5.dp.toPx(),
                         dashBridges = false,
+                        left = plotLeft,
+                        right = plotRight,
                     )
                 }
 
                 // Dots on top: a dot means "there is a reading here". The dashes
                 // between two dots mean "there is not".
                 if (chartType != MetricChartType.BAR) {
-                    val slotWidth = if (n > 1) w / (n - 1) else w
                     points.forEachIndexed { i, pt ->
                         if (pt.value != null) {
-                            val x = if (n > 1) i * slotWidth else w / 2f
                             val isSelected = i == selectedIndex
                             drawCircle(
-                                color = if (isSelected) TextForeground else AccentTeal,
+                                color = if (isSelected) TextForeground else seriesColor,
                                 radius = if (isSelected) 5.dp.toPx() else 3.dp.toPx(),
-                                center = Offset(x, yOf(pt.value))
+                                center = Offset(xOfLine(i), yOf(pt.value))
                             )
                         }
                     }
                 }
+
+                // X labels: first and last always, evenly spaced between. Clamped
+                // inside the canvas so the last one cannot be cut in half.
+                axisLabelIndexes(n).forEach { i ->
+                    val layout = measurer.measure(AnnotatedString(xLabel(points[i].dayKey)), axisStyle)
+                    val centre = if (chartType == MetricChartType.BAR) xOfBar(i) else xOfLine(i)
+                    drawText(
+                        textLayoutResult = layout,
+                        topLeft = Offset(
+                            x = (centre - layout.size.width / 2f).coerceIn(0f, (w - layout.size.width).coerceAtLeast(0f)),
+                            y = plotBottom + 3.dp.toPx()
+                        )
+                    )
+                }
             }
 
-            // Legend. Names and units, because the axes are hidden: a colour on
-            // its own means nothing.
+            // Legend. Units live on the Y axis now, so this names the series
+            // rather than substituting for the axis.
             val legendPrimary = primaryLabel ?: secondaryPrimaryLabel(points, formatValue)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                LegendDot(color = AccentTeal, label = legendPrimary)
+                LegendDot(color = seriesColor, label = legendPrimary)
                 secondary?.let { sec -> LegendDot(color = sec.color, label = sec.label) }
                 if (hasAverage && latestAverage != null) {
                     LegendDot(
