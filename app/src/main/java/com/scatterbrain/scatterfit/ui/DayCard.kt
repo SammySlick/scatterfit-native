@@ -161,9 +161,10 @@ fun DayCard(
     val kcalGreen = effectiveSettings.tolerances.kcalGreen
     val alcoholKcal = daily?.alcoholKcal?.get(dayKey) ?: 0.0
     val foodKcal = consumedKcal
-        ?: ((daily?.caloriesEaten?.get(dayKey) ?: 0.0) - alcoholKcal).coerceAtLeast(0.0)
+        ?: foodKcalFromTotals(daily?.caloriesEaten?.get(dayKey), alcoholKcal)
     val totalKcal = foodKcal + alcoholKcal
     val kcalEaten = totalKcal.roundToInt()
+    val heroSplitText = calorieSplitLabel(foodKcal, alcoholKcal)
     // Over the band's CEILING, not over the point target. Sam, 2026-11-25: "Band. For
     // sure. Better to have a range as a target than a fixed number or you can end up
     // obsessing over it." The app already judged with a band (kcalTarget +- kcalGreen);
@@ -243,6 +244,23 @@ fun DayCard(
                             fontSize = 12.sp,
                             color = heroCaptionColor
                         )
+                        // "1,391 food + 443 alcohol", only on days with a drink.
+                        //
+                        // Sam, 2026-11-26: "I don't think the alcohol calories are
+                        // being added to the total any more? I can't see anywhere they
+                        // are." They were being added - this line is what he used to be
+                        // able to check it against, and run 226 deleted it with the
+                        // calorie bar. A total that jumps 400 kcal with nothing on
+                        // screen accounting for the jump is indistinguishable from a
+                        // bug, whatever the arithmetic says.
+                        if (heroSplitText != null) {
+                            Text(
+                                text = heroSplitText,
+                                fontSize = 12.sp,
+                                color = DomainDrink,
+                                lineHeight = 16.sp
+                            )
+                        }
                     }
 
                     // Right: Back to today if this is not today.
@@ -486,6 +504,46 @@ fun DayCard(
         }
     }
 }
+
+/**
+ * Food calories recovered from a snapshot total that already includes alcohol.
+ *
+ * Daily.caloriesEaten deliberately adds drink kcal ("a pint is energy in, MFP
+ * parity"), so the alcohol rollup has to come back out before alcohol is added
+ * again — otherwise a four-pint Saturday counts its beer twice. The coerceAtLeast
+ * matters: a snapshot whose alcohol exceeds its own total (a rollup that outran a
+ * sync) would otherwise produce negative food intake.
+ */
+fun foodKcalFromTotals(caloriesEaten: Double?, alcoholKcal: Double): Double =
+    ((caloriesEaten ?: 0.0) - alcoholKcal).coerceAtLeast(0.0)
+
+/**
+ * "1,391 food + 443 alcohol", or null when the day has no drinks.
+ *
+ * The composition, not a second total: it exists so a hero that jumps by 400 kcal
+ * says why. Null rather than "1,391 food + 0 alcohol" because a breakdown that is
+ * always on screen is the "too many numbers" problem (Sam, 2026-11-24) again.
+ */
+fun calorieSplitLabel(foodKcal: Double, alcoholKcal: Double): String? {
+    if (alcoholKcal <= 0.0) return null
+    return String.format(
+        Locale.US,
+        "%,d food + %,d alcohol",
+        foodKcal.roundToInt(),
+        alcoholKcal.roundToInt()
+    )
+}
+
+/**
+ * Total intake for the food log's big number: food plus drink kcal.
+ *
+ * The food log used to show food only while My Day showed food + alcohol, so the
+ * same day read differently on two screens and the smaller figure was the one
+ * above the add button. Alcohol has no protein, carbs or fat, so the macro rows
+ * stay food-only - only the energy total is additive.
+ */
+fun totalIntakeKcal(foodKcal: Int, alcoholKcal: Int): Int =
+    foodKcal + alcoholKcal.coerceAtLeast(0)
 
 /**
  * The calorie target as the range the app already judges against: target +- green.

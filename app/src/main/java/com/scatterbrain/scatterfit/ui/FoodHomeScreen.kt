@@ -309,8 +309,15 @@ fun FoodHomeScreen(
         }.getOrDefault(activeDay)
     }
 
-    // Totals for active day derived directly from displayMeals for immediate 0ms updates
-    val totalKcal = displayMeals.sumOf { it.kcal }.roundToInt()
+    // Totals for active day derived directly from displayMeals for immediate 0ms updates.
+    //
+    // Drink kcal joins the ENERGY total only. The food log used to show food alone
+    // while My Day and the scoring layer used food + alcohol, so one day read two
+    // different ways and the smaller number sat above the add button. Macros stay
+    // food-only: alcohol carries no protein, carbs or fat, so padding them would be
+    // inventing grams that were never eaten.
+    val dayAlcoholKcal = (repoDaily?.alcoholKcal?.get(activeDay) ?: 0.0).roundToInt()
+    val totalKcal = totalIntakeKcal(displayMeals.sumOf { it.kcal }.roundToInt(), dayAlcoholKcal)
     val totalProtein = displayMeals.sumOf { it.protein ?: 0.0 }.roundToInt()
     val totalCarbs = displayMeals.sumOf { it.carbs ?: 0.0 }.roundToInt()
     val totalFat = displayMeals.sumOf { it.fat ?: 0.0 }.roundToInt()
@@ -575,7 +582,6 @@ fun FoodHomeScreen(
                             )
 
                             // Fourth row: Alcohol (CONSUMED view only, and only when alcohol kcal > 0)
-                            val dayAlcoholKcal = (repoDaily?.alcoholKcal?.get(activeDay) ?: 0.0).roundToInt()
                             if (macroMode == MacroCardMode.CONSUMED && dayAlcoholKcal > 0) {
                                 AlcoholMiniRow(
                                     alcoholKcal = dayAlcoholKcal,
