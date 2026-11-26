@@ -727,8 +727,11 @@ internal fun MetricChartCard(
                 val plotBottom = h - xBand.toPx()
                 val plotH = (plotBottom - plotTop).coerceAtLeast(1f)
 
-                fun yOf(v: Double): Float =
+                // A lambda, not a local fun: it is passed to drawConnectedSeries
+                // as a value, and a local function cannot be referenced that way.
+                val yOf: (Double) -> Float = { v ->
                     plotBottom - (((v - plotMin) / range).toFloat().coerceIn(0f, 1f) * plotH)
+                }
 
                 fun xOfLine(i: Int): Float =
                     if (n > 1) plotLeft + i * (plotW / (n - 1)) else plotLeft + plotW / 2f
